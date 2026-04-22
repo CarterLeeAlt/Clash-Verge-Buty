@@ -1,0 +1,212 @@
+import { useEffect, useState } from "react";
+import { useLockFn } from "ahooks";
+import { CheckCircleOutlineRounded } from "@mui/icons-material";
+import { alpha, Box, ListItemButton, styled, Typography } from "@mui/material";
+import { BaseLoading } from "@/components/base";
+import delayManager from "@/services/delay";
+import { useVerge } from "@/hooks/use-verge";
+
+interface Props {
+  groupName: string;
+  proxy: IProxyItem;
+  selected: boolean;
+  showType?: boolean;
+  onClick?: (name: string) => void;
+}
+
+// 多列布局
+export const ProxyItemMini = (props: Props) => {
+  const { groupName, proxy, selected, showType = true, onClick } = props;
+
+  // -1/<=0 为 不显示
+  // -2 为 loading
+  const [delay, setDelay] = useState(-1);
+  const { verge } = useVerge();
+  const rawTimeout = Number(verge?.default_latency_timeout);
+  const timeout =
+    Number.isInteger(rawTimeout) && rawTimeout > 0 ? rawTimeout : 10000;
+
+  useEffect(() => {
+    delayManager.setListener(proxy.name, groupName, setDelay);
+
+    return () => {
+      delayManager.removeListener(proxy.name, groupName);
+    };
+  }, [proxy.name, groupName]);
+
+  useEffect(() => {
+    if (!proxy) return;
+    setDelay(delayManager.getDelayFix(proxy, groupName));
+  }, [proxy]);
+
+  const onDelay = useLockFn(async () => {
+    setDelay(-2);
+    setDelay(await delayManager.checkDelay(proxy.name, groupName, timeout));
+  });
+
+  return (
+    <ListItemButton
+      dense
+      selected={selected}
+      onClick={() => onClick?.(proxy.name)}
+      sx={[
+        {
+          height: 56,
+          borderRadius: 1.5,
+          pl: 1.5,
+          pr: 1,
+          justifyContent: "space-between",
+          alignItems: "center",
+        },
+        ({ palette: { mode, primary } }) => {
+          const bgcolor = mode === "light" ? "#ffffff" : "#24252f";
+          const color = mode === "light" ? primary.main : primary.light;
+          const showDelay = delay > 0;
+          const selectColor = mode === "light" ? primary.main : primary.light;
+
+          return {
+            "&:hover .the-check": { display: !showDelay ? "block" : "none" },
+            "&:hover .the-delay": { display: showDelay ? "block" : "none" },
+            "&:hover .the-icon": { display: "none" },
+            "&.Mui-selected": {
+              width: `calc(100% + 3px)`,
+              marginLeft: `-3px`,
+              borderLeft: `3px solid ${selectColor}`,
+              bgcolor:
+                mode === "light"
+                  ? alpha(primary.main, 0.15)
+                  : alpha(primary.main, 0.35),
+            },
+            backgroundColor: bgcolor,
+          };
+        },
+      ]}
+    >
+      <Box title={proxy.name} sx={{ overflow: "hidden" }}>
+        <Typography
+          variant="body2"
+          component="div"
+          color="text.primary"
+          sx={{
+            display: "block",
+            textOverflow: "ellipsis",
+            wordBreak: "break-all",
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {proxy.name}
+        </Typography>
+
+        {showType && (
+          <Box
+            sx={{
+              display: "flex",
+              flexWrap: "nowrap",
+              flex: "none",
+              marginTop: "4px",
+            }}
+          >
+            {proxy.now && (
+              <Typography
+                variant="body2"
+                component="div"
+                color="text.secondary"
+                sx={{
+                  display: "block",
+                  textOverflow: "ellipsis",
+                  wordBreak: "break-all",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  marginRight: "8px",
+                }}
+              >
+                {proxy.now}
+              </Typography>
+            )}
+            {!!proxy.provider && (
+              <TypeBox component="span">{proxy.provider}</TypeBox>
+            )}
+            <TypeBox component="span">{proxy.type}</TypeBox>
+            {proxy.udp && <TypeBox component="span">UDP</TypeBox>}
+            {proxy.xudp && <TypeBox component="span">XUDP</TypeBox>}
+            {proxy.tfo && <TypeBox component="span">TFO</TypeBox>}
+          </Box>
+        )}
+      </Box>
+
+      <Box sx={{ ml: 0.5, color: "primary.main" }}>
+        {delay === -2 && (
+          <Widget>
+            <BaseLoading />
+          </Widget>
+        )}
+
+        {!proxy.provider && delay !== -2 && (
+          <Widget
+            className="the-check"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelay();
+            }}
+            sx={({ palette }) => ({
+              display: "none",
+              ":hover": { bgcolor: alpha(palette.primary.main, 0.15) },
+            })}
+          >
+            Check
+          </Widget>
+        )}
+
+        {delay > 0 && (
+          <Widget
+            className="the-delay"
+            onClick={(e) => {
+              if (proxy.provider) return;
+              e.preventDefault();
+              e.stopPropagation();
+              onDelay();
+            }}
+            color={delayManager.formatDelayColor(delay, timeout)}
+            sx={({ palette }) =>
+              !proxy.provider
+                ? { ":hover": { bgcolor: alpha(palette.primary.main, 0.15) } }
+                : {}
+            }
+          >
+            {delayManager.formatDelay(delay, timeout)}
+          </Widget>
+        )}
+
+        {delay !== -2 && delay <= 0 && selected && (
+          <CheckCircleOutlineRounded
+            className="the-icon"
+            sx={{ fontSize: 16, mr: 0.5, display: "block" }}
+          />
+        )}
+      </Box>
+    </ListItemButton>
+  );
+};
+
+const Widget = styled(Box)(({ theme: { typography } }) => ({
+  padding: "2px 4px",
+  fontSize: 12,
+  fontFamily: typography.fontFamily,
+  borderRadius: "4px",
+}));
+
+const TypeBox = styled(Box)(({ theme: { palette, typography } }) => ({
+  display: "inline-block",
+  border: "1px solid #ccc",
+  borderColor: palette.mode === "light" ? "#d9d9d9" : "#424242",
+  color: palette.mode === "light" ? "#8c8c8c" : "#ffffff",
+  borderRadius: 4,
+  fontSize: 10,
+  fontFamily: typography.fontFamily,
+  marginRight: "4px",
+  marginTop: "auto",
+  padding: "0 4px",
+  lineHeight: 1.5,
+}));
