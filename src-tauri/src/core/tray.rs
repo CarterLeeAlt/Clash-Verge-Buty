@@ -204,6 +204,17 @@ impl Tray {
     pub fn on_left_click(app_handle: &AppHandle) {
         let tray_event = { Config::verge().latest().tray_event.clone() };
         let tray_event = tray_event.unwrap_or("main_window".into());
+
+        #[cfg(target_os = "windows")]
+        if tray_event == "main_window" {
+            if let Some(window) = app_handle.get_window("main") {
+                crate::trace_err!(window.unminimize(), "set win unminimize");
+                crate::trace_err!(window.show(), "set win visible");
+                crate::trace_err!(window.set_focus(), "set win focus");
+                return;
+            }
+        }
+
         match tray_event.as_str() {
             "system_proxy" => feat::toggle_system_proxy(),
             "tun_mode" => feat::toggle_tun_mode(),
