@@ -1,4 +1,5 @@
 use serde_yaml::{Mapping, Value};
+use crate::core::handle::Handle;
 
 macro_rules! revise {
     ($map: expr, $key: expr, $val: expr) => {
@@ -32,6 +33,7 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
     revise!(tun_val, "enable", enable);
     let tun_log = serde_yaml::to_string(&tun_val).unwrap_or_else(|_| "<failed to serialize tun>".into());
     log::info!(target: "app", "runtime tun config (sanitized): {}", tun_log.replace('\n', " ").trim());
+    Handle::emit_log("info", format!("[tun] runtime tun config (sanitized): {}", tun_log.replace('\n', " ").trim()));
 
     revise!(config, "tun", tun_val);
 

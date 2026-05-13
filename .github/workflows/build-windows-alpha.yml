@@ -2,6 +2,17 @@ name: Alpha Build Windows
 
 on:
   workflow_dispatch:
+    inputs:
+      signing_mode:
+        description: "Windows signing mode"
+        required: false
+        default: "unsigned"
+        type: choice
+        options:
+          - unsigned
+          - pfx
+          - signpath
+          - ossign
 
 permissions:
   contents: read
@@ -9,6 +20,7 @@ permissions:
 env:
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: short
+  WINDOWS_SIGNING_MODE: ${{ github.event.inputs.signing_mode || vars.WINDOWS_SIGNING_MODE || 'unsigned' }}
 
 jobs:
   build-windows-alpha:
@@ -57,13 +69,143 @@ jobs:
       - name: Tauri build
         run: pnpm tauri build --target ${{ matrix.target }}
 
+      - name: Detect signing availability
+        id: sign_mode
+        shell: pwsh
+        run: |
+          $mode = "${{ env.WINDOWS_SIGNING_MODE }}".ToLowerInvariant()
+          if (-not $mode) { $mode = "unsigned" }
+          $cert = "${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}"
+          $pass = "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}"
+          "mode=$mode" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          if ($mode -eq "pfx") {
+            if (-not $cert -or -not $pass) {
+              throw "WINDOWS_SIGNING_MODE=pfx but certificate/password secrets are missing"
+            }
+            "can_sign=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } elseif ($mode -eq "signpath") {
+            if (-not "${{ secrets.SIGNPATH_ORGANIZATION_ID }}" -or -not "${{ secrets.SIGNPATH_PROJECT_SLUG }}" -or -not "${{ secrets.SIGNPATH_API_TOKEN }}") {
+              throw "WINDOWS_SIGNING_MODE=signpath but SignPath secrets are missing"
+            }
+            "can_sign=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } elseif ($mode -eq "ossign") {
+            if (-not "${{ secrets.OSSIGN_CLIENT_ID }}" -or -not "${{ secrets.OSSIGN_CLIENT_SECRET }}") {
+              throw "WINDOWS_SIGNING_MODE=ossign but OSSign secrets are missing"
+            }
+            "can_sign=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } else {
+            "can_sign=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            Write-Host "[WARN] signing disabled, producing unsigned artifacts"
+          }
+          "### Windows signing mode" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "- mode: $mode" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: Restore certificate
+        if: steps.sign_mode.outputs.mode == 'pfx' && steps.sign_mode.outputs.can_sign == 'true'
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes("windows-signing.pfx", [Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}"))
+
+      - name: Sign Windows artifacts (PFX)
+        if: steps.sign_mode.outputs.mode == 'pfx' && steps.sign_mode.outputs.can_sign == 'true'
+        shell: pwsh
+        run: |
+          $signtool = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe | Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          if (-not $signtool) { throw "signtool.exe not found" }
+          $files = @(
+            "src-tauri/target/${{ matrix.target }}/release/Clash_Verge_Buty.exe",
+            "src-tauri/target/${{ matrix.target }}/release/clash-meta.exe",
+            "src-tauri/target/${{ matrix.target }}/release/clash-meta-alpha.exe"
+          )
+          $files += Get-ChildItem "src-tauri/target/${{ matrix.target }}/release/bundle" -Recurse -File -Include *.exe,*.msi | ForEach-Object { $_.FullName }
+          $files = $files | Where-Object { Test-Path $_ } | Select-Object -Unique
+          foreach ($f in $files) {
+            & $signtool sign /fd SHA256 /td SHA256 /tr "http://timestamp.digicert.com" /f "windows-signing.pfx" /p "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" "$f"
+          }
+
+      - name: Sign Windows artifacts (SignPath)
+        if: steps.sign_mode.outputs.mode == 'signpath' && steps.sign_mode.outputs.can_sign == 'true'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ secrets.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          input-artifact-path: src-tauri/target/${{ matrix.target }}/release/Clash_Verge_Buty.exe
+          output-artifact-directory: src-tauri/target/${{ matrix.target }}/release
+
+      - name: OSSign signing placeholder
+        if: steps.sign_mode.outputs.mode == 'ossign' && steps.sign_mode.outputs.can_sign == 'true'
+        shell: pwsh
+        run: |
+          throw "OSSign mode selected. Please wire your OSSign action/CLI command in this step per docs/windows-signing.md."
+
+      - name: Verify signatures
+        if: steps.sign_mode.outputs.mode != 'unsigned' && steps.sign_mode.outputs.can_sign == 'true'
+        shell: pwsh
+        run: |
+          $signtool = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe | Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          $files = @(
+            "src-tauri/target/${{ matrix.target }}/release/Clash_Verge_Buty.exe",
+            "src-tauri/target/${{ matrix.target }}/release/clash-meta.exe",
+            "src-tauri/target/${{ matrix.target }}/release/clash-meta-alpha.exe"
+          )
+          $files += Get-ChildItem "src-tauri/target/${{ matrix.target }}/release/bundle" -Recurse -File -Include *.exe,*.msi | ForEach-Object { $_.FullName }
+          $files = $files | Where-Object { Test-Path $_ } | Select-Object -Unique
+          foreach ($f in $files) {
+            & $signtool verify /pa /v "$f"
+            Get-AuthenticodeSignature "$f" | Format-List Status,StatusMessage,SignerCertificate,TimeStamperCertificate
+          }
+
       - name: Portable Bundle
         shell: pwsh
-        run: pnpm portable ${{ matrix.target }}
+        run: pnpm portable ${{ matrix.target }} alpha
+        env:
+          SKIP_RELEASE_UPLOAD: "1"
+          UNSIGNED_BUILD: ${{ steps.sign_mode.outputs.can_sign == 'true' && '0' || '1' }}
+
+      - name: Normalize unsigned Windows bundle names
+        if: steps.sign_mode.outputs.can_sign != 'true'
+        shell: pwsh
+        run: |
+          $bundleRoot = "src-tauri/target/${{ matrix.target }}/release/bundle"
+          if (Test-Path $bundleRoot) {
+            $targets = Get-ChildItem $bundleRoot -Recurse -File -Include *.exe,*.msi
+            foreach ($f in $targets) {
+              if ($f.Name -match "_unsigned(\.[^.]+)$") { continue }
+              $dest = Join-Path $f.DirectoryName ($f.BaseName + "_unsigned" + $f.Extension)
+              Copy-Item $f.FullName $dest -Force
+              Write-Host "[INFO] unsigned alias: $($f.Name) -> $([IO.Path]::GetFileName($dest))"
+            }
+          }
+          "### Final Windows artifacts" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          Get-ChildItem . -File -Filter "Clash_Verge_Buty_*_portable_unsigned.zip" | ForEach-Object { "- $($_.Name)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append }
+          if (Test-Path $bundleRoot) {
+            Get-ChildItem $bundleRoot -Recurse -File -Include *_unsigned.exe,*_unsigned.msi | ForEach-Object { "- $($_.FullName)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append }
+          }
+
+      - name: Cleanup cert file
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path "windows-signing.pfx") { Remove-Item "windows-signing.pfx" -Force }
+
+      - name: Unsigned build notice
+        if: steps.sign_mode.outputs.can_sign != 'true'
+        shell: pwsh
+        run: |
+          "### Windows signing status" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "This Windows build is unsigned." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "Windows may show Unknown Publisher / SmartScreen warning." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "This is expected for unsigned builds." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
 
       - name: Upload Windows alpha artifact
         uses: actions/upload-artifact@v4
         with:
           name: Clash-Verge-Buty-windows-alpha-portable
           if-no-files-found: error
-          path: Clash_Verge_Buty_*_x64_portable.zip
+          path: |
+            Clash_Verge_Buty_*_x64_portable*.zip
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*_unsigned.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*_unsigned.msi

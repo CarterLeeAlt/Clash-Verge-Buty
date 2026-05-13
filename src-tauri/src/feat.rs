@@ -107,6 +107,7 @@ pub async fn patch_clash(patch: Mapping) -> Result<()> {
     let has_tun_patch = patch.get("tun").is_some();
     if has_tun_patch {
         log::info!(target: "app", "patch clash tun config requested");
+        handle::Handle::emit_log("info", "[tun] patch clash tun config requested");
     }
     Config::clash().draft().patch_config(patch.clone());
 
@@ -155,6 +156,7 @@ pub async fn patch_clash(patch: Mapping) -> Result<()> {
 
         if has_tun_patch {
             log::info!(target: "app", "tun config changed, reload core config");
+            handle::Handle::emit_log("info", "[tun] tun config changed, reload core config");
             update_core_config().await?;
         }
 
@@ -314,16 +316,19 @@ pub async fn update_profile(uid: String, option: Option<PrfOption>) -> Result<()
 /// 更新订阅
 async fn update_core_config() -> Result<()> {
     log::info!(target: "app", "updating core config (generate/check/reload)");
+    handle::Handle::emit_log("info", "[app] updating core config (generate/check/reload)");
     match CoreManager::global().update_config().await {
         Ok(_) => {
             handle::Handle::refresh_clash();
             handle::Handle::notice_message("set_config::ok", "ok");
             log::info!(target: "app", "core config updated successfully");
+            handle::Handle::emit_log("info", "[app] core config updated successfully");
             Ok(())
         }
         Err(err) => {
             handle::Handle::notice_message("set_config::error", format!("{err}"));
             log::error!(target: "app", "core config update failed: {err}");
+            handle::Handle::emit_log("error", format!("[app] core config update failed: {err}"));
             Err(err)
         }
     }
