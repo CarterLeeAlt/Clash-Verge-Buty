@@ -181,11 +181,9 @@ jobs:
 
       - name: Normalize unsigned Windows bundle names
         if: steps.sign_mode.outputs.can_sign != 'true'
-        id: unsigned_names
         shell: pwsh
         run: |
           $bundleRoot = "src-tauri/target/${{ matrix.target }}/release/bundle"
-          $renamed = @()
           if (Test-Path $bundleRoot) {
             $targets = Get-ChildItem $bundleRoot -Recurse -File -Include *.exe,*.msi
             foreach ($f in $targets) {
@@ -193,25 +191,40 @@ jobs:
               $dest = Join-Path $f.DirectoryName ($f.BaseName + "_unsigned" + $f.Extension)
               Copy-Item $f.FullName $dest -Force
               Write-Host "[INFO] unsigned alias: $($f.Name) -> $([IO.Path]::GetFileName($dest))"
-              $renamed += $dest
             }
           }
-          $portable = Get-ChildItem . -File -Filter "Clash_Verge_Buty_*_portable_unsigned.zip" | Select-Object -ExpandProperty FullName
-          $all = @($portable) + $renamed
-          $all = $all | Where-Object { $_ } | Select-Object -Unique
-          "files=$($all -join "`")" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          "### Final Windows artifacts" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-          foreach ($item in $all) { "- $item" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append }
 
-      - name: Upload unsigned bundle assets
-        if: steps.sign_mode.outputs.can_sign != 'true'
+      - name: Stage final Windows artifacts
+        shell: pwsh
+        run: |
+          $stage = "dist/windows-release"
+          if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+          New-Item -ItemType Directory -Path $stage | Out-Null
+
+          Get-ChildItem . -File -Filter "Clash_Verge_Buty_*_x64_portable*.zip" | ForEach-Object {
+            Copy-Item $_.FullName (Join-Path $stage $_.Name) -Force
+          }
+
+          $bundleRoot = "src-tauri/target/${{ matrix.target }}/release/bundle"
+          if (Test-Path $bundleRoot) {
+            if ("${{ steps.sign_mode.outputs.can_sign }}" -eq "true") {
+              $installers = Get-ChildItem $bundleRoot -Recurse -File -Include *.exe,*.msi | Where-Object { $_.Name -notmatch "_unsigned(\.[^.]+)$" }
+            } else {
+              $installers = Get-ChildItem $bundleRoot -Recurse -File -Include *_unsigned.exe,*_unsigned.msi
+            }
+            foreach ($f in $installers) {
+              Copy-Item $f.FullName (Join-Path $stage $f.Name) -Force
+            }
+          }
+
+          "### Final Windows artifacts" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          Get-ChildItem $stage -File | ForEach-Object { "- $($_.Name)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append }
+
+      - name: Upload Windows distribution assets
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.VERSION }}
-          files: |
-            Clash_Verge_Buty_*_portable_unsigned.zip
-            src-tauri/target/${{ matrix.target }}/release/bundle/**/*_unsigned.exe
-            src-tauri/target/${{ matrix.target }}/release/bundle/**/*_unsigned.msi
+          files: dist/windows-release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

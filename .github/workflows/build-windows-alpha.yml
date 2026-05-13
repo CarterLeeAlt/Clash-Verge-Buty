@@ -179,11 +179,32 @@ jobs:
               Write-Host "[INFO] unsigned alias: $($f.Name) -> $([IO.Path]::GetFileName($dest))"
             }
           }
-          "### Final Windows artifacts" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-          Get-ChildItem . -File -Filter "Clash_Verge_Buty_*_portable_unsigned.zip" | ForEach-Object { "- $($_.Name)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append }
-          if (Test-Path $bundleRoot) {
-            Get-ChildItem $bundleRoot -Recurse -File -Include *_unsigned.exe,*_unsigned.msi | ForEach-Object { "- $($_.FullName)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append }
+
+      - name: Stage final Windows artifacts
+        shell: pwsh
+        run: |
+          $stage = "dist/windows-alpha"
+          if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+          New-Item -ItemType Directory -Path $stage | Out-Null
+
+          Get-ChildItem . -File -Filter "Clash_Verge_Buty_*_x64_portable*.zip" | ForEach-Object {
+            Copy-Item $_.FullName (Join-Path $stage $_.Name) -Force
           }
+
+          $bundleRoot = "src-tauri/target/${{ matrix.target }}/release/bundle"
+          if (Test-Path $bundleRoot) {
+            if ("${{ steps.sign_mode.outputs.can_sign }}" -eq "true") {
+              $installers = Get-ChildItem $bundleRoot -Recurse -File -Include *.exe,*.msi | Where-Object { $_.Name -notmatch "_unsigned(\.[^.]+)$" }
+            } else {
+              $installers = Get-ChildItem $bundleRoot -Recurse -File -Include *_unsigned.exe,*_unsigned.msi
+            }
+            foreach ($f in $installers) {
+              Copy-Item $f.FullName (Join-Path $stage $f.Name) -Force
+            }
+          }
+
+          "### Final Windows artifacts" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          Get-ChildItem $stage -File | ForEach-Object { "- $($_.Name)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append }
 
       - name: Cleanup cert file
         if: always()
@@ -205,7 +226,4 @@ jobs:
         with:
           name: Clash-Verge-Buty-windows-alpha-portable
           if-no-files-found: error
-          path: |
-            Clash_Verge_Buty_*_x64_portable*.zip
-            src-tauri/target/${{ matrix.target }}/release/bundle/**/*_unsigned.exe
-            src-tauri/target/${{ matrix.target }}/release/bundle/**/*_unsigned.msi
+          path: dist/windows-alpha/*
