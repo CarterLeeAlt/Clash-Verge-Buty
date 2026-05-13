@@ -48,14 +48,17 @@ export const TunViewer = forwardRef<DialogRef>((props, ref) => {
 
   const onSave = useLockFn(async () => {
     try {
+      const dnsHijack = values.dnsHijack
+        .map((item) => item.trim())
+        .filter(Boolean);
       let tun = {
-        stack: values.stack,
-        device: values.device,
+        stack: values.stack.toLowerCase(),
+        device: values.device.trim() || "Clash-Verge",
         "auto-route": values.autoRoute,
         "auto-detect-interface": values.autoDetectInterface,
-        "dns-hijack": values.dnsHijack,
+        "dns-hijack": dnsHijack.length ? dnsHijack : ["any:53"],
         "strict-route": values.strictRoute,
-        mtu: values.mtu,
+        mtu: Number.isFinite(values.mtu) && values.mtu > 0 ? values.mtu : 9000,
       };
       await patchClash({ tun });
       await mutateClash(
@@ -192,7 +195,10 @@ export const TunViewer = forwardRef<DialogRef>((props, ref) => {
             value={values.dnsHijack.join(",")}
             placeholder="Please use , to separate multiple DNS servers"
             onChange={(e) =>
-              setValues((v) => ({ ...v, dnsHijack: e.target.value.split(",") }))
+              setValues((v) => ({
+                ...v,
+                dnsHijack: e.target.value.split(",").map((item) => item.trim()),
+              }))
             }
           />
         </ListItem>
