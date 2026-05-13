@@ -80,12 +80,18 @@ async function resolvePortable() {
   zip.addLocalFolder(resourcesPath, "resources");
   zip.addLocalFolder(configDir, ".config");
 
-  const zipFile = `${productFileName}_${version}_${ARCH_MAP[target]}_portable.zip`;
+  const unsignedSuffix = process.env.UNSIGNED_BUILD === "1" ? "_unsigned" : "";
+  const zipFile = `${productFileName}_${version}_${ARCH_MAP[target]}_portable${unsignedSuffix}.zip`;
   zip.writeZip(zipFile);
 
   console.log("[INFO]: create portable zip successfully");
 
   // push release assets
+  if (process.env.SKIP_RELEASE_UPLOAD === "1") {
+    console.log("[INFO]: skip release upload by SKIP_RELEASE_UPLOAD=1");
+    return;
+  }
+
   if (process.env.GITHUB_TOKEN === undefined) {
     throw new Error("GITHUB_TOKEN is required");
   }
