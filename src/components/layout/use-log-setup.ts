@@ -1,12 +1,13 @@
 import dayjs from "dayjs";
 import { useEffect } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 import { getClashLogs } from "@/services/cmds";
 import { useClashInfo } from "@/hooks/use-clash";
-import { atomEnableLog, atomLogData } from "@/services/states";
+import { atomEnableLog, atomLogData, atomLogError } from "@/services/states";
 import { useWebsocket } from "@/hooks/use-websocket";
 
-const MAX_LOG_NUM = 1000;
+const MAX_LOG_NUM = 2000;
 
 // setup the log websocket
 export const useLogSetup = () => {
@@ -14,26 +15,63 @@ export const useLogSetup = () => {
 
   const enableLog = useRecoilValue(atomEnableLog);
   const setLogData = useSetRecoilState(atomLogData);
+  const setLogError = useSetRecoilState(atomLogError);
 
   const { connect, disconnect } = useWebsocket((event) => {
     const data = JSON.parse(event.data) as ILogItem;
     const time = dayjs().format("MM-DD HH:mm:ss");
     setLogData((l) => {
-      if (l.length >= MAX_LOG_NUM) l.shift();
-      return [...l, { ...data, time }];
+      const next = [{ ...data, time }, ...l];
+      return next.slice(0, MAX_LOG_NUM);
     });
+  }, {
+    onError: () => {
+      setLogError("Log websocket disconnected or external-controller unavailable");
+    },
   });
 
   useEffect(() => {
-    if (!enableLog || !clashInfo) return;
+    let unlisten: null | (() => void) = null;
 
-    getClashLogs().then(setLogData);
+    listen<ILogItem>("verge://app-log", (event) => {
+      const data = event.payload;
+      const time = dayjs().format("MM-DD HH:mm:ss");
+      setLogData((l) => {
+        const next = [{ ...data, time }, ...l];
+        return next.slice(0, MAX_LOG_NUM);
+      });
+    })
+      .then((fn) => {
+        unlisten = fn;
+      })
+      .catch(() => {
+        setLogError("Failed to subscribe app log stream");
+      });
+
+    if (!enableLog) {
+      setLogError("Log stream paused");
+      return () => {
+        unlisten?.();
+      };
+    }
+
+    if (!clashInfo?.server) {
+      setLogError("Core not running or external-controller is not ready");
+      return;
+    }
+
+    setLogError(null);
+
+    getClashLogs()
+      .then((logs) => setLogData(logs.reverse().slice(0, MAX_LOG_NUM)))
+      .catch(() => setLogError("Failed to load historical logs"));
 
     const { server = "", secret = "" } = clashInfo;
     connect(`ws://${server}/logs?token=${encodeURIComponent(secret)}`);
 
     return () => {
       disconnect();
+      unlisten?.();
     };
-  }, [clashInfo, enableLog]);
+  }, [clashInfo, enableLog, setLogData, setLogError]);
 };
