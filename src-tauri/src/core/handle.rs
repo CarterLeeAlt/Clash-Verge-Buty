@@ -3,8 +3,15 @@ use crate::log_err;
 use anyhow::{bail, Result};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
+use serde::Serialize;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager, Window};
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AppLogEvent {
+    pub r#type: String,
+    pub payload: String,
+}
 
 #[derive(Debug, Default, Clone)]
 pub struct Handle {
@@ -53,6 +60,16 @@ impl Handle {
     pub fn notice_message<S: Into<String>, M: Into<String>>(status: S, msg: M) {
         if let Some(window) = Self::global().get_window() {
             log_err!(window.emit("verge://notice-message", (status.into(), msg.into())));
+        }
+    }
+
+    pub fn emit_log<T: Into<String>, M: Into<String>>(level: T, msg: M) {
+        if let Some(window) = Self::global().get_window() {
+            let event = AppLogEvent {
+                r#type: level.into(),
+                payload: msg.into(),
+            };
+            log_err!(window.emit("verge://app-log", event));
         }
     }
 
