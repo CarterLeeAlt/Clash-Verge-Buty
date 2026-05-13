@@ -10,6 +10,11 @@ export const atomLogData = atom<ILogItem[]>({
   default: [],
 });
 
+export const atomLogError = atom<string | null>({
+  key: "atomLogError",
+  default: null,
+});
+
 export const atomEnableLog = atom<boolean>({
   key: "atomEnableLog",
   effects: [

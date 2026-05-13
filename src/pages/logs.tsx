@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useRecoilState } from "recoil";
+import { useRecoilState, useRecoilValue } from "recoil";
 import {
   Box,
   Button,
@@ -15,7 +15,7 @@ import {
   PlayCircleOutlineRounded,
   PauseCircleOutlineRounded,
 } from "@mui/icons-material";
-import { atomEnableLog, atomLogData } from "@/services/states";
+import { atomEnableLog, atomLogData, atomLogError } from "@/services/states";
 import { BaseEmpty, BasePage } from "@/components/base";
 import LogItem from "@/components/log/log-item";
 
@@ -23,6 +23,7 @@ const LogPage = () => {
   const { t } = useTranslation();
   const [logData, setLogData] = useRecoilState(atomLogData);
   const [enableLog, setEnableLog] = useRecoilState(atomEnableLog);
+  const logError = useRecoilValue(atomLogError);
 
   const [logState, setLogState] = useState("all");
   const [filterText, setFilterText] = useState("");
@@ -30,7 +31,8 @@ const LogPage = () => {
   const filterLogs = useMemo(() => {
     return logData.filter((data) => {
       return (
-        data.payload.includes(filterText) &&
+        (filterText.trim() === "" ||
+          data.payload.toLowerCase().includes(filterText.trim().toLowerCase())) &&
         (logState === "all" ? true : data.type.includes(logState))
       );
     });
@@ -110,13 +112,12 @@ const LogPage = () => {
       <Box height="calc(100% - 50px)">
         {filterLogs.length > 0 ? (
           <Virtuoso
-            initialTopMostItemIndex={999}
             data={filterLogs}
             itemContent={(index, item) => <LogItem value={item} />}
-            followOutput={"smooth"}
+            followOutput={false}
           />
         ) : (
-          <BaseEmpty text="No Logs" />
+          <BaseEmpty text={logError ?? "No Logs"} />
         )}
       </Box>
     </BasePage>
