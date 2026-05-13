@@ -30,6 +30,8 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
     });
 
     revise!(tun_val, "enable", enable);
+    let tun_log = serde_yaml::to_string(&tun_val).unwrap_or_else(|_| "<failed to serialize tun>".into());
+    log::info!(target: "app", "runtime tun config (sanitized): {}", tun_log.replace('\n', " ").trim());
 
     revise!(config, "tun", tun_val);
 

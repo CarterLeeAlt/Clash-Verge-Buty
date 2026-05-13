@@ -104,6 +104,10 @@ pub fn toggle_tun_mode() {
 
 /// 修改clash的订阅
 pub async fn patch_clash(patch: Mapping) -> Result<()> {
+    let has_tun_patch = patch.get("tun").is_some();
+    if has_tun_patch {
+        log::info!(target: "app", "patch clash tun config requested");
+    }
     Config::clash().draft().patch_config(patch.clone());
 
     match {
@@ -149,6 +153,11 @@ pub async fn patch_clash(patch: Mapping) -> Result<()> {
             log_err!(handle::Handle::update_systray_part());
         }
 
+        if has_tun_patch {
+            log::info!(target: "app", "tun config changed, reload core config");
+            update_core_config().await?;
+        }
+
         Config::runtime().latest().patch_config(patch);
 
         <Result<()>>::Ok(())
@@ -184,6 +193,28 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
         #[cfg(target_os = "windows")]
         {
             let service_mode = patch.enable_service_mode;
+            if let Some(true) = tun_mode {
+                let service_enabled = Config::verge().latest().enable_service_mode.unwrap_or(false);
+                if !service_enabled && service_mode != Some(true) {
+                    bail!("Tun mode on Windows requires Service Mode. Please enable Service Mode first.");
+                }
+
+                if service_mode != Some(true) {
+                    let status = super::core::win_service::check_service().await;
+                    match status {
+                        Ok(res) if res.code != 0 => {
+                            bail!(
+                                "Tun mode on Windows requires Clash Verge Service to be active. Current service status: {}",
+                                res.msg
+                            );
+                        }
+                        Err(err) => {
+                            bail!("Tun mode on Windows requires Clash Verge Service. {err}");
+                        }
+                        _ => {}
+                    }
+                }
+            }
 
             if service_mode.is_some() {
                 log::debug!(target: "app", "change service mode to {}", service_mode.unwrap());
@@ -282,14 +313,17 @@ pub async fn update_profile(uid: String, option: Option<PrfOption>) -> Result<()
 
 /// 更新订阅
 async fn update_core_config() -> Result<()> {
+    log::info!(target: "app", "updating core config (generate/check/reload)");
     match CoreManager::global().update_config().await {
         Ok(_) => {
             handle::Handle::refresh_clash();
             handle::Handle::notice_message("set_config::ok", "ok");
+            log::info!(target: "app", "core config updated successfully");
             Ok(())
         }
         Err(err) => {
             handle::Handle::notice_message("set_config::error", format!("{err}"));
+            log::error!(target: "app", "core config update failed: {err}");
             Err(err)
         }
     }

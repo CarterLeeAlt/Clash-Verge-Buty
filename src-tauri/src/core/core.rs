@@ -8,6 +8,8 @@ use std::{fs, io::Write, sync::Arc, time::Duration};
 use sysinfo::{Pid, System};
 use tauri::api::process::{Command, CommandChild, CommandEvent};
 use tokio::time::sleep;
+#[cfg(target_os = "linux")]
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct CoreManager {
@@ -82,6 +84,8 @@ impl CoreManager {
     /// 启动核心
     pub async fn run_core(&self) -> Result<()> {
         let config_path = Config::generate_file(ConfigType::Run)?;
+        log::info!(target: "app", "starting core with runtime config: {}", dirs::path_to_str(&config_path)?);
+        self.log_tun_prerequisites();
 
         #[allow(unused_mut)]
         let mut should_kill = match self.sidecar.lock().take() {
@@ -200,6 +204,42 @@ impl CoreManager {
         });
 
         Ok(())
+    }
+
+    fn log_tun_prerequisites(&self) {
+        let tun_enabled = Config::verge().latest().enable_tun_mode.unwrap_or(false);
+        if !tun_enabled {
+            return;
+        }
+        #[cfg(target_os = "windows")]
+        {
+            use deelevate::{PrivilegeLevel, Token};
+            let service_mode = Config::verge().latest().enable_service_mode.unwrap_or(false);
+            let privilege = Token::with_current_process()
+                .ok()
+                .and_then(|t| t.privilege_level().ok());
+            let is_admin = matches!(privilege, Some(PrivilegeLevel::Elevated));
+            if !service_mode {
+                log::error!(target: "app", "Tun mode is enabled but service mode is disabled on Windows. This usually fails without admin/wintun permissions.");
+            } else {
+                log::info!(target: "app", "Tun mode enabled on Windows with service mode.");
+            }
+            if !is_admin {
+                log::warn!(target: "app", "Current process is not elevated. If service mode is unavailable, Tun setup may fail due to missing admin privileges/wintun route permissions.");
+            }
+            log::info!(target: "app", "Windows Tun diagnostics: ensure Clash Verge Service is active, wintun driver can be loaded, and firewall allows route/DNS hijack operations.");
+        }
+        #[cfg(target_os = "linux")]
+        {
+            if !Path::new("/dev/net/tun").exists() {
+                log::error!(target: "app", "Tun mode requires /dev/net/tun on Linux, but it does not exist.");
+            }
+            log::info!(target: "app", "Tun mode on Linux requires CAP_NET_ADMIN and iptables/nftables permissions.");
+        }
+        #[cfg(target_os = "macos")]
+        {
+            log::info!(target: "app", "Tun mode on macOS requires network extension / route permissions.");
+        }
     }
 
     /// 重启内核
