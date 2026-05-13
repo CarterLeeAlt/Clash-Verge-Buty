@@ -14,6 +14,7 @@
     "check": "node scripts/check.mjs",
     "updater": "node scripts/updater.mjs",
     "portable": "node scripts/portable.mjs",
+    "sync-version": "node scripts/sync-version.mjs",
     "prepare": "husky install"
   },
   "dependencies": {
