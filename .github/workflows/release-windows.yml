@@ -63,7 +63,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: v${{ env.VERSION }}
-          releaseName: "Clash Verge Buty v${{ env.VERSION }}"
+          releaseName: "Clash_Verge_Buty v${{ env.VERSION }}"
           releaseBody: "More new features are now supported."
           releaseDraft: false
           prerelease: false
@@ -80,12 +80,12 @@ jobs:
       - name: Create full source archive
         shell: pwsh
         run: |
-          git archive --format=zip --output="Clash-Verge-Buty-v${env:VERSION}-full-source.zip" HEAD
+          git archive --format=zip --output="Clash_Verge_Buty-v${env:VERSION}-full-source.zip" HEAD
 
       - name: Upload full source archive to Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.VERSION }}
-          files: Clash-Verge-Buty-v${{ env.VERSION }}-full-source.zip
+          files: Clash_Verge_Buty-v${{ env.VERSION }}-full-source.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

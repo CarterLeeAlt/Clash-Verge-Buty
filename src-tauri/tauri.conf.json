@@ -24,8 +24,8 @@
       "externalBin": ["sidecar/clash-meta", "sidecar/clash-meta-alpha"],
       "copyright": "© 2022 zzzgydi All Rights Reserved",
       "category": "DeveloperTool",
-      "shortDescription": "A Clash Meta GUI based on tauri.",
-      "longDescription": "A Clash Meta GUI based on tauri."
+      "shortDescription": "A Clash Meta GUI based on Tauri.",
+      "longDescription": "A Clash Meta GUI based on Tauri."
     },
 
     "updater": {
