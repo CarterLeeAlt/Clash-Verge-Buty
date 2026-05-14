@@ -23,22 +23,13 @@ export const ConnectionTable = (props: Props) => {
   const columns: GridColDef[] = [
     { field: "host", headerName: "Host", flex: 220, minWidth: 220 },
     {
-      field: "download",
-      headerName: "Download",
-      width: 88,
+      field: "activeSpeed",
+      headerName: "Active Speed",
+      width: 110,
       align: "right",
       headerAlign: "right",
       valueFormatter: (params: GridValueFormatterParams<number>) =>
-        parseTraffic(params.value).join(" "),
-    },
-    {
-      field: "upload",
-      headerName: "Upload",
-      width: 88,
-      align: "right",
-      headerAlign: "right",
-      valueFormatter: (params: GridValueFormatterParams<number>) =>
-        parseTraffic(params.value).join(" "),
+        parseTraffic(params.value).join(" ") + "/s",
     },
     {
       field: "dlSpeed",
@@ -57,6 +48,24 @@ export const ConnectionTable = (props: Props) => {
       headerAlign: "right",
       valueFormatter: (params: GridValueFormatterParams<number>) =>
         parseTraffic(params.value).join(" ") + "/s",
+    },
+    {
+      field: "download",
+      headerName: "Download",
+      width: 88,
+      align: "right",
+      headerAlign: "right",
+      valueFormatter: (params: GridValueFormatterParams<number>) =>
+        parseTraffic(params.value).join(" "),
+    },
+    {
+      field: "upload",
+      headerName: "Upload",
+      width: 88,
+      align: "right",
+      headerAlign: "right",
+      valueFormatter: (params: GridValueFormatterParams<number>) =>
+        parseTraffic(params.value).join(" "),
     },
     { field: "chains", headerName: "Chains", flex: 360, minWidth: 360 },
     { field: "rule", headerName: "Rule", flex: 300, minWidth: 250 },
@@ -98,6 +107,7 @@ export const ConnectionTable = (props: Props) => {
         upload: each.upload,
         dlSpeed: each.curDownload,
         ulSpeed: each.curUpload,
+        activeSpeed: (each.curDownload ?? 0) + (each.curUpload ?? 0),
         chains,
         rule,
         process: truncateStr(metadata.process || metadata.processPath),
@@ -121,6 +131,11 @@ export const ConnectionTable = (props: Props) => {
       sx={{ border: "none", "div:focus": { outline: "none !important" } }}
       columnVisibilityModel={columnVisible}
       onColumnVisibilityModelChange={(e) => setColumnVisible(e)}
+      initialState={{
+        sorting: {
+          sortModel: [{ field: "activeSpeed", sort: "desc" }],
+        },
+      }}
     />
   );
 };
