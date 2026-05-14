@@ -63,6 +63,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build Windows service binaries from source
+        shell: pwsh
+        run: |
+          cargo build --manifest-path src-tauri/windows-service-src/Cargo.toml --release --target ${{ matrix.target }}
+          New-Item -ItemType Directory -Force -Path src-tauri/local-binaries/windows-service-bin | Out-Null
+          Copy-Item src-tauri/windows-service-src/target/${{ matrix.target }}/release/clash-verge-service.exe src-tauri/local-binaries/windows-service-bin/clash-verge-service.exe -Force
+          Copy-Item src-tauri/windows-service-src/target/${{ matrix.target }}/release/install-service.exe src-tauri/local-binaries/windows-service-bin/install-service.exe -Force
+          Copy-Item src-tauri/windows-service-src/target/${{ matrix.target }}/release/uninstall-service.exe src-tauri/local-binaries/windows-service-bin/uninstall-service.exe -Force
+
       - name: Check target
         run: pnpm check ${{ matrix.target }}
 
