@@ -136,7 +136,7 @@ impl CoreManager {
                         *self.use_service_mode.lock() = false;
                         log::error!(target: "app", "{err}");
                         if tun_enabled {
-                            bail!("Tun mode requires a working Clash-Verge-Buty Service on Windows: {err}");
+                            bail!("Tun mode requires a working clash-verge-service on Windows: {err}");
                         }
                     }
                 }
@@ -234,7 +234,7 @@ impl CoreManager {
                 log::warn!(target: "app", "Current process is not elevated. If service mode is unavailable, Tun setup may fail due to missing admin privileges/wintun route permissions.");
                 super::handle::Handle::emit_log("warn", "[service] Current process is not elevated. Tun setup may fail due to missing admin privileges/wintun route permissions.");
             }
-            log::info!(target: "app", "Windows Tun diagnostics: ensure Clash-Verge-Buty Service is active, wintun driver can be loaded, and firewall allows route/DNS hijack operations.");
+            log::info!(target: "app", "Windows Tun diagnostics: ensure clash-verge-service is active, wintun driver can be loaded, and firewall allows route/DNS hijack operations.");
             super::handle::Handle::emit_log("info", "[tun] Windows Tun diagnostics: ensure service active, wintun loadable, and firewall allows route/DNS hijack operations.");
         }
         #[cfg(target_os = "linux")]
