@@ -43,6 +43,23 @@ fn service_exists() -> bool {
     })
 }
 
+fn start_service_process() -> Result<()> {
+    for name in ["clash_verge_service", "Clash-Verge-Buty Service"] {
+        let output = StdCommand::new("sc")
+            .args(["start", name])
+            .creation_flags(0x08000000)
+            .output();
+
+        if let Ok(output) = output {
+            if output.status.success() {
+                return Ok(());
+            }
+        }
+    }
+
+    bail!("failed to start Clash-Verge-Buty Service process")
+}
+
 /// Install the Clash-Verge-Buty Service
 /// 该函数应该在协程或者线程中执行，避免UAC弹窗阻塞主线程
 pub async fn install_service() -> Result<()> {
@@ -136,8 +153,28 @@ pub async fn check_service() -> Result<JsonResponse> {
     }
 }
 
+pub async fn ensure_service_ready() -> Result<()> {
+    match check_service().await {
+        Ok(status) if status.code == 0 => Ok(()),
+        Ok(status) if status.code == 400 => {
+            start_service_process()?;
+            sleep(Duration::from_millis(1200)).await;
+            let retry = check_service().await?;
+            if retry.code == 0 {
+                Ok(())
+            } else {
+                bail!("service started but API is still unavailable: {}", retry.msg)
+            }
+        }
+        Ok(status) => bail!("service is not ready: {}", status.msg),
+        Err(err) => Err(err),
+    }
+}
+
 /// start the clash by service
 pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
+    ensure_service_ready().await?;
+
     let status = check_service().await?;
 
     if status.code == 0 {
