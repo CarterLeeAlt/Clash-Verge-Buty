@@ -251,7 +251,7 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
     map.insert("config_file", config_file);
     map.insert("log_file", log_path);
     log::info!(target: "app", "service mode enabled: calling /start_clash");
-    log::info!(target: "app", "start_clash request field summary: core_type={clash_core}, bin_path={}, config_dir={}, config_file={}, log_file={}", bin_path_buf.exists(), config_dir_buf.exists(), config_file.as_ref(), log_path);
+    log::info!(target: "app", "start_clash request field summary: core_type={clash_core}, bin_path_exists={}, config_dir_exists={}, config_file={}, log_file={}", bin_path_buf.exists(), config_dir_buf.exists(), config_file, log_path);
     let res = reqwest::ClientBuilder::new()
         .no_proxy()
         .build()?
