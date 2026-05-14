@@ -11,7 +11,7 @@ mod feat;
 mod utils;
 
 use crate::utils::{init, resolve, server};
-use tauri::{api, SystemTray};
+use tauri::SystemTray;
 
 fn main() -> std::io::Result<()> {
     // 单例检测

@@ -95,8 +95,8 @@ pub fn view_profile(app_handle: tauri::AppHandle, index: String) -> CmdResult {
 
     let base_dir = wrap_err!(dirs::app_profiles_dir())?;
     let path = base_dir.join(file);
-    let canonical_path = wrap_err!(std::fs::canonicalize(&path));
-    let canonical_base = wrap_err!(std::fs::canonicalize(&base_dir));
+    let canonical_path = wrap_err!(std::fs::canonicalize(&path))?;
+    let canonical_base = wrap_err!(std::fs::canonicalize(&base_dir))?;
 
     if !canonical_path.starts_with(&canonical_base) {
         ret_err!("invalid profile file path");
@@ -243,14 +243,14 @@ pub fn open_logs_dir() -> CmdResult<()> {
 
 #[tauri::command]
 pub fn open_web_url(url: String) -> CmdResult<()> {
-    let parsed = wrap_err!(url::Url::parse(&url));
-    let scheme = parsed.scheme();
+    let url = url.trim();
+    let lower = url.to_ascii_lowercase();
 
-    if scheme != "http" && scheme != "https" {
-        ret_err!("unsupported url scheme");
+    if !(lower.starts_with("https://") || lower.starts_with("http://")) {
+        ret_err!("Only http(s) URLs are allowed");
     }
 
-    wrap_err!(open::that(parsed.as_str()))
+    wrap_err!(open::that(url))
 }
 
 #[cfg(windows)]
