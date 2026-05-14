@@ -18,24 +18,47 @@ macro_rules! append {
     };
 }
 
-pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
+pub fn use_tun(
+    mut config: Mapping,
+    enable: bool,
+    source_has_tun: bool,
+    default_tun: Mapping,
+) -> Mapping {
     let tun_key = Value::from("tun");
     let tun_val = config.get(&tun_key);
+    let tun_existed = tun_val.is_some();
+    log::info!(target: "app", "tun existed before sync: {tun_existed}, tun existed in source: {source_has_tun}, tun enabled by ui: {enable}");
+    Handle::emit_log("info", format!("[tun] sync start: existed_before={tun_existed}, existed_in_source={source_has_tun}, enabled_by_ui={enable}"));
 
-    if !enable && tun_val.is_none() {
+    if enable {
+        let mut tun_val = tun_val
+            .and_then(Value::as_mapping)
+            .cloned()
+            .unwrap_or_else(|| default_tun.clone());
+        revise!(tun_val, "enable", true);
+        revise!(config, "tun", tun_val);
+        Handle::emit_log("info", "[tun] action: inject/update tun and set enable=true");
+    } else if tun_existed || source_has_tun {
+        let mut tun_val = tun_val
+            .and_then(Value::as_mapping)
+            .cloned()
+            .unwrap_or_else(|| default_tun.clone());
+        revise!(tun_val, "enable", false);
+        revise!(config, "tun", tun_val);
+        Handle::emit_log("info", "[tun] action: keep tun and set enable=false");
+    } else {
+        config.remove(&tun_key);
+        Handle::emit_log("info", "[tun] action: leave tun absent");
         return config;
     }
 
-    let mut tun_val = tun_val.map_or(Mapping::new(), |val| {
-        val.as_mapping().cloned().unwrap_or(Mapping::new())
-    });
-
-    revise!(tun_val, "enable", enable);
-    let tun_log = serde_yaml::to_string(&tun_val).unwrap_or_else(|_| "<failed to serialize tun>".into());
-    log::info!(target: "app", "runtime tun config (sanitized): {}", tun_log.replace('\n', " ").trim());
-    Handle::emit_log("info", format!("[tun] runtime tun config (sanitized): {}", tun_log.replace('\n', " ").trim()));
-
-    revise!(config, "tun", tun_val);
+    let stack = config
+        .get("tun")
+        .and_then(Value::as_mapping)
+        .and_then(|m| m.get("stack"))
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    Handle::emit_log("info", format!("[tun] stack={stack}"));
 
     if enable {
         use_dns_for_tun(config)
