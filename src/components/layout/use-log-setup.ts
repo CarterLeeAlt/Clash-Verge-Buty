@@ -18,12 +18,14 @@ export const useLogSetup = () => {
   const setLogError = useSetRecoilState(atomLogError);
 
   const { connect, disconnect } = useWebsocket((event) => {
-    const data = JSON.parse(event.data) as ILogItem;
-    const time = dayjs().format("MM-DD HH:mm:ss");
-    setLogData((l) => {
-      const next = [{ ...data, time }, ...l];
-      return next.slice(0, MAX_LOG_NUM);
-    });
+    try {
+      const data = JSON.parse(event.data) as ILogItem;
+      const time = dayjs().format("MM-DD HH:mm:ss");
+      setLogData((l) => {
+        const next = [{ ...data, time }, ...l];
+        return next.slice(0, MAX_LOG_NUM);
+      });
+    } catch {}
   }, {
     onError: () => {
       setLogError("Log websocket disconnected or external-controller unavailable");

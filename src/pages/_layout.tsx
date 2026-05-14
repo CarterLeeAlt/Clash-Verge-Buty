@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
 import { alpha, List, Paper, ThemeProvider } from "@mui/material";
-import { listen } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { appWindow } from "@tauri-apps/api/window";
 import { routers } from "./_routers";
 import { getAxios } from "@/services/api";
@@ -45,27 +45,31 @@ const Layout = () => {
   const location = useLocation();
 
   useEffect(() => {
-    window.addEventListener("keydown", (e) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       // macOS有cmd+w
       if (e.key === "Escape" && OS !== "macos") {
         appWindow.close();
       }
-    });
+    };
 
-    listen("verge://refresh-clash-config", async () => {
+    window.addEventListener("keydown", onKeyDown);
+
+    const unlistenTasks: Promise<UnlistenFn>[] = [];
+
+    unlistenTasks.push(listen("verge://refresh-clash-config", async () => {
       // the clash info may be updated
       await getAxios(true);
       mutate("getProxies");
       mutate("getVersion");
       mutate("getClashConfig");
       mutate("getProxyProviders");
-    });
+    }));
 
     // update the verge config
-    listen("verge://refresh-verge-config", () => mutate("getVergeConfig"));
+    unlistenTasks.push(listen("verge://refresh-verge-config", () => mutate("getVergeConfig")));
 
     // 设置提示监听
-    listen("verge://notice-message", ({ payload }) => {
+    unlistenTasks.push(listen("verge://notice-message", ({ payload }) => {
       const [status, msg] = payload as [string, string];
       switch (status) {
         case "set_config::ok":
@@ -77,14 +81,22 @@ const Layout = () => {
         default:
           break;
       }
-    });
+    }));
 
-    setTimeout(async () => {
+    const timer = window.setTimeout(async () => {
       portableFlag = await getPortableFlag();
       await appWindow.unminimize();
       await appWindow.show();
       await appWindow.setFocus();
     }, 50);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.clearTimeout(timer);
+      unlistenTasks.forEach((task) => {
+        task.then((unlisten) => unlisten()).catch(() => undefined);
+      });
+    };
   }, []);
 
   useEffect(() => {
@@ -114,8 +126,8 @@ const Layout = () => {
             if (
               OS === "windows" &&
               !(
-                validList.includes(target.tagName.toLowerCase()) ||
-                target.isContentEditable
+                validList.includes((e.target as HTMLElement).tagName.toLowerCase()) ||
+                (e.target as HTMLElement).isContentEditable
               )
             ) {
               e.preventDefault();

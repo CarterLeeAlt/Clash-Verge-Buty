@@ -255,14 +255,16 @@ pub async fn resolve_scheme(param: String) {
                 .title("Clash-Verge-Buty")
                 .body("Import profile success")
                 .show()
-                .unwrap();
+                .map_err(|err| log::warn!("failed to show import success notification: {err}"))
+                .ok();
         };
     } else {
         notification::Notification::new(crate::utils::dirs::APP_ID)
             .title("Clash-Verge-Buty")
             .body("Import profile failed")
             .show()
-            .unwrap();
+            .map_err(|err| log::warn!("failed to show import failed notification: {err}"))
+            .ok();
         log::error!("failed to parse url: {}", url);
     }
 }
