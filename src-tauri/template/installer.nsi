@@ -433,15 +433,15 @@ FunctionEnd
     ${EndIf}
 
     
-    ; Check if clash-verge-service.exe is running
-    nsis_tauri_utils::FindProcess "clash-verge-service.exe"
+    ; Check if clash-verge-buty-service.exe is running
+    nsis_tauri_utils::FindProcess "clash-verge-buty-service.exe"
     ${If} $R0 != 0
         ; Kill the process
-        DetailPrint "Kill clash-verge-service.exe..."
+        DetailPrint "Kill clash-verge-buty-service.exe..."
         !if "${INSTALLMODE}" == "currentUser"
-            nsis_tauri_utils::KillProcessCurrentUser "clash-verge-service.exe"
+            nsis_tauri_utils::KillProcessCurrentUser "clash-verge-buty-service.exe"
         !else
-            nsis_tauri_utils::KillProcess "clash-verge-service.exe"
+            nsis_tauri_utils::KillProcess "clash-verge-buty-service.exe"
         !endif
     ${EndIf}
 
