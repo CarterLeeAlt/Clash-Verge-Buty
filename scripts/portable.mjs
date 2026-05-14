@@ -52,10 +52,41 @@ async function resolvePortable() {
   await fs.mkdirp(configDir);
   await fs.createFile(path.join(configDir, "PORTABLE"));
 
-  const exePath = path.join(releaseDir, `${productName}.exe`);
-  if (!(await fs.pathExists(exePath))) {
-    throw new Error(`File not found: ${exePath}`);
+  const releaseExeFiles = (await fs.readdir(releaseDir))
+    .filter((name) => name.toLowerCase().endsWith(".exe"))
+    .sort();
+  const nsisDir = path.join(releaseDir, "bundle", "nsis");
+  const nsisExeFiles = (await fs.pathExists(nsisDir))
+    ? (await fs.readdir(nsisDir))
+        .filter((name) => name.toLowerCase().endsWith(".exe"))
+        .sort()
+    : [];
+
+  console.log("[INFO]: target/release exe files:", releaseExeFiles);
+  console.log("[INFO]: target/release/bundle/nsis exe files:", nsisExeFiles);
+
+  const preferredNames = [
+    "Clash_Verge_Buty.exe",
+    `${productName}.exe`,
+    `${productName.replace(/-/g, "_")}.exe`,
+    `${productName.toLowerCase()}.exe`,
+    `${productName.toLowerCase().replace(/-/g, "_")}.exe`,
+  ];
+
+  const deniedKeyword = /(setup|setup_unsigned|installer)/i;
+  const portableExeName =
+    preferredNames.find((name) => releaseExeFiles.includes(name)) ||
+    releaseExeFiles.find(
+      (name) => !deniedKeyword.test(name) && !/clash-meta(-alpha)?\.exe$/i.test(name)
+    );
+
+  if (!portableExeName) {
+    throw new Error(`Portable main exe not found under ${releaseDir}`);
   }
+  if (deniedKeyword.test(portableExeName)) {
+    throw new Error(`Portable main exe resolved to installer-like file: ${portableExeName}`);
+  }
+  const exePath = path.join(releaseDir, portableExeName);
 
   const clashMetaPath = path.join(releaseDir, "clash-meta.exe");
   if (!(await fs.pathExists(clashMetaPath))) {
@@ -83,6 +114,32 @@ async function resolvePortable() {
   const unsignedSuffix = process.env.UNSIGNED_BUILD === "1" ? "_unsigned" : "";
   const zipFile = `${productFileName}_${version}_${ARCH_MAP[target]}_portable${unsignedSuffix}.zip`;
   zip.writeZip(zipFile);
+
+  const zipCheck = new AdmZip(zipFile)
+    .getEntries()
+    .map((entry) => entry.entryName);
+  console.log("[INFO]: portable zip entries:", zipCheck);
+
+  const zipExeEntries = zipCheck.filter((name) => name.toLowerCase().endsWith(".exe"));
+  const zipEntriesLower = zipCheck.map((name) => name.toLowerCase());
+  if (!zipExeEntries.some((name) => path.basename(name).toLowerCase() === portableExeName.toLowerCase())) {
+    throw new Error(`portable.zip missing main exe: ${portableExeName}`);
+  }
+  if (!zipExeEntries.some((name) => path.basename(name).toLowerCase() === "clash-meta.exe")) {
+    throw new Error("portable.zip missing clash-meta.exe");
+  }
+  if (!zipExeEntries.some((name) => path.basename(name).toLowerCase() === "clash-meta-alpha.exe")) {
+    throw new Error("portable.zip missing clash-meta-alpha.exe");
+  }
+  if (!zipEntriesLower.some((name) => name.startsWith("resources/"))) {
+    throw new Error("portable.zip missing resources/ directory");
+  }
+  if (!zipEntriesLower.some((name) => name.startsWith(".config/"))) {
+    console.warn("[WARN]: portable.zip missing .config/ directory");
+  }
+  if (zipExeEntries.some((name) => deniedKeyword.test(path.basename(name)))) {
+    throw new Error(`portable.zip contains installer exe: ${zipExeEntries.join(", ")}`);
+  }
 
   console.log("[INFO]: create portable zip successfully");
 
