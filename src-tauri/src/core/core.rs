@@ -132,11 +132,11 @@ impl CoreManager {
                 {
                     Ok(_) => return Ok(()),
                     Err(err) => {
-                        log::error!(target: "app", "Service Mode failed; core is running by sidecar fallback. {err}");
+                        log::error!(target: "app", "Service Mode failed; service could not start clash core. {err}");
                         if tun_enabled {
                             bail!("Tun mode requires a working clash-verge-service on Windows: {err}");
                         }
-                        bail!("Service Mode failed; core is running by sidecar fallback. {err}");
+                        bail!("Service Mode failed; service could not start clash core. {err}");
                     }
                 }
             }

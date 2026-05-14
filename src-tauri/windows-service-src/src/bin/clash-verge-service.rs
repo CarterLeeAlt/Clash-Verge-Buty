@@ -11,7 +11,7 @@ use windows_service::service::{ServiceControl, ServiceControlAccept, ServiceExit
 use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
 use windows_service::{define_windows_service, service_dispatcher};
 
-use clash_verge_windows_service_src::{API_ADDR, API_GET_CLASH, API_START_CLASH, API_STOP_CLASH, SERVICE_NAME};
+use clash_verge_windows_service_src::{API_ADDR, API_GET_CLASH, API_HEALTH, API_START_CLASH, API_STOP_CLASH, SERVICE_NAME};
 
 #[derive(Serialize)]
 struct JsonResponse<T> {
@@ -106,6 +106,13 @@ fn run_service() -> Result<()> {
                     let method = req.method().clone();
                     let url = req.url().to_string();
                     let (status, body) = match (method, url.as_str()) {
+                        (Method::Get, API_HEALTH) => {
+                            (200, serde_json::to_string(&JsonResponse::<serde_json::Value> {
+                                code: 0,
+                                msg: "ok".into(),
+                                data: Some(serde_json::json!({"service": "running"})),
+                            }))
+                        }
                         (Method::Get, API_GET_CLASH) => {
                             let mut state = clash_state_for_server.lock().unwrap();
                             if let Some(state_ref) = state.as_mut() {

@@ -16,7 +16,7 @@ async function waitForServiceActive(maxTry = 5, interval = 3000) {
     // 立即把最新状态写回 SWR 缓存，所有用到 "checkService" 的组件都会同步更新
     await mutate("checkService", status, false);
 
-    if (status === "active") {
+    if (status?.api_ready) {
       return true;
     }
 

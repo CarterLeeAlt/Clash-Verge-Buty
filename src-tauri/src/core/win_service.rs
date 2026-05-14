@@ -48,6 +48,11 @@ fn start_service_process() -> Result<()> {
     if start.code == 0 {
         return Ok(());
     }
+    let out = format!("{}\n{}", start.stdout, start.stderr).to_ascii_uppercase();
+    if start.code == 1056 || out.contains("1056") || out.contains("INSTANCE OF THE SERVICE IS ALREADY RUNNING") {
+        log::info!(target: "app", "service already running, continue checking API readiness.");
+        return Ok(());
+    }
     bail!("failed to start service process. expected service name: {SERVICE_NAME}; service binary: {SERVICE_BINARY}; install helper: {INSTALL_HELPER}; uninstall helper: {UNINSTALL_HELPER}; sc.exe start exit code: {}; stdout: {}; stderr: {}", start.code, start.stdout, start.stderr)
 }
 
@@ -91,6 +96,18 @@ pub struct JsonResponse {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct HealthData {
+    pub service: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct HealthResponse {
+    pub code: u64,
+    pub msg: String,
+    pub data: Option<HealthData>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ServiceStatus {
     pub installed: bool,
     pub running: bool,
@@ -101,14 +118,14 @@ pub struct ServiceStatus {
     pub message: String,
 }
 
-async fn get_service_health() -> Result<JsonResponse> {
+async fn get_service_health() -> Result<HealthResponse> {
     reqwest::ClientBuilder::new()
         .no_proxy()
         .build()?
         .get(format!("{SERVICE_URL}/health"))
         .send()
         .await?
-        .json::<JsonResponse>()
+        .json::<HealthResponse>()
         .await
         .context("failed to parse the clash-verge-service health response")
 }
@@ -180,15 +197,15 @@ pub async fn check_service() -> Result<ServiceStatus> {
     let core_pid = clash.as_ref().and_then(|s| s.data.as_ref()).and_then(|d| d.pid);
     let core_managed = core_pid.is_some();
     let message = if !installed {
-        format!("{SERVICE_NAME} is not installed.")
+        "service not installed.".to_string()
     } else if !running {
-        format!("{SERVICE_NAME} is installed but stopped.")
+        "service installed but stopped.".to_string()
     } else if !api_ready {
-        format!("{SERVICE_NAME} is running but API is not ready.")
+        "service running, API not ready.".to_string()
     } else if !core_managed {
-        format!("{SERVICE_NAME} is installed and running. Core is not currently managed by service.")
+        "service running, API ready, core not managed by service.".to_string()
     } else {
-        format!("{SERVICE_NAME} is running and managing core (pid {}).", core_pid.unwrap())
+        format!("service running, API ready, core managed by service (pid {}).", core_pid.unwrap())
     };
     Ok(ServiceStatus {
         installed,
@@ -202,10 +219,9 @@ pub async fn check_service() -> Result<ServiceStatus> {
 }
 
 pub async fn ensure_service_ready() -> Result<()> {
-    if let Ok(status) = check_service().await {
-        if status.api_ready {
-            return Ok(());
-        }
+    if query_service_state().unwrap_or(ServiceStateHint::Other) == ServiceStateHint::Running
+        && get_service_health().await.map(|h| h.code == 0).unwrap_or(false) {
+        return Ok(());
     }
 
     start_service_process()?;
@@ -213,10 +229,9 @@ pub async fn ensure_service_ready() -> Result<()> {
     let started = std::time::Instant::now();
 
     loop {
-        if let Ok(status) = check_service().await {
-            if status.api_ready {
-                return Ok(());
-            }
+        if query_service_state().unwrap_or(ServiceStateHint::Other) == ServiceStateHint::Running
+            && get_service_health().await.map(|h| h.code == 0).unwrap_or(false) {
+            return Ok(());
         }
 
         let state = query_service_state().unwrap_or(ServiceStateHint::Other);
@@ -273,6 +288,22 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
     if res.code != 0 {
         bail!(res.msg);
     }
+    log::info!(target: "app", "waiting for /get_clash pid");
+    let mut core_pid = None;
+    for _ in 0..20 {
+        if let Ok(state) = get_service_clash_state().await {
+            let pid = state.data.as_ref().and_then(|d| d.pid);
+            if pid.is_some() {
+                core_pid = pid;
+                break;
+            }
+        }
+        sleep(Duration::from_millis(300)).await;
+    }
+    if core_pid.is_none() {
+        bail!("service did not start clash core; /get_clash has no pid");
+    }
+
     log::info!(target: "app", "waiting 9097 ready");
     let client = reqwest::ClientBuilder::new().no_proxy().build()?;
     for _ in 0..20 {
@@ -289,11 +320,7 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
         sleep(Duration::from_millis(300)).await;
     }
     log::error!(target: "app", "9097 ready failure");
-    let status = check_service().await?;
-    if !status.core_managed {
-        bail!("service did not start clash-meta; /get_clash returned null");
-    }
-    bail!("service started clash-meta but external-controller 127.0.0.1:9097 is not ready")
+    bail!("service started clash core (pid {:?}) but external-controller 127.0.0.1:9097 is not ready", core_pid)
 }
 
 pub(super) async fn stop_core_by_service() -> Result<()> {
