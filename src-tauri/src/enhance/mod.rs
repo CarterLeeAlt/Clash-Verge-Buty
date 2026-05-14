@@ -76,18 +76,16 @@ pub fn enhance() -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
         }
     });
 
-    // 合并默认的config
+    let source_has_tun = config.get("tun").is_some();
+    let clash_tun_default = clash_config
+        .get("tun")
+        .and_then(|v| v.as_mapping())
+        .cloned()
+        .unwrap_or_default();
+
+    // 合并默认的config（tun 由 use_tun 统一处理，避免来源混淆）
     for (key, value) in clash_config.into_iter() {
-        if key.as_str() == Some("tun") {
-            let mut tun = config.get_mut("tun").map_or(Mapping::new(), |val| {
-                val.as_mapping().cloned().unwrap_or(Mapping::new())
-            });
-            let patch_tun = value.as_mapping().cloned().unwrap_or(Mapping::new());
-            for (key, value) in patch_tun.into_iter() {
-                tun.insert(key, value);
-            }
-            config.insert("tun".into(), tun.into());
-        } else {
+        if key.as_str() != Some("tun") {
             config.insert(key, value);
         }
     }
@@ -115,7 +113,7 @@ pub fn enhance() -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
             });
     }
 
-    config = use_tun(config, enable_tun);
+    config = use_tun(config, enable_tun, source_has_tun, clash_tun_default);
     config = use_sort(config);
 
     let mut exists_set = HashSet::new();
