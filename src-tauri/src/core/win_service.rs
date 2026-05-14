@@ -45,8 +45,28 @@ fn start_service_process() -> Result<()> {
     bail!("failed to start service process. expected service name: {SERVICE_NAME}; legacy service name checked: {LEGACY_SERVICE_NAME}; selected service name: {selected}; service binary: {SERVICE_BINARY}; install helper: {INSTALL_HELPER}; uninstall helper: {UNINSTALL_HELPER}; sc.exe start exit code: {}; stdout: {}; stderr: {}", start.code, start.stdout, start.stderr)
 }
 
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ServiceStateHint { Running, StartPending, Other }
+
+fn query_service_state(name: &str) -> Result<ServiceStateHint> {
+    let r = sc(&["query", name])?;
+    if r.code != 0 { return Ok(ServiceStateHint::Other); }
+    let out = r.stdout.to_ascii_uppercase();
+    if out.contains("RUNNING") { Ok(ServiceStateHint::Running) }
+    else if out.contains("START_PENDING") { Ok(ServiceStateHint::StartPending) }
+    else { Ok(ServiceStateHint::Other) }
+}
+
+fn selected_service_name() -> &'static str {
+    if service_exists(SERVICE_NAME) { SERVICE_NAME }
+    else if service_exists(LEGACY_SERVICE_NAME) { LEGACY_SERVICE_NAME }
+    else { SERVICE_NAME }
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ResponseBody { pub core_type: Option<String>, pub bin_path: String, pub config_dir: String, pub log_file: String }
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct JsonResponse { pub code: u64, pub msg: String, pub data: Option<ResponseBody> }
 
@@ -83,11 +103,33 @@ pub async fn check_service() -> Result<JsonResponse> {
 
 pub async fn ensure_service_ready() -> Result<()> {
     migrate_legacy_service_if_needed().await?;
-    match check_service().await {
-        Ok(status) if status.code == 0 => Ok(()),
-        Ok(status) if status.code == 400 => { start_service_process()?; sleep(Duration::from_millis(1200)).await; let retry = check_service().await?; if retry.code == 0 { Ok(()) } else { bail!("service started but API is still unavailable: {} (api ready result: false)", retry.msg) } }
-        Ok(status) => bail!("service is not ready: {}", status.msg),
-        Err(err) => Err(err),
+    if let Ok(status) = check_service().await {
+        if status.code == 0 {
+            return Ok(());
+        }
+    }
+
+    start_service_process()?;
+    let selected = selected_service_name();
+    let timeout = Duration::from_secs(15);
+    let started = std::time::Instant::now();
+
+    loop {
+        if let Ok(status) = check_service().await {
+            if status.code == 0 {
+                return Ok(());
+            }
+        }
+
+        let state = query_service_state(selected).unwrap_or(ServiceStateHint::Other);
+        if started.elapsed() >= timeout {
+            if state == ServiceStateHint::StartPending {
+                bail!("Windows service is stuck in StartPending and API 127.0.0.1:33211 is not ready.");
+            }
+            bail!("service API 127.0.0.1:33211 is not ready after start timeout; current service state: {:?}", state);
+        }
+
+        sleep(Duration::from_millis(500)).await;
     }
 }
 
