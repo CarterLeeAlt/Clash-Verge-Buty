@@ -49,10 +49,27 @@ const SIDECAR_HOST = target
       .toString()
       .match(/(?<=host: ).+(?=\s*)/g)[0];
 
+const DOWNLOAD_SOURCES = {
+  mihomoAlphaVersion: "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt",
+  mihomoAlphaPrefix: "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha",
+  mihomoStableVersion: "https://github.com/MetaCubeX/mihomo/releases/latest/download/version.txt",
+  mihomoStablePrefix: "https://github.com/MetaCubeX/mihomo/releases/download",
+  simpleScZip:
+    "https://nsis.sourceforge.io/mediawiki/images/e/ef/NSIS_Simple_Service_Plugin_Unicode_1.30.zip",
+  countryMmdb:
+    "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/country.mmdb",
+  geositeDat:
+    "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat",
+  geoipDat:
+    "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.dat",
+  enableLoopback:
+    "https://github.com/Kuingsmile/uwp-tool/releases/download/latest/enableLoopback.exe",
+};
+
 /* ======= clash meta alpha======= */
-const META_ALPHA_VERSION_URL =
-  "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt";
-const META_ALPHA_URL_PREFIX = `https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha`;
+const META_ALPHA_VERSION_URL = DOWNLOAD_SOURCES.mihomoAlphaVersion;
+const META_ALPHA_URL_PREFIX = DOWNLOAD_SOURCES.mihomoAlphaPrefix;
+// Dynamic upstream asset; checksum cannot be fixed unless version is pinned.
 let META_ALPHA_VERSION;
 
 const META_ALPHA_MAP = {
@@ -86,6 +103,11 @@ async function getLatestAlphaVersion() {
       ...options,
       method: "GET",
     });
+    if (!response.ok) {
+      throw new Error(
+        `failed to fetch version for "clash-meta-alpha" (url="${META_ALPHA_VERSION_URL}", target="${SIDECAR_HOST}", status=${response.status} statusText="${response.statusText}")`
+      );
+    }
     let v = await response.text();
     META_ALPHA_VERSION = v.trim(); // Trim to remove extra whitespaces
     console.log(`Latest alpha version: ${META_ALPHA_VERSION}`);
@@ -96,9 +118,9 @@ async function getLatestAlphaVersion() {
 }
 
 /* ======= clash meta stable ======= */
-const META_VERSION_URL =
-  "https://github.com/MetaCubeX/mihomo/releases/latest/download/version.txt";
-const META_URL_PREFIX = `https://github.com/MetaCubeX/mihomo/releases/download`;
+const META_VERSION_URL = DOWNLOAD_SOURCES.mihomoStableVersion;
+const META_URL_PREFIX = DOWNLOAD_SOURCES.mihomoStablePrefix;
+// Dynamic upstream asset; checksum cannot be fixed unless version is pinned.
 let META_VERSION;
 
 const META_MAP = {
@@ -132,6 +154,11 @@ async function getLatestReleaseVersion() {
       ...options,
       method: "GET",
     });
+    if (!response.ok) {
+      throw new Error(
+        `failed to fetch version for "clash-meta" (url="${META_VERSION_URL}", target="${SIDECAR_HOST}", status=${response.status} statusText="${response.statusText}")`
+      );
+    }
     let v = await response.text();
     META_VERSION = v.trim(); // Trim to remove extra whitespaces
     console.log(`Latest release version: ${META_VERSION}`);
@@ -207,6 +234,9 @@ async function resolveSidecar(binInfo) {
   const tempDir = path.join(TEMP_DIR, name);
   const tempZip = path.join(tempDir, zipFile);
   const tempExe = path.join(tempDir, exeFile);
+  console.log(
+    `[INFO]: resolving sidecar "${name}" target=${SIDECAR_HOST} url="${downloadURL}" targetPath="${sidecarPath}" tempZip="${tempZip}"`
+  );
 
   await fs.mkdirp(tempDir);
   try {
@@ -220,6 +250,11 @@ async function resolveSidecar(binInfo) {
         console.log(`[DEBUG]: "${name}" entry name`, entry.entryName);
       });
       zip.extractAllTo(tempDir, true);
+      if (!(await fs.pathExists(tempExe))) {
+        throw new Error(
+          `missing extracted executable for "${name}" (url="${downloadURL}", expected="${tempExe}", target="${SIDECAR_HOST}")`
+        );
+      }
       await fs.rename(tempExe, sidecarPath);
       console.log(`[INFO]: "${name}" unzip finished`);
     } else if (zipFile.endsWith(".tgz")) {
@@ -240,7 +275,9 @@ async function resolveSidecar(binInfo) {
         execSync(`chmod 755 ${sidecarPath}`);
         console.log(`[INFO]: "${name}" chmod binary finished`);
       } else {
-        throw new Error(`Expected file not found in ${tempDir}`);
+        throw new Error(
+          `expected extracted file not found for "${name}" (url="${downloadURL}", tempDir="${tempDir}", target="${SIDECAR_HOST}")`
+        );
       }
     } else {
       // gz
@@ -281,6 +318,9 @@ async function resolveResource(binInfo) {
 
   const resDir = path.join(cwd, "src-tauri/resources");
   const targetPath = path.join(resDir, file);
+  console.log(
+    `[INFO]: resolving resource "${file}" url="${downloadURL}" targetPath="${targetPath}" target="${SIDECAR_HOST}"`
+  );
 
   if (!FORCE && (await fs.pathExists(targetPath))) return;
 
@@ -293,11 +333,25 @@ async function resolveResource(binInfo) {
 /**
  * copy local windows service binaries to resources dir
  */
+async function buildWindowsServiceBinariesIfNeeded() {
+  if (process.platform !== "win32") return;
+  const manifestPath = path.join(cwd, "src-tauri", "windows-service-src", "Cargo.toml");
+  const outDir = path.join(cwd, "src-tauri", "local-binaries", "windows-service-bin");
+  await fs.mkdirp(outDir);
+  execSync(`cargo build --manifest-path "${manifestPath}" --release --target ${SIDECAR_HOST || "x86_64-pc-windows-msvc"}`, { stdio: "inherit" });
+  const binDir = path.join(cwd, "src-tauri", "windows-service-src", "target", SIDECAR_HOST || "x86_64-pc-windows-msvc", "release");
+  for (const f of ["clash-verge-service.exe", "install-service.exe", "uninstall-service.exe"]) {
+    await fs.copy(path.join(binDir, f), path.join(outDir, f), { overwrite: true });
+  }
+}
+
 async function copyLocalWindowsServiceBinaries() {
+  await buildWindowsServiceBinariesIfNeeded();
   const sourceDir = path.join(cwd, "src-tauri", "local-binaries", "windows-service-bin");
   const targetDir = path.join(cwd, "src-tauri", "resources");
 
   const files = [
+    // Windows service binary keeps historical filename for CI/local-binaries compatibility.
     "clash-verge-service.exe",
     "install-service.exe",
     "uninstall-service.exe",
@@ -315,7 +369,8 @@ async function copyLocalWindowsServiceBinaries() {
 
     if (!FORCE && (await fs.pathExists(dst))) continue;
 
-    await fs.copy(src, dst, { overwrite: true });
+    await fs.rm(dst, { force: true });
+    await fs.copyFile(src, dst);
     console.log(`[INFO]: ${file} copied from local repository`);
   }
 }
@@ -336,11 +391,17 @@ async function downloadFile(url, path) {
     options.agent = proxyAgent(httpProxy);
   }
 
+  console.log(`[INFO]: downloading url="${url}" -> "${path}" target="${SIDECAR_HOST}"`);
   const response = await fetch(url, {
     ...options,
     method: "GET",
     headers: { "Content-Type": "application/octet-stream" },
   });
+  if (!response.ok) {
+    throw new Error(
+      `download failed url="${url}" targetPath="${path}" target="${SIDECAR_HOST}" status=${response.status} statusText="${response.statusText}"`
+    );
+  }
   const buffer = await response.arrayBuffer();
   await fs.writeFile(path, new Uint8Array(buffer));
 
@@ -349,8 +410,9 @@ async function downloadFile(url, path) {
 
 // SimpleSC.dll
 const resolvePlugin = async () => {
-  const url =
-    "https://nsis.sourceforge.io/mediawiki/images/e/ef/NSIS_Simple_Service_Plugin_Unicode_1.30.zip";
+  const name = "SimpleSC";
+  const url = DOWNLOAD_SOURCES.simpleScZip;
+  // TODO: add SHA256 checksum for fixed external asset
 
   const tempDir = path.join(TEMP_DIR, "SimpleSC");
   const tempZip = path.join(
@@ -360,6 +422,9 @@ const resolvePlugin = async () => {
   const tempDll = path.join(tempDir, "SimpleSC.dll");
   const pluginDir = path.join(process.env.APPDATA, "Local/NSIS");
   const pluginPath = path.join(pluginDir, "SimpleSC.dll");
+  console.log(
+    `[INFO]: resolving plugin "${name}" url="${url}" targetPath="${pluginPath}" tempZip="${tempZip}" target="${SIDECAR_HOST}"`
+  );
   await fs.mkdirp(pluginDir);
   await fs.mkdirp(tempDir);
   if (!FORCE && (await fs.pathExists(pluginPath))) return;
@@ -372,6 +437,11 @@ const resolvePlugin = async () => {
       console.log(`[DEBUG]: "SimpleSC" entry name`, entry.entryName);
     });
     zip.extractAllTo(tempDir, true);
+    if (!(await fs.pathExists(tempDll))) {
+      throw new Error(
+        `plugin dll missing for "${name}" (url="${url}", expected="${tempDll}", targetPath="${pluginPath}", target="${SIDECAR_HOST}")`
+      );
+    }
     await fs.copyFile(tempDll, pluginPath);
     console.log(`[INFO]: "SimpleSC" unzip finished`);
   } finally {
@@ -389,22 +459,26 @@ const resolveUninstall = () => copyLocalWindowsServiceBinaries();
 const resolveMmdb = () =>
   resolveResource({
     file: "Country.mmdb",
-    downloadURL: `https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/country.mmdb`,
+    // Dynamic upstream asset; checksum cannot be fixed unless version is pinned.
+    downloadURL: DOWNLOAD_SOURCES.countryMmdb,
   });
 const resolveGeosite = () =>
   resolveResource({
     file: "geosite.dat",
-    downloadURL: `https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat`,
+    // Dynamic upstream asset; checksum cannot be fixed unless version is pinned.
+    downloadURL: DOWNLOAD_SOURCES.geositeDat,
   });
 const resolveGeoIP = () =>
   resolveResource({
     file: "geoip.dat",
-    downloadURL: `https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.dat`,
+    // Dynamic upstream asset; checksum cannot be fixed unless version is pinned.
+    downloadURL: DOWNLOAD_SOURCES.geoipDat,
   });
 const resolveEnableLoopback = () =>
   resolveResource({
     file: "enableLoopback.exe",
-    downloadURL: `https://github.com/Kuingsmile/uwp-tool/releases/download/latest/enableLoopback.exe`,
+    // Dynamic upstream asset; checksum cannot be fixed unless version is pinned.
+    downloadURL: DOWNLOAD_SOURCES.enableLoopback,
   });
 
 const tasks = [

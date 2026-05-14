@@ -42,7 +42,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.VERSION }}
-          name: "Clash Verge Rev v${{ env.VERSION }}"
+          name: "Clash_Verge_Buty v${{ env.VERSION }}"
           body: "More new features are now supported."
           token: ${{ secrets.GITHUB_TOKEN }}
           files: src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage*
@@ -51,7 +51,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.VERSION }}
-          name: "Clash Verge Rev v${{ env.VERSION }}"
+          name: "Clash_Verge_Buty v${{ env.VERSION }}"
           body: "More new features are now supported."
           token: ${{ secrets.GITHUB_TOKEN }}
           files: src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb

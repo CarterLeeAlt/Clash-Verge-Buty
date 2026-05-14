@@ -4,7 +4,7 @@
       "iconPath": "icons/tray-icon.png"
     },
     "bundle": {
-      "targets": ["deb", "appimage", "updater"],
+      "targets": ["deb", "appimage"],
       "deb": {
         "depends": ["openssl"],
         "desktopTemplate": "./template/clash-verge.desktop"

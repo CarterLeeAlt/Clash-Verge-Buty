@@ -93,12 +93,14 @@ pub fn view_profile(app_handle: tauri::AppHandle, index: String) -> CmdResult {
             .ok_or("the file field is null")
     }?;
 
-    let path = wrap_err!(dirs::app_profiles_dir())?.join(file);
-    if !path.exists() {
+    let path = wrap_err!(help::resolve_profile_path(&file))?;
+    let canonical_path = wrap_err!(std::fs::canonicalize(&path))?;
+
+    if !canonical_path.exists() {
         ret_err!("the file not found");
     }
 
-    wrap_err!(help::open_file(app_handle, path))
+    wrap_err!(help::open_file(app_handle, canonical_path))
 }
 
 #[tauri::command]
@@ -119,7 +121,11 @@ pub fn save_profile_file(index: String, file_data: Option<String>) -> CmdResult 
     let profiles = Config::profiles();
     let profiles = profiles.latest();
     let item = wrap_err!(profiles.get_item(&index))?;
-    wrap_err!(item.save_file(file_data.unwrap()))
+    if let Some(data) = file_data {
+        wrap_err!(item.save_file(data))
+    } else {
+        Ok(())
+    }
 }
 
 #[tauri::command]
@@ -231,6 +237,13 @@ pub fn open_logs_dir() -> CmdResult<()> {
 
 #[tauri::command]
 pub fn open_web_url(url: String) -> CmdResult<()> {
+    let url = url.trim();
+    let lower = url.to_ascii_lowercase();
+
+    if !(lower.starts_with("https://") || lower.starts_with("http://")) {
+        ret_err!("Only http(s) URLs are allowed");
+    }
+
     wrap_err!(open::that(url))
 }
 
@@ -279,10 +292,18 @@ pub fn get_app_dir() -> CmdResult<String> {
 pub fn copy_icon_file(path: String, name: String) -> CmdResult<String> {
     let file_path = std::path::Path::new(&path);
     let icon_dir = wrap_err!(dirs::app_home_dir())?.join("icons");
+
+    let file_name = std::path::Path::new(&name)
+        .file_name()
+        .ok_or("invalid file name")?
+        .to_os_string();
+    if file_name.to_string_lossy().is_empty() {
+        ret_err!("invalid file name");
+    }
     if !icon_dir.exists() {
         let _ = std::fs::create_dir_all(&icon_dir);
     }
-    let dest_path = icon_dir.join(name);
+    let dest_path = icon_dir.join(file_name);
 
     if file_path.exists() {
         match std::fs::copy(file_path, &dest_path) {
@@ -309,7 +330,7 @@ pub mod service {
     use crate::core::win_service;
 
     #[tauri::command]
-    pub async fn check_service() -> CmdResult<win_service::JsonResponse> {
+    pub async fn check_service() -> CmdResult<win_service::ServiceStatus> {
         wrap_err!(win_service::check_service().await)
     }
 

@@ -18,7 +18,7 @@ import { Notice } from "@/components/base";
 import { TestBox } from "./test-box";
 import delayManager from "@/services/delay";
 import { cmdTestDelay } from "@/services/cmds";
-import { listen, Event, UnlistenFn } from "@tauri-apps/api/event";
+import { listen, UnlistenFn } from "@tauri-apps/api/event";
 
 interface Props {
   id: string;
@@ -38,6 +38,7 @@ export const TestItem = (props: Props) => {
   const [anchorEl, setAnchorEl] = useState<any>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
   const [delay, setDelay] = useState(-1);
+  const [iconLoadFailed, setIconLoadFailed] = useState(false);
   const { uid, name, icon, url } = itemData;
 
   const onDelay = async () => {
@@ -101,23 +102,19 @@ export const TestItem = (props: Props) => {
           {...attributes}
           {...listeners}
         >
-          {icon && icon.trim() !== "" ? (
-            <Box sx={{ display: "flex", justifyContent: "center" }}>
-              {icon.trim().startsWith("http") && (
-                <img src={icon} height="40px" />
-              )}
-              {icon.trim().startsWith("data") && (
-                <img src={icon} height="40px" />
-              )}
-              {icon.trim().startsWith("<svg") && (
-                <img
-                  src={`data:image/svg+xml;base64,${btoa(icon)}`}
-                  height="40px"
-                />
-              )}
+          {icon && icon.trim() !== "" && !iconLoadFailed ? (
+            <Box sx={{ display: "flex", justifyContent: "center", minHeight: "40px" }}>
+              <img
+                src={icon.trim().startsWith("<svg") ? `data:image/svg+xml;base64,${btoa(icon)}` : icon}
+                alt={`${name} icon`}
+                height="40"
+                width="40"
+                onError={() => setIconLoadFailed(true)}
+                style={{ objectFit: "contain" }}
+              />
             </Box>
           ) : (
-            <Box sx={{ display: "flex", justifyContent: "center" }}>
+            <Box sx={{ display: "flex", justifyContent: "center", minHeight: "40px" }}>
               <LanguageTwoTone sx={{ height: "40px" }} fontSize="large" />
             </Box>
           )}

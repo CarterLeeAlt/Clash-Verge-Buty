@@ -30,12 +30,41 @@ const initConn = { uploadTotal: 0, downloadTotal: 0, connections: [] };
 
 type OrderFunc = (list: IConnectionsItem[]) => IConnectionsItem[];
 
+const getActiveSpeed = (conn: IConnectionsItem) =>
+  (conn.curDownload ?? 0) + (conn.curUpload ?? 0);
+
+const getTotalTraffic = (conn: IConnectionsItem) =>
+  (conn.download ?? 0) + (conn.upload ?? 0);
+
+const getStartTimestamp = (conn: IConnectionsItem) => {
+  if (!conn.start) return 0;
+  const ts = new Date(conn.start).getTime();
+  return Number.isNaN(ts) ? 0 : ts;
+};
+
+const sortByActiveSpeed = (list: IConnectionsItem[]) =>
+  list
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const activeDiff = getActiveSpeed(b.item) - getActiveSpeed(a.item);
+      if (activeDiff !== 0) return activeDiff;
+
+      const trafficDiff = getTotalTraffic(b.item) - getTotalTraffic(a.item);
+      if (trafficDiff !== 0) return trafficDiff;
+
+      const startDiff = getStartTimestamp(b.item) - getStartTimestamp(a.item);
+      if (startDiff !== 0) return startDiff;
+
+      return a.index - b.index;
+    })
+    .map(({ item }) => item);
+
 const ConnectionsPage = () => {
   const { t, i18n } = useTranslation();
   const { clashInfo } = useClashInfo();
 
   const [filterText, setFilterText] = useState("");
-  const [curOrderOpt, setOrderOpt] = useState("Default");
+  const [curOrderOpt, setOrderOpt] = useState("Active Speed");
   const [connData, setConnData] = useState<IConnections>(initConn);
 
   const [setting, setSetting] = useRecoilState(atomConnectionSetting);
@@ -43,10 +72,12 @@ const ConnectionsPage = () => {
   const isTableLayout = setting.layout === "table";
 
   const orderOpts: Record<string, OrderFunc> = {
+    "Active Speed": sortByActiveSpeed,
     Default: (list) => list,
-    "Upload Speed": (list) => list.sort((a, b) => b.curUpload! - a.curUpload!),
+    "Upload Speed": (list) =>
+      [...list].sort((a, b) => (b.curUpload ?? 0) - (a.curUpload ?? 0)),
     "Download Speed": (list) =>
-      list.sort((a, b) => b.curDownload! - a.curDownload!),
+      [...list].sort((a, b) => (b.curDownload ?? 0) - (a.curDownload ?? 0)),
   };
 
   const [filterConn, download, upload] = useMemo(() => {

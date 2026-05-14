@@ -125,7 +125,7 @@ pub fn create_window(app_handle: &AppHandle) {
         "main".to_string(),
         tauri::WindowUrl::App("index.html".into()),
     )
-    .title("Clash Verge")
+    .title("Clash-Verge-Buty")
     .visible(false)
     .fullscreen(false)
     .min_inner_size(600.0, 520.0);
@@ -252,17 +252,19 @@ pub async fn resolve_scheme(param: String) {
     if let Ok(item) = PrfItem::from_url(url, None, None, Some(option)).await {
         if Config::profiles().data().append_item(item).is_ok() {
             notification::Notification::new(crate::utils::dirs::APP_ID)
-                .title("Clash Verge")
+                .title("Clash-Verge-Buty")
                 .body("Import profile success")
                 .show()
-                .unwrap();
+                .map_err(|err| log::warn!("failed to show import success notification: {err}"))
+                .ok();
         };
     } else {
         notification::Notification::new(crate::utils::dirs::APP_ID)
-            .title("Clash Verge")
+            .title("Clash-Verge-Buty")
             .body("Import profile failed")
             .show()
-            .unwrap();
+            .map_err(|err| log::warn!("failed to show import failed notification: {err}"))
+            .ok();
         log::error!("failed to parse url: {}", url);
     }
 }

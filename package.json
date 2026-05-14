@@ -1,7 +1,17 @@
 {
-  "name": "clash-verge",
+  "name": "clash-verge-buty",
   "version": "1.5.6",
+  "description": "A Clash Meta GUI based on Tauri.",
+  "author": "zzzgydi",
   "license": "GPL-3.0-only",
+  "homepage": "https://github.com/flyduckfly/Clash-Verge-Buty",
+  "repository": "https://github.com/flyduckfly/Clash-Verge-Buty.git",
+  "metadata": {
+    "productName": "Clash-Verge-Buty",
+    "identifier": "io.github.clash-verge-buty.clash-verge-buty",
+    "authors": ["zzzgydi", "wonfen", "MystiPanda"],
+    "releaseNamePrefix": "Clash-Verge-Buty v"
+  },
   "packageManager": "pnpm@8.15.9",
   "scripts": {
     "dev": "tauri dev",
@@ -14,6 +24,8 @@
     "check": "node scripts/check.mjs",
     "updater": "node scripts/updater.mjs",
     "portable": "node scripts/portable.mjs",
+    "sync-metadata": "node scripts/sync-metadata.mjs",
+    "sync-version": "pnpm sync-metadata",
     "prepare": "husky install"
   },
   "dependencies": {

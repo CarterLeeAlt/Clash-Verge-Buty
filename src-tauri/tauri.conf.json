@@ -1,6 +1,6 @@
 {
   "package": {
-    "productName": "Clash_Verge_Buty",
+    "productName": "Clash-Verge-Buty",
     "version": "1.5.6"
   },
   "build": {
@@ -12,7 +12,7 @@
   "tauri": {
     "bundle": {
       "active": true,
-      "identifier": "io.github.clash-verge-rev.clash-verge-rev",
+      "identifier": "io.github.clash-verge-buty.clash-verge-buty",
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",
@@ -24,8 +24,8 @@
       "externalBin": ["sidecar/clash-meta", "sidecar/clash-meta-alpha"],
       "copyright": "© 2022 zzzgydi All Rights Reserved",
       "category": "DeveloperTool",
-      "shortDescription": "A Clash Meta GUI based on tauri.",
-      "longDescription": "A Clash Meta GUI based on tauri."
+      "shortDescription": "A Clash Meta GUI based on Tauri.",
+      "longDescription": "A Clash Meta GUI based on Tauri."
     },
 
     "updater": {

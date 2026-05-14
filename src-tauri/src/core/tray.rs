@@ -146,7 +146,9 @@ impl Tray {
             if *sysproxy_tray_icon {
                 let path = dirs::app_home_dir()?.join("icons").join("sysproxy.png");
                 if path.exists() {
-                    icon = std::fs::read(path).unwrap();
+                    if let Ok(custom_icon) = std::fs::read(path) {
+                        icon = custom_icon;
+                    }
                 }
             }
             icon
@@ -158,7 +160,9 @@ impl Tray {
             if *common_tray_icon {
                 let path = dirs::app_home_dir()?.join("icons").join("common.png");
                 if path.exists() {
-                    icon = std::fs::read(path).unwrap();
+                    if let Ok(custom_icon) = std::fs::read(path) {
+                        icon = custom_icon;
+                    }
                 }
             }
             icon
@@ -172,7 +176,9 @@ impl Tray {
             if *tun_tray_icon {
                 let path = dirs::app_home_dir()?.join("icons").join("tun.png");
                 if path.exists() {
-                    icon = std::fs::read(path).unwrap();
+                    if let Ok(custom_icon) = std::fs::read(path) {
+                        icon = custom_icon;
+                    }
                 }
             }
             indication_icon = icon
@@ -191,7 +197,7 @@ impl Tray {
         };
 
         let _ = tray.set_tooltip(&format!(
-            "Clash Verge {version}\n{}: {}\n{}: {}",
+            "Clash-Verge-Buty {version}\n{}: {}\n{}: {}",
             t!("System Proxy", "系统代理"),
             switch_map[system_proxy],
             t!("TUN Mode", "Tun 模式"),

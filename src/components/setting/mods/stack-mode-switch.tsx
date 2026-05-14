@@ -31,7 +31,7 @@ export const StackModeSwitch = (props: Props) => {
   return (
     <Tooltip
       title={
-        isWIN && (serviceStatus !== "active" || !enable_service_mode)
+        isWIN && (!serviceStatus?.installed || !enable_service_mode)
           ? t("System and Mixed Can Only be Used in Service Mode")
           : ""
       }
@@ -41,7 +41,7 @@ export const StackModeSwitch = (props: Props) => {
           variant={value?.toLowerCase() === "system" ? "contained" : "outlined"}
           onClick={() => onChange?.("system")}
           disabled={
-            isWIN && (serviceStatus !== "active" || !enable_service_mode)
+            isWIN && (!serviceStatus?.installed || !enable_service_mode)
           }
           sx={{ textTransform: "capitalize" }}
         >
@@ -59,7 +59,7 @@ export const StackModeSwitch = (props: Props) => {
           variant={value?.toLowerCase() === "mixed" ? "contained" : "outlined"}
           onClick={() => onChange?.("mixed")}
           disabled={
-            isWIN && (serviceStatus !== "active" || !enable_service_mode)
+            isWIN && (!serviceStatus?.installed || !enable_service_mode)
           }
           sx={{ textTransform: "capitalize" }}
         >
