@@ -288,6 +288,22 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
     if res.code != 0 {
         bail!(res.msg);
     }
+    log::info!(target: "app", "waiting for /get_clash pid");
+    let mut core_pid = None;
+    for _ in 0..20 {
+        if let Ok(state) = get_service_clash_state().await {
+            let pid = state.data.as_ref().and_then(|d| d.pid);
+            if pid.is_some() {
+                core_pid = pid;
+                break;
+            }
+        }
+        sleep(Duration::from_millis(300)).await;
+    }
+    if core_pid.is_none() {
+        bail!("service did not start clash core; /get_clash has no pid");
+    }
+
     log::info!(target: "app", "waiting 9097 ready");
     let client = reqwest::ClientBuilder::new().no_proxy().build()?;
     for _ in 0..20 {
@@ -304,11 +320,7 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
         sleep(Duration::from_millis(300)).await;
     }
     log::error!(target: "app", "9097 ready failure");
-    let status = check_service().await?;
-    if !status.core_managed {
-        bail!("service did not start clash-meta; /get_clash returned null");
-    }
-    bail!("service started clash-meta but external-controller 127.0.0.1:9097 is not ready")
+    bail!("service started clash core (pid {:?}) but external-controller 127.0.0.1:9097 is not ready", core_pid)
 }
 
 pub(super) async fn stop_core_by_service() -> Result<()> {
