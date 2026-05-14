@@ -8,9 +8,9 @@ use tauri::{
 };
 
 #[cfg(not(feature = "verge-dev"))]
-pub static APP_ID: &str = "io.github.clash-verge-rev.clash-verge-rev";
+pub static APP_ID: &str = "io.github.clash-verge-buty.clash-verge-buty";
 #[cfg(feature = "verge-dev")]
-pub static APP_ID: &str = "io.github.clash-verge-rev.clash-verge-rev.dev";
+pub static APP_ID: &str = "io.github.clash-verge-buty.clash-verge-buty.dev";
 
 pub static PORTABLE_FLAG: OnceCell<bool> = OnceCell::new();
 
@@ -94,7 +94,7 @@ pub fn clash_pid_path() -> Result<PathBuf> {
 
 #[cfg(windows)]
 pub fn service_path() -> Result<PathBuf> {
-    Ok(app_resources_dir()?.join("clash-verge-service.exe"))
+    Ok(app_resources_dir()?.join("clash-verge-buty-service.exe"))
 }
 
 #[cfg(windows)]

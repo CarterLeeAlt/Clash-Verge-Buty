@@ -1,11 +1,11 @@
 [package]
-name = "clash-verge"
+name = "clash-verge-buty"
 version = "1.5.6"
 description = "A Clash Meta GUI based on Tauri."
 authors = ["zzzgydi", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
 repository = "https://github.com/clash-verge-rev/clash-verge-rev.git"
-default-run = "clash-verge"
+default-run = "clash-verge-buty"
 edition = "2021"
 build = "build.rs"
 
