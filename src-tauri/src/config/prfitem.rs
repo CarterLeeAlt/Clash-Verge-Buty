@@ -1,4 +1,4 @@
-use crate::utils::{dirs, help, resolve::VERSION, tmpl};
+use crate::utils::{help, resolve::VERSION, tmpl};
 use anyhow::{bail, Context, Result};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};

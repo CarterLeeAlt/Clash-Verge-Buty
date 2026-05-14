@@ -253,15 +253,11 @@ impl IProfiles {
 
         if let Some(index) = index {
             if let Some(file) = items.remove(index).file {
-                {
-                    let path = match help::resolve_profile_path(&file) {
-                        Ok(path) => path,
-                        Err(_) => return,
-                    };
+                if let Ok(path) = help::resolve_profile_path(&file) {
                     if path.exists() {
                         let _ = fs::remove_file(path);
                     }
-                };
+                }
             }
         }
 
