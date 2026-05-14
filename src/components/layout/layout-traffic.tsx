@@ -30,9 +30,11 @@ export const LayoutTraffic = () => {
   useLogSetup();
 
   const { connect, disconnect } = useWebsocket((event) => {
-    const data = JSON.parse(event.data) as ITrafficItem;
-    trafficRef.current?.appendData(data);
-    setTraffic(data);
+    try {
+      const data = JSON.parse(event.data) as ITrafficItem;
+      trafficRef.current?.appendData(data);
+      setTraffic(data);
+    } catch {}
   });
 
   useEffect(() => {
@@ -52,7 +54,11 @@ export const LayoutTraffic = () => {
 
   const memoryWs = useWebsocket(
     (event) => {
-      setMemory(JSON.parse(event.data));
+      try {
+        setMemory(JSON.parse(event.data));
+      } catch {
+        setMemory({ inuse: 0 });
+      }
     },
     { onError: () => setMemory({ inuse: 0 }) }
   );

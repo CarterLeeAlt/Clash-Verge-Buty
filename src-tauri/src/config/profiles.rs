@@ -3,7 +3,7 @@ use crate::utils::{dirs, help};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Mapping;
-use std::{fs, io::Write};
+use std::fs;
 
 /// Define the `profiles.yaml` schema
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -127,11 +127,9 @@ impl IProfiles {
             }
 
             let file = item.file.clone().unwrap();
-            let path = dirs::app_profiles_dir()?.join(&file);
+            let path = help::resolve_profile_path(&file)?;
 
-            fs::File::create(path)
-                .with_context(|| format!("failed to create file \"{}\"", file))?
-                .write(file_data.as_bytes())
+            help::write_file_atomic(&path, file_data.as_bytes())
                 .with_context(|| format!("failed to write to file \"{}\"", file))?;
         }
 
@@ -222,11 +220,9 @@ impl IProfiles {
                         // the file must exists
                         each.file = Some(file.clone());
 
-                        let path = dirs::app_profiles_dir()?.join(&file);
+                        let path = help::resolve_profile_path(&file)?;
 
-                        fs::File::create(path)
-                            .with_context(|| format!("failed to create file \"{}\"", file))?
-                            .write(file_data.as_bytes())
+                        help::write_file_atomic(&path, file_data.as_bytes())
                             .with_context(|| format!("failed to write to file \"{}\"", file))?;
                     }
 
@@ -257,12 +253,11 @@ impl IProfiles {
 
         if let Some(index) = index {
             if let Some(file) = items.remove(index).file {
-                let _ = dirs::app_profiles_dir().map(|path| {
-                    let path = path.join(file);
+                if let Ok(path) = help::resolve_profile_path(&file) {
                     if path.exists() {
                         let _ = fs::remove_file(path);
                     }
-                });
+                }
             }
         }
 
@@ -285,7 +280,7 @@ impl IProfiles {
             (Some(current), Some(items)) => {
                 if let Some(item) = items.iter().find(|e| e.uid.as_ref() == Some(current)) {
                     let file_path = match item.file.as_ref() {
-                        Some(file) => dirs::app_profiles_dir()?.join(file),
+                        Some(file) => help::resolve_profile_path(file)?,
                         None => bail!("failed to get the file field"),
                     };
                     return help::read_merge_mapping(&file_path);
