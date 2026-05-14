@@ -333,7 +333,20 @@ async function resolveResource(binInfo) {
 /**
  * copy local windows service binaries to resources dir
  */
+async function buildWindowsServiceBinariesIfNeeded() {
+  if (process.platform !== "win32") return;
+  const manifestPath = path.join(cwd, "src-tauri", "windows-service-src", "Cargo.toml");
+  const outDir = path.join(cwd, "src-tauri", "local-binaries", "windows-service-bin");
+  await fs.mkdirp(outDir);
+  execSync(`cargo build --manifest-path "${manifestPath}" --release --target ${SIDECAR_HOST || "x86_64-pc-windows-msvc"}`, { stdio: "inherit" });
+  const binDir = path.join(cwd, "src-tauri", "windows-service-src", "target", SIDECAR_HOST || "x86_64-pc-windows-msvc", "release");
+  for (const f of ["clash-verge-service.exe", "install-service.exe", "uninstall-service.exe"]) {
+    await fs.copy(path.join(binDir, f), path.join(outDir, f), { overwrite: true });
+  }
+}
+
 async function copyLocalWindowsServiceBinaries() {
+  await buildWindowsServiceBinariesIfNeeded();
   const sourceDir = path.join(cwd, "src-tauri", "local-binaries", "windows-service-bin");
   const targetDir = path.join(cwd, "src-tauri", "resources");
 

@@ -203,7 +203,7 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
 
                 super::core::win_service::ensure_service_ready()
                     .await
-                    .map_err(|err| anyhow::anyhow!("Tun mode on Windows requires Clash-Verge-Buty Service. {err}"))?;
+                    .map_err(|err| anyhow::anyhow!("Tun mode on Windows requires clash-verge-service. {err}"))?;
             }
 
             if service_mode.is_some() {
