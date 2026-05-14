@@ -102,7 +102,7 @@ fn run_service() -> Result<()> {
     let server_thread = thread::spawn(move || {
         while !stop_for_server.load(Ordering::Relaxed) {
             match server.recv_timeout(Duration::from_millis(300)) {
-                Ok(Some(req)) => {
+                Ok(Some(mut req)) => {
                     let method = req.method().clone();
                     let url = req.url().to_string();
                     let (status, body) = match (method, url.as_str()) {
