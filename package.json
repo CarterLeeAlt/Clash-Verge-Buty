@@ -1,5 +1,5 @@
 {
-  "name": "clash-verge",
+  "name": "clash-verge-buty",
   "version": "1.5.6",
   "description": "A Clash Meta GUI based on Tauri.",
   "author": "zzzgydi",
@@ -7,10 +7,10 @@
   "homepage": "https://github.com/clash-verge-rev/clash-verge-rev",
   "repository": "https://github.com/clash-verge-rev/clash-verge-rev.git",
   "metadata": {
-    "productName": "Clash_Verge_Buty",
-    "identifier": "io.github.clash-verge-rev.clash-verge-rev",
+    "productName": "Clash-Verge-Buty",
+    "identifier": "io.github.clash-verge-buty.clash-verge-buty",
     "authors": ["zzzgydi", "wonfen", "MystiPanda"],
-    "releaseNamePrefix": "Clash_Verge_Buty v"
+    "releaseNamePrefix": "Clash-Verge-Buty v"
   },
   "packageManager": "pnpm@8.15.9",
   "scripts": {

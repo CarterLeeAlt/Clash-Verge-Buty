@@ -206,12 +206,12 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
                     match status {
                         Ok(res) if res.code != 0 => {
                             bail!(
-                                "Tun mode on Windows requires Clash Verge Service to be active. Current service status: {}",
+                                "Tun mode on Windows requires Clash-Verge-Buty Service to be active. Current service status: {}",
                                 res.msg
                             );
                         }
                         Err(err) => {
-                            bail!("Tun mode on Windows requires Clash Verge Service. {err}");
+                            bail!("Tun mode on Windows requires Clash-Verge-Buty Service. {err}");
                         }
                         _ => {}
                     }

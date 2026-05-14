@@ -31,7 +31,7 @@ pub struct JsonResponse {
 }
 
 fn service_exists() -> bool {
-    let candidates = ["clash_verge_service", "Clash Verge Service"];
+    let candidates = ["clash_verge_service", "Clash-Verge-Buty Service"];
 
     candidates.iter().any(|name| {
         StdCommand::new("sc")
@@ -43,7 +43,7 @@ fn service_exists() -> bool {
     })
 }
 
-/// Install the Clash Verge Service
+/// Install the Clash-Verge-Buty Service
 /// 该函数应该在协程或者线程中执行，避免UAC弹窗阻塞主线程
 pub async fn install_service() -> Result<()> {
     let binary_path = dirs::service_path()?;
@@ -73,7 +73,7 @@ pub async fn install_service() -> Result<()> {
     Ok(())
 }
 
-/// Uninstall the Clash Verge Service
+/// Uninstall the Clash-Verge-Buty Service
 /// 该函数应该在协程或者线程中执行，避免UAC弹窗阻塞主线程
 pub async fn uninstall_service() -> Result<()> {
     let binary_path = dirs::service_path()?;
@@ -119,7 +119,7 @@ pub async fn check_service() -> Result<JsonResponse> {
             let json = resp
                 .json::<JsonResponse>()
                 .await
-                .context("failed to parse the Clash Verge Service response")?;
+                .context("failed to parse the Clash-Verge-Buty Service response")?;
             Ok(json)
         }
         Err(_) => {
@@ -130,7 +130,7 @@ pub async fn check_service() -> Result<JsonResponse> {
                     data: None,
                 })
             } else {
-                bail!("failed to connect to the Clash Verge Service");
+                bail!("failed to connect to the Clash-Verge-Buty Service");
             }
         }
     }
@@ -177,7 +177,7 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
         .await?
         .json::<JsonResponse>()
         .await
-        .context("failed to connect to the Clash Verge Service")?;
+        .context("failed to connect to the Clash-Verge-Buty Service")?;
 
     if res.code != 0 {
         bail!(res.msg);
@@ -197,7 +197,7 @@ pub(super) async fn stop_core_by_service() -> Result<()> {
         .await?
         .json::<JsonResponse>()
         .await
-        .context("failed to connect to the Clash Verge Service")?;
+        .context("failed to connect to the Clash-Verge-Buty Service")?;
 
     if res.code != 0 {
         bail!(res.msg);
