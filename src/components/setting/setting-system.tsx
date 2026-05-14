@@ -129,7 +129,7 @@ const SettingSystem = ({ onError }: Props) => {
             <Switch
               edge="end"
               disabled={
-                serviceStatus !== "active" && serviceStatus !== "installed"
+                !serviceStatus?.installed
               }
             />
           </GuardState>

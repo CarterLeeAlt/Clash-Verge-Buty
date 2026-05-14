@@ -16,7 +16,6 @@ use tokio::time::sleep;
 const SERVICE_URL: &str = "http://127.0.0.1:33211";
 const EXTERNAL_CONTROLLER_URL: &str = "http://127.0.0.1:9097/configs";
 const SERVICE_NAME: &str = "clash-verge-service";
-const LEGACY_SERVICE_NAME: &str = "clash_verge_service";
 const SERVICE_BINARY: &str = "clash-verge-service.exe";
 const INSTALL_HELPER: &str = "install-service.exe";
 const UNINSTALL_HELPER: &str = "uninstall-service.exe";
@@ -44,33 +43,12 @@ fn service_exists(name: &str) -> bool {
     sc(&["query", name]).map(|r| r.code == 0).unwrap_or(false)
 }
 
-async fn migrate_legacy_service_if_needed() -> Result<()> {
-    if service_exists(SERVICE_NAME) || !service_exists(LEGACY_SERVICE_NAME) {
-        return Ok(());
-    }
-    let stop = sc(&["stop", LEGACY_SERVICE_NAME])?;
-    log::info!(target:"app", "legacy stop {} => {} | {}", LEGACY_SERVICE_NAME, stop.code, stop.stdout);
-    let del = sc(&["delete", LEGACY_SERVICE_NAME])?;
-    if del.code != 0 {
-        bail!("legacy migration failed while deleting service. expected service name: {SERVICE_NAME}; legacy service name checked: {LEGACY_SERVICE_NAME}; selected service name: {LEGACY_SERVICE_NAME}; service binary: {SERVICE_BINARY}; install helper: {INSTALL_HELPER}; uninstall helper: {UNINSTALL_HELPER}; sc.exe delete exit code: {}; stdout: {}; stderr: {}", del.code, del.stdout, del.stderr);
-    }
-    install_service().await?;
-    Ok(())
-}
-
 fn start_service_process() -> Result<()> {
-    let selected = if service_exists(SERVICE_NAME) {
-        SERVICE_NAME
-    } else if service_exists(LEGACY_SERVICE_NAME) {
-        LEGACY_SERVICE_NAME
-    } else {
-        SERVICE_NAME
-    };
-    let start = sc(&["start", selected])?;
+    let start = sc(&["start", SERVICE_NAME])?;
     if start.code == 0 {
         return Ok(());
     }
-    bail!("failed to start service process. expected service name: {SERVICE_NAME}; legacy service name checked: {LEGACY_SERVICE_NAME}; selected service name: {selected}; service binary: {SERVICE_BINARY}; install helper: {INSTALL_HELPER}; uninstall helper: {UNINSTALL_HELPER}; sc.exe start exit code: {}; stdout: {}; stderr: {}", start.code, start.stdout, start.stderr)
+    bail!("failed to start service process. expected service name: {SERVICE_NAME}; service binary: {SERVICE_BINARY}; install helper: {INSTALL_HELPER}; uninstall helper: {UNINSTALL_HELPER}; sc.exe start exit code: {}; stdout: {}; stderr: {}", start.code, start.stdout, start.stderr)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,8 +58,8 @@ enum ServiceStateHint {
     Other,
 }
 
-fn query_service_state(name: &str) -> Result<ServiceStateHint> {
-    let r = sc(&["query", name])?;
+fn query_service_state() -> Result<ServiceStateHint> {
+    let r = sc(&["query", SERVICE_NAME])?;
     if r.code != 0 {
         return Ok(ServiceStateHint::Other);
     }
@@ -95,19 +73,11 @@ fn query_service_state(name: &str) -> Result<ServiceStateHint> {
     }
 }
 
-fn selected_service_name() -> &'static str {
-    if service_exists(SERVICE_NAME) {
-        SERVICE_NAME
-    } else if service_exists(LEGACY_SERVICE_NAME) {
-        LEGACY_SERVICE_NAME
-    } else {
-        SERVICE_NAME
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ResponseBody {
     pub core_type: Option<String>,
+    pub pid: Option<u32>,
+    pub running: Option<bool>,
     pub bin_path: String,
     pub config_dir: String,
     pub log_file: String,
@@ -118,6 +88,41 @@ pub struct JsonResponse {
     pub code: u64,
     pub msg: String,
     pub data: Option<ResponseBody>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ServiceStatus {
+    pub installed: bool,
+    pub running: bool,
+    pub api_ready: bool,
+    pub core_managed: bool,
+    pub core_pid: Option<u32>,
+    pub service_name: String,
+    pub message: String,
+}
+
+async fn get_service_health() -> Result<JsonResponse> {
+    reqwest::ClientBuilder::new()
+        .no_proxy()
+        .build()?
+        .get(format!("{SERVICE_URL}/health"))
+        .send()
+        .await?
+        .json::<JsonResponse>()
+        .await
+        .context("failed to parse the clash-verge-service health response")
+}
+
+async fn get_service_clash_state() -> Result<JsonResponse> {
+    reqwest::ClientBuilder::new()
+        .no_proxy()
+        .build()?
+        .get(format!("{SERVICE_URL}/get_clash"))
+        .send()
+        .await?
+        .json::<JsonResponse>()
+        .await
+        .context("failed to parse the clash-verge-service response")
 }
 
 pub async fn install_service() -> Result<()> {
@@ -166,53 +171,55 @@ pub async fn uninstall_service() -> Result<()> {
     Ok(())
 }
 
-pub async fn check_service() -> Result<JsonResponse> {
-    let response = reqwest::ClientBuilder::new()
-        .no_proxy()
-        .build()?
-        .get(format!("{SERVICE_URL}/get_clash"))
-        .send()
-        .await;
-    match response {
-        Ok(resp) => Ok(resp
-            .json::<JsonResponse>()
-            .await
-            .context("failed to parse the clash-verge-service response")?),
-        Err(err) => {
-            if service_exists(SERVICE_NAME) || service_exists(LEGACY_SERVICE_NAME) {
-                Ok(JsonResponse {
-                    code: 400,
-                    msg: "service installed but not active".into(),
-                    data: None,
-                })
-            } else {
-                bail!("failed to connect to service. expected service name: {SERVICE_NAME}; legacy service name checked: {LEGACY_SERVICE_NAME}; selected service name: {SERVICE_NAME}; service binary: {SERVICE_BINARY}; install helper: {INSTALL_HELPER}; uninstall helper: {UNINSTALL_HELPER}; api ready result: false; error: {err}")
-            }
-        }
-    }
+pub async fn check_service() -> Result<ServiceStatus> {
+    let installed = service_exists(SERVICE_NAME);
+    let running = installed && query_service_state().unwrap_or(ServiceStateHint::Other) == ServiceStateHint::Running;
+    let health = get_service_health().await.ok();
+    let api_ready = health.as_ref().map(|h| h.code == 0).unwrap_or(false);
+    let clash = if api_ready { get_service_clash_state().await.ok() } else { None };
+    let core_pid = clash.as_ref().and_then(|s| s.data.as_ref()).and_then(|d| d.pid);
+    let core_managed = core_pid.is_some();
+    let message = if !installed {
+        format!("{SERVICE_NAME} is not installed.")
+    } else if !running {
+        format!("{SERVICE_NAME} is installed but stopped.")
+    } else if !api_ready {
+        format!("{SERVICE_NAME} is running but API is not ready.")
+    } else if !core_managed {
+        format!("{SERVICE_NAME} is installed and running. Core is not currently managed by service.")
+    } else {
+        format!("{SERVICE_NAME} is running and managing core (pid {}).", core_pid.unwrap())
+    };
+    Ok(ServiceStatus {
+        installed,
+        running,
+        api_ready,
+        core_managed,
+        core_pid,
+        service_name: SERVICE_NAME.to_string(),
+        message,
+    })
 }
 
 pub async fn ensure_service_ready() -> Result<()> {
-    migrate_legacy_service_if_needed().await?;
     if let Ok(status) = check_service().await {
-        if status.code == 0 {
+        if status.api_ready {
             return Ok(());
         }
     }
 
     start_service_process()?;
-    let selected = selected_service_name();
     let timeout = Duration::from_secs(15);
     let started = std::time::Instant::now();
 
     loop {
         if let Ok(status) = check_service().await {
-            if status.code == 0 {
+            if status.api_ready {
                 return Ok(());
             }
         }
 
-        let state = query_service_state(selected).unwrap_or(ServiceStateHint::Other);
+        let state = query_service_state().unwrap_or(ServiceStateHint::Other);
         if started.elapsed() >= timeout {
             if state == ServiceStateHint::StartPending {
                 bail!("Windows service is stuck in StartPending and API 127.0.0.1:33211 is not ready.");
@@ -227,7 +234,7 @@ pub async fn ensure_service_ready() -> Result<()> {
 pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
     ensure_service_ready().await?;
     let status = check_service().await?;
-    if status.code == 0 {
+    if status.core_managed {
         stop_core_by_service().await?;
         sleep(Duration::from_secs(1)).await;
     }
@@ -283,7 +290,7 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
     }
     log::error!(target: "app", "9097 ready failure");
     let status = check_service().await?;
-    if status.data.is_none() {
+    if !status.core_managed {
         bail!("service did not start clash-meta; /get_clash returned null");
     }
     bail!("service started clash-meta but external-controller 127.0.0.1:9097 is not ready")

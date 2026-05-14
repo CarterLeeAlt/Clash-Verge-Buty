@@ -186,12 +186,18 @@ export async function cmdTestDelay(url: string) {
 
 export async function checkService() {
   try {
-    const result = await invoke<any>("check_service");
-    if (result?.code === 0) return "active";
-    if (result?.code === 400) return "installed";
-    return "unknown";
+    return await invoke<any>("check_service");
   } catch (err: any) {
-    return "uninstall";
+    return {
+      installed: false,
+      running: false,
+      api_ready: false,
+      core_managed: false,
+      core_pid: null,
+      service_name: "clash-verge-service",
+      message: "clash-verge-service is not installed.",
+      state: "service_not_installed",
+    };
   }
 }
 

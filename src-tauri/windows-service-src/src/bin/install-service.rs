@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use clash_verge_service_src::{LEGACY_SERVICE_NAME, SERVICE_DISPLAY_NAME, SERVICE_NAME};
+use clash_verge_windows_service_src::{SERVICE_DISPLAY_NAME, SERVICE_NAME};
 use std::ffi::OsString;
 use std::time::Duration;
 use windows_service::service::{
@@ -13,16 +13,6 @@ fn main() -> Result<()> {
         ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE,
     )
     .context("failed to connect ServiceManager")?;
-
-    if manager
-        .open_service(LEGACY_SERVICE_NAME, ServiceAccess::QUERY_STATUS)
-        .is_ok()
-    {
-        eprintln!(
-            "legacy service '{}' exists; please migrate to '{}' before installing",
-            LEGACY_SERVICE_NAME, SERVICE_NAME
-        );
-    }
 
     let service = match manager.open_service(
         SERVICE_NAME,

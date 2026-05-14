@@ -11,7 +11,7 @@ use windows_service::service::{ServiceControl, ServiceControlAccept, ServiceExit
 use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
 use windows_service::{define_windows_service, service_dispatcher};
 
-use clash_verge_service_src::{API_ADDR, API_GET_CLASH, API_START_CLASH, API_STOP_CLASH, SERVICE_NAME};
+use clash_verge_windows_service_src::{API_ADDR, API_GET_CLASH, API_START_CLASH, API_STOP_CLASH, SERVICE_NAME};
 
 #[derive(Serialize)]
 struct JsonResponse<T> {
