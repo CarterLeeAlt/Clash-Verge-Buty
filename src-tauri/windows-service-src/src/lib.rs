@@ -1,6 +1,5 @@
 // Keep these constants aligned with src-tauri/src/core/win_service.rs.
 pub const SERVICE_NAME: &str = "clash-verge-service";
-pub const LEGACY_SERVICE_NAME: &str = "clash_verge_service";
 pub const SERVICE_DISPLAY_NAME: &str = "clash-verge-service";
 pub const SERVICE_BINARY: &str = "clash-verge-service.exe";
 pub const INSTALL_HELPER: &str = "install-service.exe";

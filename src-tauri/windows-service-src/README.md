@@ -1,4 +1,4 @@
-# Clash Verge Service (vendored)
+# clash-verge-service (vendored)
 
 This directory vendors the Windows service source implementation used by this repository.
 

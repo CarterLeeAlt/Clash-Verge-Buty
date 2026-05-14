@@ -36,7 +36,18 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
     close: () => setOpen(false),
   }));
 
-  const state = status != null ? status : "pending";
+  const state =
+    status == null
+      ? "pending"
+      : !status.installed
+        ? "service_not_installed"
+        : !status.running
+          ? "service_installed_stopped"
+          : !status.api_ready
+            ? "service_running_api_not_ready"
+            : !status.core_managed
+              ? "service_running_api_ready_core_not_managed"
+              : "service_running_api_ready_core_managed";
 
   const onInstall = useLockFn(async () => {
     try {
@@ -86,33 +97,30 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
       disableFooter
       onClose={() => setOpen(false)}
     >
-      <Typography>Current State: {state}</Typography>
-
-      {(state === "unknown" || state === "uninstall") && (
-        <Typography>
-          Information: Please make sure that the Clash-Verge-Buty Service is
-          installed and enabled
-        </Typography>
-      )}
+      <Typography>
+        Current State:{" "}
+        {state.startsWith("service_running") ? "running" : state}
+      </Typography>
+      <Typography>Information: {status?.message}</Typography>
 
       <Stack
         direction="row"
         spacing={1}
         sx={{ mt: 4, justifyContent: "flex-end" }}
       >
-        {state === "uninstall" && enable && (
+        {state === "service_not_installed" && enable && (
           <Button variant="contained" onClick={onDisable}>
             Disable Service Mode
           </Button>
         )}
 
-        {state === "uninstall" && (
+        {state === "service_not_installed" && (
           <Button variant="contained" onClick={onInstall}>
             Install
           </Button>
         )}
 
-        {(state === "active" || state === "installed") && (
+        {state !== "service_not_installed" && (
           <Button variant="outlined" onClick={onUninstall}>
             Uninstall
           </Button>

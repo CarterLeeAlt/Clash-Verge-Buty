@@ -330,7 +330,7 @@ pub mod service {
     use crate::core::win_service;
 
     #[tauri::command]
-    pub async fn check_service() -> CmdResult<win_service::JsonResponse> {
+    pub async fn check_service() -> CmdResult<win_service::ServiceStatus> {
         wrap_err!(win_service::check_service().await)
     }
 

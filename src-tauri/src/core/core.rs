@@ -120,7 +120,7 @@ impl CoreManager {
             *self.use_service_mode.lock() = enable;
 
             if enable {
-                // 服务模式启动失败就直接运行sidecar
+                // 服务模式启动失败直接报错，避免误判为服务托管
                 log::debug!(target: "app", "try to run core in service mode");
                 let tun_enabled = Config::verge().latest().enable_tun_mode.unwrap_or(false);
 
@@ -132,12 +132,11 @@ impl CoreManager {
                 {
                     Ok(_) => return Ok(()),
                     Err(err) => {
-                        // 修改这个值，免得stop出错
-                        *self.use_service_mode.lock() = false;
-                        log::error!(target: "app", "{err}");
+                        log::error!(target: "app", "Service Mode failed; core is running by sidecar fallback. {err}");
                         if tun_enabled {
                             bail!("Tun mode requires a working clash-verge-service on Windows: {err}");
                         }
+                        bail!("Service Mode failed; core is running by sidecar fallback. {err}");
                     }
                 }
             }
