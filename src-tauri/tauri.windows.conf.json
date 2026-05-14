@@ -4,7 +4,7 @@
       "iconPath": "icons/tray-icon.png"
     },
     "bundle": {
-      "targets": ["nsis", "updater"],
+      "targets": ["nsis"],
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",

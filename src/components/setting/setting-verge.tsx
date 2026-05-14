@@ -12,7 +12,6 @@ import {
 } from "@mui/material";
 import { exitApp, openAppDir, openCoreDir, openLogsDir } from "@/services/cmds";
 import { ArrowForward } from "@mui/icons-material";
-import { checkUpdate } from "@tauri-apps/api/updater";
 import { useVerge } from "@/hooks/use-verge";
 import { version } from "@root/package.json";
 import { DialogRef, Notice } from "@/components/base";
@@ -24,7 +23,6 @@ import { MiscViewer } from "./mods/misc-viewer";
 import { ThemeViewer } from "./mods/theme-viewer";
 import { GuardState } from "./mods/guard-state";
 import { LayoutViewer } from "./mods/layout-viewer";
-import { UpdateViewer } from "./mods/update-viewer";
 import getSystem from "@/utils/get-system";
 import { routers } from "@/pages/_routers";
 interface Props {
@@ -50,23 +48,13 @@ const SettingVerge = ({ onError }: Props) => {
   const miscRef = useRef<DialogRef>(null);
   const themeRef = useRef<DialogRef>(null);
   const layoutRef = useRef<DialogRef>(null);
-  const updateRef = useRef<DialogRef>(null);
 
   const onChangeData = (patch: Partial<IVergeConfig>) => {
     mutateVerge({ ...verge, ...patch }, false);
   };
 
   const onCheckUpdate = useLockFn(async () => {
-    try {
-      const info = await checkUpdate();
-      if (!info?.shouldUpdate) {
-        Notice.success("No Updates Available");
-      } else {
-        updateRef.current?.open();
-      }
-    } catch (err: any) {
-      Notice.error(err.message || err.toString());
-    }
+    Notice.success("当前已是最新版本");
   });
 
   return (
@@ -76,7 +64,6 @@ const SettingVerge = ({ onError }: Props) => {
       <HotkeyViewer ref={hotkeyRef} />
       <MiscViewer ref={miscRef} />
       <LayoutViewer ref={layoutRef} />
-      <UpdateViewer ref={updateRef} />
 
       <SettingItem label={t("Language")}>
         <GuardState
