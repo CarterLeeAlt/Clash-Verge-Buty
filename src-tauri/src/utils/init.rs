@@ -159,21 +159,21 @@ pub fn init_config() -> Result<()> {
 
     crate::log_err!(dirs::clash_path().map(|path| {
         if !path.exists() {
-            help::save_yaml(&path, &IClashTemp::template().0, Some("# Clash Vergeasu"))?;
+            help::save_yaml(&path, &IClashTemp::template().0, Some("# Clash-Verge-Buty"))?;
         }
         <Result<()>>::Ok(())
     }));
 
     crate::log_err!(dirs::verge_path().map(|path| {
         if !path.exists() {
-            help::save_yaml(&path, &IVerge::template(), Some("# Clash Verge"))?;
+            help::save_yaml(&path, &IVerge::template(), Some("# Clash-Verge-Buty"))?;
         }
         <Result<()>>::Ok(())
     }));
 
     crate::log_err!(dirs::profiles_path().map(|path| {
         if !path.exists() {
-            help::save_yaml(&path, &IProfiles::template(), Some("# Clash Verge"))?;
+            help::save_yaml(&path, &IProfiles::template(), Some("# Clash-Verge-Buty"))?;
         }
         <Result<()>>::Ok(())
     }));
@@ -253,8 +253,8 @@ pub fn init_scheme() -> Result<()> {
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let (clash, _) = hkcu.create_subkey("Software\\Classes\\Clash")?;
-    clash.set_value("", &"Clash Verge")?;
-    clash.set_value("URL Protocol", &"Clash Verge URL Scheme Protocol")?;
+    clash.set_value("", &"Clash-Verge-Buty")?;
+    clash.set_value("URL Protocol", &"Clash-Verge-Buty URL Scheme Protocol")?;
     let (default_icon, _) = hkcu.create_subkey("Software\\Classes\\Clash\\DefaultIcon")?;
     default_icon.set_value("", &app_exe)?;
     let (command, _) = hkcu.create_subkey("Software\\Classes\\Clash\\Shell\\Open\\Command")?;
