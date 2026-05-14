@@ -369,7 +369,8 @@ async function copyLocalWindowsServiceBinaries() {
 
     if (!FORCE && (await fs.pathExists(dst))) continue;
 
-    await fs.copy(src, dst, { overwrite: true });
+    await fs.rm(dst, { force: true });
+    await fs.copyFile(src, dst);
     console.log(`[INFO]: ${file} copied from local repository`);
   }
 }

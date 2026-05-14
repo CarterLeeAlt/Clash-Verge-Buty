@@ -35,6 +35,7 @@ async fn migrate_legacy_service_if_needed() -> Result<()> {
     let stop = sc(&["stop", LEGACY_SERVICE_NAME])?; log::info!(target:"app", "legacy stop {} => {} | {}", LEGACY_SERVICE_NAME, stop.code, stop.stdout);
     let del = sc(&["delete", LEGACY_SERVICE_NAME])?; if del.code != 0 { bail!("legacy migration failed while deleting service. expected service name: {SERVICE_NAME}; legacy service name checked: {LEGACY_SERVICE_NAME}; selected service name: {LEGACY_SERVICE_NAME}; service binary: {SERVICE_BINARY}; install helper: {INSTALL_HELPER}; uninstall helper: {UNINSTALL_HELPER}; sc.exe delete exit code: {}; stdout: {}; stderr: {}", del.code, del.stdout, del.stderr); }
     install_service().await?;
+    Ok(())
 }
 
 fn start_service_process() -> Result<()> {
@@ -91,7 +92,7 @@ pub async fn ensure_service_ready() -> Result<()> {
 }
 
 pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> { ensure_service_ready().await?; let status = check_service().await?; if status.code == 0 { stop_core_by_service().await?; sleep(Duration::from_secs(1)).await; }
-let clash_core = Config::verge().latest().clash_core.clone().unwrap_or("clash".into()); let clash_bin = format!("{clash_core}.exe"); let bin_path = dirs::path_to_str(&current_exe()?.with_file_name(clash_bin))?; let config_dir = dirs::path_to_str(&dirs::app_home_dir()?)?; let log_path = dirs::path_to_str(&dirs::service_log_file()?)?; let config_file = dirs::path_to_str(config_file)?; let mut map = HashMap::new(); map.insert("core_type", clash_core.as_str()); map.insert("bin_path", bin_path); map.insert("config_dir", config_dir); map.insert("config_file", config_file); map.insert("log_file", log_path);
+let clash_core = Config::verge().latest().clash_core.clone().unwrap_or("clash".into()); let clash_bin = format!("{clash_core}.exe"); let bin_path_buf = current_exe()?.with_file_name(clash_bin); let config_dir_buf = dirs::app_home_dir()?; let log_path_buf = dirs::service_log_file()?; let bin_path = dirs::path_to_str(&bin_path_buf)?; let config_dir = dirs::path_to_str(&config_dir_buf)?; let log_path = dirs::path_to_str(&log_path_buf)?; let config_file = dirs::path_to_str(config_file)?; let mut map = HashMap::new(); map.insert("core_type", clash_core.as_str()); map.insert("bin_path", bin_path); map.insert("config_dir", config_dir); map.insert("config_file", config_file); map.insert("log_file", log_path);
 let res = reqwest::ClientBuilder::new().no_proxy().build()?.post(format!("{SERVICE_URL}/start_clash")).json(&map).send().await?.json::<JsonResponse>().await.context("failed to connect to the clash-verge-service")?; if res.code != 0 { bail!(res.msg); } Ok(()) }
 
 pub(super) async fn stop_core_by_service() -> Result<()> { let res = reqwest::ClientBuilder::new().no_proxy().build()?.post(format!("{SERVICE_URL}/stop_clash")).send().await?.json::<JsonResponse>().await.context("failed to connect to the clash-verge-service")?; if res.code != 0 { bail!(res.msg); } Ok(()) }
