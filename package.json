@@ -4,8 +4,8 @@
   "description": "A Clash Meta GUI based on Tauri.",
   "author": "zzzgydi",
   "license": "GPL-3.0-only",
-  "homepage": "https://github.com/clash-verge-rev/clash-verge-rev",
-  "repository": "https://github.com/clash-verge-rev/clash-verge-rev.git",
+  "homepage": "https://github.com/flyduckfly/Clash-Verge-Buty",
+  "repository": "https://github.com/flyduckfly/Clash-Verge-Buty.git",
   "metadata": {
     "productName": "Clash-Verge-Buty",
     "identifier": "io.github.clash-verge-buty.clash-verge-buty",
