@@ -6,6 +6,7 @@ pub const INSTALL_HELPER: &str = "install-service.exe";
 pub const UNINSTALL_HELPER: &str = "uninstall-service.exe";
 
 pub const API_ADDR: &str = "127.0.0.1:33211";
+pub const API_HEALTH: &str = "/health";
 pub const API_GET_CLASH: &str = "/get_clash";
 pub const API_START_CLASH: &str = "/start_clash";
 pub const API_STOP_CLASH: &str = "/stop_clash";
