@@ -7,7 +7,8 @@ use clash_verge_service_src::{API_ADDR, API_GET_CLASH, API_START_CLASH, API_STOP
 struct JsonResponse<T> { code: u64, msg: String, data: Option<T> }
 
 fn main() -> anyhow::Result<()> {
-    let server = Server::http(API_ADDR)?;
+    let server = Server::http(API_ADDR)
+        .map_err(|err| anyhow::anyhow!("failed to bind service API on {API_ADDR}: {err}"))?;
     for req in server.incoming_requests() {
         let (code,msg) = match (req.method(), req.url()) {
             (&Method::Get, API_GET_CLASH) => (0, "ok"),

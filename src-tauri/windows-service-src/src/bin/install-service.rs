@@ -12,7 +12,7 @@ fn main() -> Result<()> {
         name: OsString::from(SERVICE_NAME),
         display_name: OsString::from(SERVICE_DISPLAY_NAME),
         service_type: ServiceType::OWN_PROCESS,
-        start_type: ServiceStartType::Automatic,
+        start_type: ServiceStartType::AutoStart,
         error_control: ServiceErrorControl::Normal,
         executable_path: exe,
         launch_arguments: vec![],
