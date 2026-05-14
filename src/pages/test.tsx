@@ -21,7 +21,7 @@ import { TestViewer, TestViewerRef } from "@/components/test/test-viewer";
 import { TestItem } from "@/components/test/test-item";
 import { emit } from "@tauri-apps/api/event";
 import { nanoid } from "nanoid";
-import logoPng from "@/assets/image/logo.png";
+import AppleIcon from "@/assets/image/apple.svg";
 
 const TestPage = () => {
   const { t } = useTranslation();
@@ -39,7 +39,7 @@ const TestPage = () => {
       uid: nanoid(),
       name: "Apple",
       url: "https://www.apple.com",
-      icon: logoPng,
+      icon: AppleIcon,
     },
     {
       uid: nanoid(),
