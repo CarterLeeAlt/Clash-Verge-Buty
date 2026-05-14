@@ -298,7 +298,8 @@ async function copyLocalWindowsServiceBinaries() {
   const targetDir = path.join(cwd, "src-tauri", "resources");
 
   const files = [
-    "clash-verge-buty-service.exe",
+    // Windows service binary keeps historical filename for CI/local-binaries compatibility.
+    "clash-verge-service.exe",
     "install-service.exe",
     "uninstall-service.exe",
   ];

@@ -94,7 +94,9 @@ pub fn clash_pid_path() -> Result<PathBuf> {
 
 #[cfg(windows)]
 pub fn service_path() -> Result<PathBuf> {
-    Ok(app_resources_dir()?.join("clash-verge-buty-service.exe"))
+    // Windows service binary keeps the historical filename clash-verge-service.exe
+    // because local-binaries and CI provide it under this name.
+    Ok(app_resources_dir()?.join("clash-verge-service.exe"))
 }
 
 #[cfg(windows)]
