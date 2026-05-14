@@ -122,9 +122,10 @@ impl CoreManager {
             if enable {
                 // 服务模式启动失败就直接运行sidecar
                 log::debug!(target: "app", "try to run core in service mode");
+                let tun_enabled = Config::verge().latest().enable_tun_mode.unwrap_or(false);
 
                 match (|| async {
-                    win_service::check_service().await?;
+                    win_service::ensure_service_ready().await?;
                     win_service::run_core_by_service(&config_path).await
                 })()
                 .await
@@ -134,6 +135,9 @@ impl CoreManager {
                         // 修改这个值，免得stop出错
                         *self.use_service_mode.lock() = false;
                         log::error!(target: "app", "{err}");
+                        if tun_enabled {
+                            bail!("Tun mode requires a working Clash-Verge-Buty Service on Windows: {err}");
+                        }
                     }
                 }
             }
