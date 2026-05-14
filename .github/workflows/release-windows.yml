@@ -69,9 +69,13 @@ jobs:
         run: |
           cargo build --manifest-path src-tauri/windows-service-src/Cargo.toml --release --target ${{ matrix.target }}
           New-Item -ItemType Directory -Force -Path src-tauri/local-binaries/windows-service-bin | Out-Null
-          Copy-Item src-tauri/windows-service-src/target/${{ matrix.target }}/release/clash-verge-service.exe src-tauri/local-binaries/windows-service-bin/clash-verge-service.exe -Force
-          Copy-Item src-tauri/windows-service-src/target/${{ matrix.target }}/release/install-service.exe src-tauri/local-binaries/windows-service-bin/install-service.exe -Force
-          Copy-Item src-tauri/windows-service-src/target/${{ matrix.target }}/release/uninstall-service.exe src-tauri/local-binaries/windows-service-bin/uninstall-service.exe -Force
+          $svcOut = "src-tauri/windows-service-src/target/${{ matrix.target }}/release"
+          $need = @("clash-verge-service.exe", "install-service.exe", "uninstall-service.exe")
+          foreach ($n in $need) {
+            $src = Join-Path $svcOut $n
+            if (-not (Test-Path $src)) { throw "missing service binary: $src" }
+            Copy-Item $src (Join-Path "src-tauri/local-binaries/windows-service-bin" $n) -Force
+          }
 
       - name: Pnpm install and check
         run: |
