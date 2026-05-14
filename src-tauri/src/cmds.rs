@@ -93,14 +93,8 @@ pub fn view_profile(app_handle: tauri::AppHandle, index: String) -> CmdResult {
             .ok_or("the file field is null")
     }?;
 
-    let base_dir = wrap_err!(dirs::app_profiles_dir())?;
-    let path = base_dir.join(file);
+    let path = wrap_err!(help::resolve_profile_path(&file))?;
     let canonical_path = wrap_err!(std::fs::canonicalize(&path))?;
-    let canonical_base = wrap_err!(std::fs::canonicalize(&base_dir))?;
-
-    if !canonical_path.starts_with(&canonical_base) {
-        ret_err!("invalid profile file path");
-    }
 
     if !canonical_path.exists() {
         ret_err!("the file not found");

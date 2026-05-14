@@ -371,7 +371,7 @@ impl PrfItem {
         }
 
         let file = self.file.clone().unwrap();
-        let path = dirs::app_profiles_dir()?.join(file);
+        let path = help::resolve_profile_path(&file)?;
         fs::read_to_string(path).context("failed to read the file")
     }
 
@@ -382,7 +382,7 @@ impl PrfItem {
         }
 
         let file = self.file.clone().unwrap();
-        let path = dirs::app_profiles_dir()?.join(file);
-        fs::write(path, data.as_bytes()).context("failed to save the file")
+        let path = help::resolve_profile_path(&file)?;
+        help::write_file_atomic(&path, data.as_bytes()).context("failed to save the file")
     }
 }

@@ -146,7 +146,9 @@ impl Tray {
             if *sysproxy_tray_icon {
                 let path = dirs::app_home_dir()?.join("icons").join("sysproxy.png");
                 if path.exists() {
-                    icon = std::fs::read(path).unwrap();
+                    if let Ok(custom_icon) = std::fs::read(path) {
+                        icon = custom_icon;
+                    }
                 }
             }
             icon
@@ -158,7 +160,9 @@ impl Tray {
             if *common_tray_icon {
                 let path = dirs::app_home_dir()?.join("icons").join("common.png");
                 if path.exists() {
-                    icon = std::fs::read(path).unwrap();
+                    if let Ok(custom_icon) = std::fs::read(path) {
+                        icon = custom_icon;
+                    }
                 }
             }
             icon
@@ -172,7 +176,9 @@ impl Tray {
             if *tun_tray_icon {
                 let path = dirs::app_home_dir()?.join("icons").join("tun.png");
                 if path.exists() {
-                    icon = std::fs::read(path).unwrap();
+                    if let Ok(custom_icon) = std::fs::read(path) {
+                        icon = custom_icon;
+                    }
                 }
             }
             indication_icon = icon
