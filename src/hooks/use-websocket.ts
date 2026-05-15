@@ -9,10 +9,10 @@ export interface WsOptions {
   maxRetries?: number | "infinite";
   reconnect?: boolean;
   backoff?: boolean;
-  onError?: () => void;
-  onOpen?: () => void;
-  onClose?: () => void;
-  shouldReconnect?: boolean; // default is true
+  onError?: (event: Event) => void;
+  onOpen?: (event: Event) => void;
+  onClose?: (event: CloseEvent) => void;
+  shouldReconnect?: boolean; // legacy alias of reconnect
 }
 
 export const useWebsocket = (onMessage: WsMsgFn, options?: WsOptions) => {
@@ -24,6 +24,7 @@ export const useWebsocket = (onMessage: WsMsgFn, options?: WsOptions) => {
   const urlRef = useRef("");
   const msgRef = useRef(onMessage);
   const optsRef = useRef(options);
+  const connIdRef = useRef(0);
 
   msgRef.current = onMessage;
   optsRef.current = options;
@@ -66,22 +67,30 @@ export const useWebsocket = (onMessage: WsMsgFn, options?: WsOptions) => {
 
     const ws = new WebSocket(url);
     wsRef.current = ws;
+    const connId = connIdRef.current + 1;
+    connIdRef.current = connId;
 
     const scheduleReconnect = () => {
       const opts = optsRef.current;
       const reconnectEnabled = (opts?.reconnect ?? opts?.shouldReconnect ?? true) !== false;
-
       if (!reconnectEnabled || manualCloseRef.current || unmountedRef.current) return;
-      if (wsRef.current !== ws || timerRef.current || !urlRef.current) return;
+      if (connIdRef.current !== connId || timerRef.current || !urlRef.current) return;
 
       const maxRetries = opts?.maxRetries ?? opts?.errorCount ?? 5;
-      if (maxRetries !== "infinite" && retryCountRef.current >= maxRetries) {
-        opts?.onError?.();
-        return;
-      }
+      const normalizedMaxRetries =
+        maxRetries === "infinite"
+          ? "infinite"
+          : Number.isFinite(maxRetries)
+            ? Math.max(0, Math.floor(maxRetries))
+            : 5;
+      if (normalizedMaxRetries !== "infinite" && retryCountRef.current >= normalizedMaxRetries) return;
 
-      const retryInterval = opts?.retryInterval ?? 2500;
-      const maxRetryInterval = opts?.maxRetryInterval ?? retryInterval;
+      const retryInterval = Number.isFinite(opts?.retryInterval)
+        ? Math.max(0, opts!.retryInterval as number)
+        : 2500;
+      const maxRetryInterval = Number.isFinite(opts?.maxRetryInterval)
+        ? Math.max(retryInterval, opts!.maxRetryInterval as number)
+        : retryInterval;
       const backoff = opts?.backoff ?? false;
       const delay = backoff
         ? Math.min(retryInterval * 2 ** retryCountRef.current, maxRetryInterval)
@@ -90,38 +99,41 @@ export const useWebsocket = (onMessage: WsMsgFn, options?: WsOptions) => {
       retryCountRef.current += 1;
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
-        if (manualCloseRef.current || unmountedRef.current) return;
+        if (manualCloseRef.current || unmountedRef.current || connIdRef.current !== connId) return;
         connect(urlRef.current, false);
       }, delay);
     };
 
-    ws.onopen = () => {
-      if (wsRef.current !== ws) return;
+    ws.onopen = (event) => {
+      if (wsRef.current !== ws || connIdRef.current !== connId) return;
       retryCountRef.current = 0;
-      optsRef.current?.onOpen?.();
+      clearTimer();
+      optsRef.current?.onOpen?.(event);
     };
 
     ws.onmessage = (event) => {
-      if (wsRef.current !== ws) return;
+      if (wsRef.current !== ws || connIdRef.current !== connId) return;
       msgRef.current(event);
     };
 
-    ws.onerror = () => {
-      if (wsRef.current !== ws) return;
-      optsRef.current?.onError?.();
+    ws.onerror = (event) => {
+      if (connIdRef.current !== connId) return;
+      optsRef.current?.onError?.(event);
       scheduleReconnect();
     };
 
-    ws.onclose = () => {
-      if (wsRef.current !== ws) return;
-      wsRef.current = null;
-      optsRef.current?.onClose?.();
+    ws.onclose = (event) => {
+      if (connIdRef.current !== connId) return;
+      if (wsRef.current === ws) wsRef.current = null;
+      optsRef.current?.onClose?.(event);
       scheduleReconnect();
     };
   }, [clearTimer, closeWs]);
 
   const disconnect = useCallback(() => {
     manualCloseRef.current = true;
+    retryCountRef.current = 0;
+    connIdRef.current += 1;
     clearTimer();
     closeWs();
   }, [clearTimer, closeWs]);

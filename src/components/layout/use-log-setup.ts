@@ -14,8 +14,9 @@ import { useWebsocket } from "@/hooks/use-websocket";
 import { buildControllerWsUrl } from "@/utils/controller";
 
 const MAX_LOG_NUM = 2000;
-const FALLBACK_SYNC_INTERVAL = 1500;
+const FALLBACK_SYNC_INTERVAL = 4000;
 const RECONNECTING_HINT_DELAY = 8000;
+
 const getLogKey = (item: Partial<ILogItem>) => {
   const payload = item.payload ?? (item as any).message ?? (item as any).msg ?? "";
   return `${item.time ?? ""}|${item.type ?? ""}|${payload}`;
@@ -74,7 +75,7 @@ export const useLogSetup = () => {
     [setLogData],
   );
 
-  const pullHistory = useCallback(async () => {
+  const pullHistory = useCallback(async (source: "ws-open" | "fallback" | "manual" = "manual") => {
     const reqId = ++historyReqIdRef.current;
     try {
       const logs = await getClashLogs();
@@ -85,26 +86,28 @@ export const useLogSetup = () => {
           time: normalizeLogTime(item.time),
         })).reverse(),
       );
-      setLogError(null);
-      setLogConnState("connected");
-      clearReconnectHintTimer();
-      clearFallbackTimer();
+
+      if (source === "ws-open") {
+        setLogError(null);
+        setLogConnState("connected");
+        clearReconnectHintTimer();
+      }
     } catch (err) {
       if (reqId !== historyReqIdRef.current) return;
-      console.warn("[log] fallback sync failed", err);
+      console.warn("[log] history sync failed", err);
     }
-  }, [clearFallbackTimer, clearReconnectHintTimer, mergeLogs, setLogConnState, setLogError]);
+  }, [clearReconnectHintTimer, mergeLogs, setLogConnState, setLogError]);
 
   const scheduleFallbackSync = useCallback(() => {
-    clearFallbackTimer();
     if (!enableLog) return;
+    if (fallbackTimerRef.current) return;
 
     fallbackTimerRef.current = setTimeout(async () => {
       fallbackTimerRef.current = null;
-      await pullHistory();
+      await pullHistory("fallback");
       scheduleFallbackSync();
     }, FALLBACK_SYNC_INTERVAL);
-  }, [clearFallbackTimer, enableLog, pullHistory]);
+  }, [enableLog, pullHistory]);
 
   const { connect, disconnect } = useWebsocket(
     (event) => {
@@ -122,20 +125,20 @@ export const useLogSetup = () => {
       maxRetryInterval: 10000,
       backoff: true,
       onOpen: () => {
-        setLogConnState("connected");
-        setLogError(null);
-        pullHistory();
         clearFallbackTimer();
         clearReconnectHintTimer();
+        setLogConnState("connected");
+        setLogError(null);
+        void pullHistory("ws-open");
       },
       onClose: () => {
         enterReconnectingState();
-        pullHistory();
+        void pullHistory("fallback");
         scheduleFallbackSync();
       },
       onError: () => {
         enterReconnectingState();
-        pullHistory();
+        void pullHistory("fallback");
         scheduleFallbackSync();
       },
     },
@@ -161,7 +164,7 @@ export const useLogSetup = () => {
     listen("verge://refresh-clash-config", () => {
       if (!enableLog) return;
       enterReconnectingState();
-      pullHistory();
+      void pullHistory("fallback");
       if (wsUrl) {
         disconnect();
         connect(wsUrl);
@@ -193,14 +196,14 @@ export const useLogSetup = () => {
       enterReconnectingState();
       disconnect();
       setLogError("Core not running or external-controller is not ready");
-      pullHistory();
+      void pullHistory("fallback");
       scheduleFallbackSync();
       return;
     }
 
     setLogConnState("reconnecting");
     connect(wsUrl);
-    pullHistory();
+    void pullHistory("manual");
 
     return () => {
       historyReqIdRef.current += 1;
