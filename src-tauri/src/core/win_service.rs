@@ -40,7 +40,27 @@ fn sc(args: &[&str]) -> Result<ScResult> {
 }
 
 fn service_exists(name: &str) -> bool {
-    sc(&["query", name]).map(|r| r.code == 0).unwrap_or(false)
+    service_exists_detailed(name).ok().unwrap_or(false)
+}
+
+fn output_indicates_service_not_found(stdout: &str, stderr: &str, code: i32) -> bool {
+    let all = format!("{stdout}\n{stderr}").to_ascii_uppercase();
+    code == 1060
+        || all.contains("FAILED 1060")
+        || all.contains("DOES NOT EXIST")
+        || all.contains("SERVICE DOES NOT EXIST")
+        || all.contains("指定的服务未安装")
+}
+
+fn service_exists_detailed(name: &str) -> Result<bool> {
+    let result = sc(&["query", name])?;
+    if output_indicates_service_not_found(&result.stdout, &result.stderr, result.code) {
+        return Ok(false);
+    }
+    if result.code == 0 {
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 fn start_service_process() -> Result<()> {
@@ -121,6 +141,7 @@ pub struct ServiceStatus {
 async fn get_service_health() -> Result<HealthResponse> {
     reqwest::ClientBuilder::new()
         .no_proxy()
+        .timeout(Duration::from_millis(1200))
         .build()?
         .get(format!("{SERVICE_URL}/health"))
         .send()
@@ -133,6 +154,7 @@ async fn get_service_health() -> Result<HealthResponse> {
 async fn get_service_clash_state() -> Result<JsonResponse> {
     reqwest::ClientBuilder::new()
         .no_proxy()
+        .timeout(Duration::from_millis(1200))
         .build()?
         .get(format!("{SERVICE_URL}/get_clash"))
         .send()
@@ -171,21 +193,59 @@ pub async fn uninstall_service() -> Result<()> {
     if !uninstall_path.exists() {
         bail!("uninstaller exe not found: {}", UNINSTALL_HELPER);
     }
+    let existed_before = service_exists_detailed(SERVICE_NAME)?;
+    log::info!(target: "app", "uninstall_service: service exists before uninstall = {}", existed_before);
+    if !existed_before {
+        return Ok(());
+    }
+
     let token = Token::with_current_process()?;
     let level = token.privilege_level()?;
-    let status = match level {
-        PrivilegeLevel::NotPrivileged => RunasCommand::new(uninstall_path).show(false).status()?,
-        _ => StdCommand::new(uninstall_path)
+    let use_runas = matches!(level, PrivilegeLevel::NotPrivileged);
+    log::info!(target: "app", "uninstall_service: helper_path={}, runas={}", uninstall_path.display(), use_runas);
+    let output = match level {
+        PrivilegeLevel::NotPrivileged => {
+            let status = RunasCommand::new(&uninstall_path).show(false).status()?;
+            std::process::Output { status, stdout: Vec::new(), stderr: Vec::new() }
+        }
+        _ => StdCommand::new(&uninstall_path)
             .creation_flags(0x08000000)
-            .status()?,
+            .output()?,
     };
-    if !status.success() {
-        bail!(
-            "failed to uninstall service with status {}",
-            status.code().unwrap_or(-1)
-        );
+    let exit_code = output.status.code().unwrap_or(-1);
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    log::info!(target: "app", "uninstall_service: helper exit_code={}, stdout={}, stderr={}", exit_code, stdout, stderr);
+
+    for _ in 0..10 {
+        if !service_exists_detailed(SERVICE_NAME)? {
+            log::info!(target: "app", "uninstall_service: service removed");
+            return Ok(());
+        }
+        sleep(Duration::from_millis(300)).await;
     }
-    Ok(())
+
+    let query = sc(&["query", SERVICE_NAME])?;
+    let query_out_upper = format!("{}\n{}", query.stdout, query.stderr).to_ascii_uppercase();
+    log::warn!(target: "app", "uninstall_service: service still exists after polling, sc_query_code={}, stdout={}, stderr={}", query.code, query.stdout, query.stderr);
+
+    if output_indicates_service_not_found(&query.stdout, &query.stderr, query.code) {
+        return Ok(());
+    }
+
+    if query_out_upper.contains("DELETE_PENDING")
+        || query_out_upper.contains("STOP_PENDING")
+        || query_out_upper.contains("MARKED FOR DELETION")
+    {
+        bail!("Windows is still removing the service. Please wait a moment and try again.");
+    }
+
+    if output.status.success() {
+        bail!("Failed to uninstall service. Please try again or run as administrator.");
+    }
+    bail!(
+        "Failed to uninstall service. Please try again or run as administrator."
+    )
 }
 
 pub async fn check_service() -> Result<ServiceStatus> {
@@ -326,6 +386,7 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
 pub async fn stop_core_by_service() -> Result<()> {
     let res = reqwest::ClientBuilder::new()
         .no_proxy()
+        .timeout(Duration::from_millis(1500))
         .build()?
         .post(format!("{SERVICE_URL}/stop_clash"))
         .send()
