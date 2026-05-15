@@ -214,17 +214,18 @@ jobs:
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
           New-Item -ItemType Directory -Path $stage | Out-Null
 
-          Get-ChildItem . -File | Where-Object { $_.Name -match "^Clash-Verge-Buty([_-].*)?[-_]portable.*\.zip$" -or $_.Name -match "^Clash[-_.]Verge[-_.]Buty_.*_x64_portable.*\.zip$" } | ForEach-Object {
-            Copy-Item $_.FullName (Join-Path $stage $_.Name) -Force
+          $portableZip = Get-ChildItem . -File | Where-Object { $_.Name -match "^Clash-Verge-Buty([_-].*)?[-_]portable.*\.zip$" -or $_.Name -match "^Clash[-_.]Verge[-_.]Buty_.*_x64_portable.*\.zip$" } | Select-Object -First 1
+          if (-not $portableZip) {
+            throw "portable artifact zip not found in workspace root"
           }
 
-          Write-Host "[INFO] portable zip content"
-          Get-ChildItem $stage -File -Filter "*portable*.zip" | ForEach-Object {
-            Write-Host "# $($_.Name)"
-            tar -tf $_.FullName
-          }
-          if (-not (Get-ChildItem $stage -File -Filter "*portable*.zip")) {
-            throw "portable artifact zip not found in $stage"
+          Expand-Archive -Path $portableZip.FullName -DestinationPath $stage -Force
+          Write-Host "[INFO] prepared portable artifact from: $($portableZip.Name)"
+          Write-Host "[INFO] staged portable content"
+          Get-ChildItem $stage -Recurse | ForEach-Object { Write-Host " - $($_.FullName)" }
+
+          if (-not (Get-ChildItem $stage -Recurse -File)) {
+            throw "portable artifact content not found after unzip: $($portableZip.FullName)"
           }
 
       - name: Stage Windows installer artifact
@@ -251,8 +252,8 @@ jobs:
           }
 
           "### Final Windows artifacts" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-          "- portable artifact: dist/windows-alpha-portable/*portable*.zip" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-          Get-ChildItem "dist/windows-alpha-portable" -File | ForEach-Object { "  - $($_.Name)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append }
+          "- portable artifact: dist/windows-alpha-portable/** (unzipped portable content)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          Get-ChildItem "dist/windows-alpha-portable" -Recurse -File | ForEach-Object { "  - $($_.FullName)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append }
           "- installer artifact: dist/windows-alpha-installer/*" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
           Get-ChildItem "dist/windows-alpha-installer" -File | ForEach-Object { "  - $($_.Name)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append }
 
@@ -276,7 +277,7 @@ jobs:
         with:
           name: Clash-Verge-Buty-windows-alpha-portable
           if-no-files-found: error
-          path: dist/windows-alpha-portable/*portable*.zip
+          path: dist/windows-alpha-portable/
       - name: Upload Windows alpha installer artifact
         uses: actions/upload-artifact@v4
         with:
