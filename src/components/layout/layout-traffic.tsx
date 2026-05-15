@@ -8,10 +8,10 @@ import {
 import { useClashInfo } from "@/hooks/use-clash";
 import { useVerge } from "@/hooks/use-verge";
 import { TrafficGraph, type TrafficRef } from "./traffic-graph";
-import { useLogSetup } from "./use-log-setup";
 import { useVisibility } from "@/hooks/use-visibility";
 import { useWebsocket } from "@/hooks/use-websocket";
 import parseTraffic from "@/utils/parse-traffic";
+import { buildControllerWsUrl } from "@/utils/controller";
 
 // setup the traffic
 export const LayoutTraffic = () => {
@@ -26,9 +26,6 @@ export const LayoutTraffic = () => {
   const [memory, setMemory] = useState({ inuse: 0 });
   const pageVisible = useVisibility();
 
-  // setup log ws during layout
-  useLogSetup();
-
   const { connect, disconnect } = useWebsocket((event) => {
     try {
       const data = JSON.parse(event.data) as ITrafficItem;
@@ -41,7 +38,9 @@ export const LayoutTraffic = () => {
     if (!clashInfo || !pageVisible) return;
 
     const { server = "", secret = "" } = clashInfo;
-    connect(`ws://${server}/traffic?token=${encodeURIComponent(secret)}`);
+    const url = buildControllerWsUrl(server, "/traffic", secret);
+    if (!url) return;
+    connect(url);
 
     return () => {
       disconnect();
@@ -66,9 +65,9 @@ export const LayoutTraffic = () => {
   useEffect(() => {
     if (!clashInfo || !pageVisible || !displayMemory) return;
     const { server = "", secret = "" } = clashInfo;
-    memoryWs.connect(
-      `ws://${server}/memory?token=${encodeURIComponent(secret)}`
-    );
+    const url = buildControllerWsUrl(server, "/memory", secret);
+    if (!url) return;
+    memoryWs.connect(url);
     return () => memoryWs.disconnect();
   }, [clashInfo, pageVisible, displayMemory]);
 

@@ -15,6 +15,11 @@ export const atomLogError = atom<string | null>({
   default: null,
 });
 
+export const atomLogConnState = atom<"connected" | "reconnecting" | "paused">({
+  key: "atomLogConnState",
+  default: "reconnecting",
+});
+
 export const atomEnableLog = atom<boolean>({
   key: "atomEnableLog",
   effects: [
