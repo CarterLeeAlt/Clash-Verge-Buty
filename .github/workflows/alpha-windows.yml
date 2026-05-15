@@ -23,7 +23,7 @@ env:
   WINDOWS_SIGNING_MODE: ${{ github.event.inputs.signing_mode || vars.WINDOWS_SIGNING_MODE || 'unsigned' }}
 
 jobs:
-  build-windows-alpha:
+  alpha-windows:
     if: github.ref_name == 'alpha'
     strategy:
       fail-fast: false
