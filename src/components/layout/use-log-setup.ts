@@ -67,7 +67,7 @@ export const useLogSetup = () => {
     (incoming: ILogItem[]) => {
       setLogData((old) => {
         const map = new Map<string, ILogItem>();
-        [...old, ...incoming].forEach((item) => map.set(getLogKey(item), item));
+        [...incoming, ...old].forEach((item) => map.set(getLogKey(item), item));
         return Array.from(map.values()).slice(0, MAX_LOG_NUM);
       });
     },
@@ -83,7 +83,7 @@ export const useLogSetup = () => {
         (logs || []).map((item) => ({
           ...item,
           time: normalizeLogTime(item.time),
-        })),
+        })).reverse(),
       );
       setLogError(null);
       setLogConnState("connected");
