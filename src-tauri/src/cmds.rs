@@ -341,7 +341,8 @@ pub mod service {
 
     #[tauri::command]
     pub async fn uninstall_service() -> CmdResult {
-        let verge = Config::verge().latest();
+        let verge_config = Config::verge();
+        let verge = verge_config.latest();
         if verge.enable_tun_mode.unwrap_or(false) {
             return Err(
                 "Tun Mode is enabled. Please disable Tun Mode before uninstalling the service."

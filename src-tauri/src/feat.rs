@@ -190,7 +190,7 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
     let tun_mode = patch.enable_tun_mode;
     let auto_launch = patch.enable_auto_launch;
     let system_proxy = patch.enable_system_proxy;
-    let proxy_bypass = patch.system_proxy_bypass;
+    let proxy_bypass = patch.system_proxy_bypass.clone();
     let language = patch.language.clone();
     let port = patch.verge_mixed_port;
     let common_tray_icon = patch.common_tray_icon;
