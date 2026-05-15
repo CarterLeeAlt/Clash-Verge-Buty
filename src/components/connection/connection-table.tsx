@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import {
   DataGrid,
   GridColDef,
+  GridColumnVisibilityModel,
   GridValueFormatterParams,
 } from "@mui/x-data-grid";
 import { truncateStr } from "@/utils/truncate-str";
@@ -16,9 +17,7 @@ interface Props {
 export const ConnectionTable = (props: Props) => {
   const { connections, onShowDetail } = props;
 
-  const [columnVisible, setColumnVisible] = useState<
-    Partial<Record<keyof IConnectionsItem, boolean>>
-  >({
+  const [columnVisible, setColumnVisible] = useState<GridColumnVisibilityModel>({
     activeSpeed: false,
     process: false,
   });
