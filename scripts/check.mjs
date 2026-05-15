@@ -359,6 +359,14 @@ async function copyLocalWindowsServiceBinaries() {
 
   await fs.mkdirp(targetDir);
 
+  const removeIfExists = async (filePath) => {
+    try {
+      await fs.unlink(filePath);
+    } catch (err) {
+      if (err?.code !== "ENOENT") throw err;
+    }
+  };
+
   for (const file of files) {
     const src = path.join(sourceDir, file);
     const dst = path.join(targetDir, file);
@@ -369,7 +377,7 @@ async function copyLocalWindowsServiceBinaries() {
 
     if (!FORCE && (await fs.pathExists(dst))) continue;
 
-    await fs.rm(dst, { force: true });
+    await removeIfExists(dst);
     await fs.copyFile(src, dst);
     console.log(`[INFO]: ${file} copied from local repository`);
   }
