@@ -3,8 +3,12 @@ import { useCallback, useEffect, useRef } from "react";
 export type WsMsgFn = (event: MessageEvent<any>) => void;
 
 export interface WsOptions {
-  errorCount?: number; // default is 5
+  errorCount?: number; // legacy alias of maxRetries
   retryInterval?: number; // default is 2500
+  maxRetryInterval?: number;
+  maxRetries?: number | "infinite";
+  reconnect?: boolean;
+  backoff?: boolean;
   onError?: () => void;
   onOpen?: () => void;
   onClose?: () => void;
@@ -14,7 +18,7 @@ export interface WsOptions {
 export const useWebsocket = (onMessage: WsMsgFn, options?: WsOptions) => {
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const retryLeftRef = useRef(options?.errorCount ?? 5);
+  const retryCountRef = useRef(0);
   const manualCloseRef = useRef(false);
   const unmountedRef = useRef(false);
   const urlRef = useRef("");
@@ -25,10 +29,9 @@ export const useWebsocket = (onMessage: WsMsgFn, options?: WsOptions) => {
   optsRef.current = options;
 
   const clearTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
+    if (!timerRef.current) return;
+    clearTimeout(timerRef.current);
+    timerRef.current = null;
   }, []);
 
   const closeWs = useCallback((ws?: WebSocket | null) => {
@@ -42,11 +45,11 @@ export const useWebsocket = (onMessage: WsMsgFn, options?: WsOptions) => {
 
     try {
       target.close();
-    } catch {}
-
-    if (wsRef.current === target) {
-      wsRef.current = null;
+    } catch {
+      // ignore close failures
     }
+
+    if (wsRef.current === target) wsRef.current = null;
   }, []);
 
   const connect = useCallback((url: string, resetRetry = true) => {
@@ -56,40 +59,45 @@ export const useWebsocket = (onMessage: WsMsgFn, options?: WsOptions) => {
     manualCloseRef.current = false;
     urlRef.current = url;
 
-    if (resetRetry || prevUrl !== url) {
-      retryLeftRef.current = optsRef.current?.errorCount ?? 5;
-    }
+    if (resetRetry || prevUrl !== url) retryCountRef.current = 0;
 
     clearTimer();
-    const oldWs = wsRef.current;
-    closeWs(oldWs);
+    closeWs(wsRef.current);
 
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
     const scheduleReconnect = () => {
-      if (manualCloseRef.current || unmountedRef.current) return;
-      if (wsRef.current !== ws) return;
-      if (optsRef.current?.shouldReconnect === false) return;
-      if (!urlRef.current || timerRef.current) return;
+      const opts = optsRef.current;
+      const reconnectEnabled = (opts?.reconnect ?? opts?.shouldReconnect ?? true) !== false;
 
-      retryLeftRef.current -= 1;
-      if (retryLeftRef.current < 0) {
-        optsRef.current?.onError?.();
+      if (!reconnectEnabled || manualCloseRef.current || unmountedRef.current) return;
+      if (wsRef.current !== ws || timerRef.current || !urlRef.current) return;
+
+      const maxRetries = opts?.maxRetries ?? opts?.errorCount ?? 5;
+      if (maxRetries !== "infinite" && retryCountRef.current >= maxRetries) {
+        opts?.onError?.();
         return;
       }
 
-      const interval = optsRef.current?.retryInterval ?? 2500;
+      const retryInterval = opts?.retryInterval ?? 2500;
+      const maxRetryInterval = opts?.maxRetryInterval ?? retryInterval;
+      const backoff = opts?.backoff ?? false;
+      const delay = backoff
+        ? Math.min(retryInterval * 2 ** retryCountRef.current, maxRetryInterval)
+        : retryInterval;
+
+      retryCountRef.current += 1;
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
         if (manualCloseRef.current || unmountedRef.current) return;
         connect(urlRef.current, false);
-      }, interval);
+      }, delay);
     };
 
     ws.onopen = () => {
       if (wsRef.current !== ws) return;
-      retryLeftRef.current = optsRef.current?.errorCount ?? 5;
+      retryCountRef.current = 0;
       optsRef.current?.onOpen?.();
     };
 
@@ -118,11 +126,9 @@ export const useWebsocket = (onMessage: WsMsgFn, options?: WsOptions) => {
     closeWs();
   }, [clearTimer, closeWs]);
 
-  useEffect(() => {
-    return () => {
-      unmountedRef.current = true;
-      disconnect();
-    };
+  useEffect(() => () => {
+    unmountedRef.current = true;
+    disconnect();
   }, [disconnect]);
 
   return { connect, disconnect };

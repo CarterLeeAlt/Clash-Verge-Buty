@@ -8,6 +8,7 @@ import {
   Paper,
   Select,
   TextField,
+  Alert,
 } from "@mui/material";
 import { Virtuoso } from "react-virtuoso";
 import { useTranslation } from "react-i18next";
@@ -15,7 +16,7 @@ import {
   PlayCircleOutlineRounded,
   PauseCircleOutlineRounded,
 } from "@mui/icons-material";
-import { atomEnableLog, atomLogData, atomLogError } from "@/services/states";
+import { atomEnableLog, atomLogConnState, atomLogData, atomLogError } from "@/services/states";
 import { BaseEmpty, BasePage } from "@/components/base";
 import LogItem from "@/components/log/log-item";
 
@@ -24,6 +25,7 @@ const LogPage = () => {
   const [logData, setLogData] = useRecoilState(atomLogData);
   const [enableLog, setEnableLog] = useRecoilState(atomEnableLog);
   const logError = useRecoilValue(atomLogError);
+  const logConnState = useRecoilValue(atomLogConnState);
 
   const [logState, setLogState] = useState("all");
   const [filterText, setFilterText] = useState("");
@@ -67,6 +69,14 @@ const LogPage = () => {
         </Box>
       }
     >
+      {enableLog && logConnState === "reconnecting" && (
+        <Box sx={{ px: "10px", pb: 0.5 }}>
+          <Alert severity="info" variant="outlined" sx={{ py: 0 }}>
+            {logError || "日志流短暂中断，正在自动重连…"}
+          </Alert>
+        </Box>
+      )}
+
       <Box
         sx={{
           pt: 1,
