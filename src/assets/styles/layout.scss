@@ -36,6 +36,7 @@
       flex-direction: column;
       justify-content: center;
       align-items: flex-start;
+      transform: translateY(2px);
       align-self: stretch;
       border-bottom: 1px solid var(--divider-color);
       // max-width: $maxLogo + 32px;
