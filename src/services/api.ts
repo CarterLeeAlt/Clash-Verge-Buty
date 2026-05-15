@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from "axios";
 import { getClashInfo } from "./cmds";
+import { normalizeControllerHost } from "@/utils/controller";
 
 let axiosIns: AxiosInstance = null!;
 
@@ -15,11 +16,7 @@ export const getAxios = async (force: boolean = false) => {
     const info = await getClashInfo();
 
     if (info?.server) {
-      server = info.server;
-
-      // compatible width `external-controller`
-      if (server.startsWith(":")) server = `127.0.0.1${server}`;
-      else if (/^\d+$/.test(server)) server = `127.0.0.1:${server}`;
+      server = normalizeControllerHost(info.server);
     }
     if (info?.secret) secret = info?.secret;
   } catch {}

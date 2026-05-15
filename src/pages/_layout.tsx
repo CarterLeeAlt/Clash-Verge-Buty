@@ -21,6 +21,7 @@ import { LayoutItem } from "@/components/layout/layout-item";
 import { LayoutControl } from "@/components/layout/layout-control";
 import { LayoutTraffic } from "@/components/layout/layout-traffic";
 import { useCustomTheme } from "@/components/layout/use-custom-theme";
+import { useLogSetup } from "@/components/layout/use-log-setup";
 import getSystem from "@/utils/get-system";
 import "dayjs/locale/ru";
 import "dayjs/locale/zh-cn";
@@ -43,6 +44,8 @@ const Layout = () => {
   const { language, start_page } = verge || {};
   const navigate = useNavigate();
   const location = useLocation();
+
+  useLogSetup();
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
