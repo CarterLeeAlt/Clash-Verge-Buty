@@ -24,7 +24,6 @@ import {
   ConnectionDetail,
   ConnectionDetailRef,
 } from "@/components/connection/connection-detail";
-import parseTraffic from "@/utils/parse-traffic";
 
 const initConn = { uploadTotal: 0, downloadTotal: 0, connections: [] };
 
@@ -80,20 +79,14 @@ const ConnectionsPage = () => {
       [...list].sort((a, b) => (b.curDownload ?? 0) - (a.curDownload ?? 0)),
   };
 
-  const [filterConn, download, upload] = useMemo(() => {
+  const [filterConn] = useMemo(() => {
     const orderFunc = orderOpts[curOrderOpt];
     let connections = connData.connections.filter((conn) =>
       (conn.metadata.host || conn.metadata.destinationIP)?.includes(filterText)
     );
 
     if (orderFunc) connections = orderFunc(connections);
-    let download = 0;
-    let upload = 0;
-    connections.forEach((x) => {
-      download += x.download;
-      upload += x.upload;
-    });
-    return [connections, download, upload];
+    return [connections];
   }, [connData, filterText, curOrderOpt]);
 
   const syncConnections = useLockFn(async () => {
@@ -198,8 +191,6 @@ const ConnectionsPage = () => {
       contentStyle={{ height: "100%" }}
       header={
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Box sx={{ mx: 1 }}>Download: {parseTraffic(download)}</Box>
-          <Box sx={{ mx: 1 }}>Upload: {parseTraffic(upload)}</Box>
           <IconButton
             color="inherit"
             size="small"

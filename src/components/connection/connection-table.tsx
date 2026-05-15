@@ -18,10 +18,13 @@ export const ConnectionTable = (props: Props) => {
 
   const [columnVisible, setColumnVisible] = useState<
     Partial<Record<keyof IConnectionsItem, boolean>>
-  >({});
+  >({
+    activeSpeed: false,
+    process: false,
+  });
 
   const columns: GridColDef[] = [
-    { field: "host", headerName: "Host", flex: 1.3, minWidth: 240 },
+    { field: "host", headerName: "Host", flex: 1, minWidth: 200 },
     {
       field: "activeSpeed",
       headerName: "Active Speed",

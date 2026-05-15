@@ -28,16 +28,16 @@ export const routers = [
     ele: ProfilesPage,
   },
   {
-    label: "Label-Connections",
-    link: "/connections",
-    icon: <ConnectionsSvg />,
-    ele: ConnectionsPage,
-  },
-  {
     label: "Label-Rules",
     link: "/rules",
     icon: <RulesSvg />,
     ele: RulesPage,
+  },
+  {
+    label: "Label-Connections",
+    link: "/connections",
+    icon: <ConnectionsSvg />,
+    ele: ConnectionsPage,
   },
   {
     label: "Label-Logs",
