@@ -202,10 +202,14 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
     #[cfg(target_os = "windows")]
     {
         let service_mode = patch.enable_service_mode;
-        let verge_config = Config::verge();
-        let current_verge = verge_config.latest();
-        let current_tun_enabled = current_verge.enable_tun_mode.unwrap_or(false);
-        let current_service_enabled = current_verge.enable_service_mode.unwrap_or(false);
+        let (current_tun_enabled, current_service_enabled) = {
+            let verge_config = Config::verge();
+            let current_verge = verge_config.latest();
+            (
+                current_verge.enable_tun_mode.unwrap_or(false),
+                current_verge.enable_service_mode.unwrap_or(false),
+            )
+        };
 
         if current_tun_enabled && service_mode.is_some() {
             bail!("Tun Mode is enabled. Please disable Tun Mode before changing Service Mode.");
