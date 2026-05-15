@@ -19,6 +19,7 @@ impl IRuntime {
     // 这里只更改 allow-lan | ipv6 | log-level | tun
     pub fn patch_config(&mut self, patch: Mapping) {
         if let Some(config) = self.config.as_mut() {
+            let patch_ipv6 = patch.get("ipv6").and_then(|v| v.as_bool());
             ["allow-lan", "ipv6", "log-level"]
                 .into_iter()
                 .for_each(|key| {
@@ -26,6 +27,14 @@ impl IRuntime {
                         config.insert(key.into(), value.clone());
                     }
                 });
+            if let Some(ipv6_enabled) = patch_ipv6 {
+                let dns = config.get("dns");
+                let mut dns = dns.map_or(Mapping::new(), |val| {
+                    val.as_mapping().cloned().unwrap_or(Mapping::new())
+                });
+                dns.insert("ipv6".into(), Value::Bool(ipv6_enabled));
+                config.insert("dns".into(), Value::Mapping(dns));
+            }
             let tun = config.get("tun");
             let mut tun = tun.map_or(Mapping::new(), |val| {
                 val.as_mapping().cloned().unwrap_or(Mapping::new())

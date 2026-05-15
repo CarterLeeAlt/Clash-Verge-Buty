@@ -10,7 +10,7 @@ use self::merge::*;
 use self::script::*;
 use self::tun::*;
 use crate::config::Config;
-use serde_yaml::Mapping;
+use serde_yaml::{Mapping, Value};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -114,6 +114,7 @@ pub fn enhance() -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
     }
 
     config = use_tun(config, enable_tun, source_has_tun, clash_tun_default);
+    config = apply_ipv6_to_dns(config);
     config = use_sort(config);
 
     let mut exists_set = HashSet::new();
@@ -121,4 +122,13 @@ pub fn enhance() -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
     exists_keys = exists_set.into_iter().collect();
 
     (config, exists_keys, result_map)
+}
+
+fn apply_ipv6_to_dns(mut config: Mapping) -> Mapping {
+    let ipv6_enabled = config.get("ipv6").and_then(|v| v.as_bool()).unwrap_or(false);
+    let dns = config.get("dns").and_then(|v| v.as_mapping()).cloned();
+    let mut dns = dns.unwrap_or_default();
+    dns.insert("ipv6".into(), Value::Bool(ipv6_enabled));
+    config.insert("dns".into(), Value::Mapping(dns));
+    config
 }
