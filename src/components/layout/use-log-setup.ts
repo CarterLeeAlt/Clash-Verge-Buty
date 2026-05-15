@@ -80,12 +80,10 @@ export const useLogSetup = () => {
       const logs = await getClashLogs();
       if (reqId !== historyReqIdRef.current) return;
       mergeLogs(
-        (logs || [])
-          .map((item) => ({
-            ...item,
-            time: normalizeLogTime(item.time),
-          }))
-          .reverse(),
+        (logs || []).map((item) => ({
+          ...item,
+          time: normalizeLogTime(item.time),
+        })),
       );
       setLogError(null);
       setLogConnState("connected");
