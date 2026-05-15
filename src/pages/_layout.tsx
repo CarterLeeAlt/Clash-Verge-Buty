@@ -59,6 +59,9 @@ const Layout = () => {
     unlistenTasks.push(listen("verge://refresh-clash-config", async () => {
       // the clash info may be updated
       await getAxios(true);
+      await mutate("getClashInfo");
+      mutate("getRuntimeConfig");
+      mutate("checkService");
       mutate("getProxies");
       mutate("getVersion");
       mutate("getClashConfig");

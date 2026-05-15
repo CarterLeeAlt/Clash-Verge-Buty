@@ -4,6 +4,9 @@ import {
   patchVergeConfig,
   checkService,
 } from "@/services/cmds";
+import { getAxios } from "@/services/api";
+
+let runtimeRefreshSeq = 0;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -12,15 +15,12 @@ function sleep(ms: number) {
 async function waitForServiceActive(maxTry = 5, interval = 3000) {
   for (let i = 0; i < maxTry; i++) {
     const status = await checkService();
-
-    // 立即把最新状态写回 SWR 缓存，所有用到 "checkService" 的组件都会同步更新
     await mutate("checkService", status, false);
 
     if (status?.api_ready) {
       return true;
     }
 
-    // 最后一次就不用再等了
     if (i < maxTry - 1) {
       await sleep(interval);
     }
@@ -39,16 +39,37 @@ export const useVerge = () => {
     await patchVergeConfig(value);
     await mutateVerge();
 
-    // 只有切换 service mode 时，才主动处理 service 状态同步
+    const affectsRuntime =
+      value.enable_service_mode !== undefined ||
+      value.enable_tun_mode !== undefined ||
+      value.enable_system_proxy !== undefined;
+
     if (value.enable_service_mode !== undefined) {
       if (value.enable_service_mode) {
-        // 开启服务模式后，每 3 秒检查一次，最多 5 次
         await waitForServiceActive(5, 3000);
       } else {
-        // 关闭时直接刷新一次即可
         const status = await checkService();
         await mutate("checkService", status, false);
       }
+
+      await getAxios(true);
+      await mutate("getClashInfo");
+      mutate("getClashConfig");
+      mutate("getProxies");
+      mutate("getVersion");
+      mutate("checkService");
+    }
+
+    if (affectsRuntime) {
+      const seq = ++runtimeRefreshSeq;
+      mutate("getClashInfo");
+      mutate("getClashConfig");
+      mutate("getRuntimeConfig");
+      setTimeout(() => {
+        if (seq !== runtimeRefreshSeq) return;
+        mutate("getClashInfo");
+        mutate("getClashConfig");
+      }, 600);
     }
   };
 

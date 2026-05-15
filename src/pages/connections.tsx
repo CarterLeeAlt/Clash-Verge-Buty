@@ -13,7 +13,7 @@ import { useRecoilState } from "recoil";
 import { Virtuoso } from "react-virtuoso";
 import { useTranslation } from "react-i18next";
 import { TableChartRounded, TableRowsRounded } from "@mui/icons-material";
-import { closeAllConnections } from "@/services/api";
+import { closeAllConnections, getConnections } from "@/services/api";
 import { atomConnectionSetting } from "@/services/states";
 import { useClashInfo } from "@/hooks/use-clash";
 import { BaseEmpty, BasePage } from "@/components/base";
@@ -96,18 +96,47 @@ const ConnectionsPage = () => {
     return [connections, download, upload];
   }, [connData, filterText, curOrderOpt]);
 
+  const syncConnections = useLockFn(async () => {
+    const snapshot = await getConnections();
+    const incoming = snapshot?.connections ?? [];
+    setConnData((old) => {
+      const oldConn = old.connections;
+      const connections: IConnectionsItem[] = [];
+      const rest = incoming.filter((each) => {
+        const index = oldConn.findIndex((o) => o.id === each.id);
+        if (index >= 0 && index < incoming.length) {
+          const prev = oldConn[index];
+          each.curUpload = (each.upload ?? 0) - (prev.upload ?? 0);
+          each.curDownload = (each.download ?? 0) - (prev.download ?? 0);
+          connections[index] = each;
+          return false;
+        }
+        return true;
+      });
+      for (let i = 0; i < incoming.length; ++i) {
+        if (!connections[i] && rest.length > 0) {
+          const item = rest.shift()!;
+          item.curUpload = item.curUpload ?? 0;
+          item.curDownload = item.curDownload ?? 0;
+          connections[i] = item;
+        }
+      }
+      return { ...snapshot, connections };
+    });
+  });
+
   const { connect, disconnect } = useWebsocket(
     (event) => {
       // meta v1.15.0 出现data.connections为null的情况
       const data = JSON.parse(event.data) as IConnections;
-      // 尽量与前一次connections的展示顺序保持一致
+      const incoming = data.connections ?? [];
       setConnData((old) => {
         const oldConn = old.connections;
-        const maxLen = data.connections?.length;
+        const maxLen = incoming.length;
 
         const connections: typeof oldConn = [];
 
-        const rest = (data.connections || []).filter((each) => {
+        const rest = incoming.filter((each) => {
           const index = oldConn.findIndex((o) => o.id === each.id);
 
           if (index >= 0 && index < maxLen) {
@@ -132,11 +161,11 @@ const ConnectionsPage = () => {
         return { ...data, connections };
       });
     },
-    { errorCount: 3, retryInterval: 1000 }
+    { errorCount: 3, retryInterval: 1000, onOpen: () => { void syncConnections().catch(() => undefined); } }
   );
 
   useEffect(() => {
-    if (!clashInfo) return;
+    if (!clashInfo?.server) return;
 
     const { server = "", secret = "" } = clashInfo;
     connect(`ws://${server}/connections?token=${encodeURIComponent(secret)}`);
@@ -144,9 +173,21 @@ const ConnectionsPage = () => {
     return () => {
       disconnect();
     };
-  }, [clashInfo]);
+  }, [clashInfo?.server, clashInfo?.secret]);
 
-  const onCloseAll = useLockFn(closeAllConnections);
+
+  useEffect(() => {
+    const onRefresh = () => {
+      void syncConnections().catch(() => undefined);
+    };
+    window.addEventListener("verge://connections-refresh", onRefresh);
+    return () => window.removeEventListener("verge://connections-refresh", onRefresh);
+  }, [syncConnections]);
+  const onCloseAll = useLockFn(async () => {
+    await closeAllConnections();
+    setConnData(initConn);
+    await syncConnections().catch(() => undefined);
+  });
 
   const detailRef = useRef<ConnectionDetailRef>(null!);
 
