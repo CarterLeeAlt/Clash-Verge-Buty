@@ -191,7 +191,7 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
     let auto_launch = patch.enable_auto_launch;
     let system_proxy = patch.enable_system_proxy;
     let proxy_bypass = patch.system_proxy_bypass;
-    let language = patch.language;
+    let language = patch.language.clone();
     let port = patch.verge_mixed_port;
     let common_tray_icon = patch.common_tray_icon;
     let sysproxy_tray_icon = patch.sysproxy_tray_icon;
@@ -202,7 +202,8 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
     #[cfg(target_os = "windows")]
     {
         let service_mode = patch.enable_service_mode;
-        let current_verge = Config::verge().latest();
+        let verge_config = Config::verge();
+        let current_verge = verge_config.latest();
         let current_tun_enabled = current_verge.enable_tun_mode.unwrap_or(false);
         let current_service_enabled = current_verge.enable_service_mode.unwrap_or(false);
 
