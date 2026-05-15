@@ -83,7 +83,7 @@
   "Clash Core": "Clash 内核",
   "Grant": "授权",
   "Tun mode requires": "如需启用TUN模式需要授权",
-  "Tun Mode": "Tun 模式",
+  "Tun Mode": "网卡模式",
   "Service Mode": "服务模式",
   "Auto Launch": "开机自启",
   "Silent Start": "静默启动",
