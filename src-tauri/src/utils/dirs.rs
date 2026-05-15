@@ -72,8 +72,22 @@ pub fn app_profiles_dir() -> Result<PathBuf> {
 }
 
 /// logs dir
-pub fn app_logs_dir() -> Result<PathBuf> {
+pub fn logs_dir() -> Result<PathBuf> {
     Ok(app_home_dir()?.join("logs"))
+}
+
+/// app logs dir
+pub fn app_logs_dir() -> Result<PathBuf> {
+    let dir = logs_dir()?.join("app");
+    let _ = std::fs::create_dir_all(&dir);
+    Ok(dir)
+}
+
+/// service logs dir
+pub fn service_logs_dir() -> Result<PathBuf> {
+    let dir = logs_dir()?.join("service");
+    let _ = std::fs::create_dir_all(&dir);
+    Ok(dir)
 }
 
 pub fn clash_path() -> Result<PathBuf> {
@@ -103,13 +117,11 @@ pub fn service_path() -> Result<PathBuf> {
 pub fn service_log_file() -> Result<PathBuf> {
     use chrono::Local;
 
-    let log_dir = app_logs_dir()?.join("service");
+    let log_dir = service_logs_dir()?;
 
     let local_time = Local::now().format("%Y-%m-%d-%H%M").to_string();
     let log_file = format!("{}.log", local_time);
     let log_file = log_dir.join(log_file);
-
-    let _ = std::fs::create_dir_all(&log_dir);
 
     Ok(log_file)
 }

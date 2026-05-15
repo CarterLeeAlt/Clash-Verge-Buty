@@ -231,7 +231,7 @@ pub fn open_core_dir() -> CmdResult<()> {
 
 #[tauri::command]
 pub fn open_logs_dir() -> CmdResult<()> {
-    let log_dir = wrap_err!(dirs::app_logs_dir())?;
+    let log_dir = wrap_err!(dirs::logs_dir())?;
     wrap_err!(open::that(log_dir))
 }
 

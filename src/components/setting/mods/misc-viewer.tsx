@@ -23,7 +23,7 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
     enableBuiltinEnhanced: true,
     proxyLayoutColumn: 6,
     defaultLatencyTest: "",
-    autoLogClean: 0,
+    autoLogClean: 1,
     defaultLatencyTimeout: "10000",
   });
 
@@ -34,9 +34,9 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
         appLogLevel: verge?.app_log_level ?? "info",
         autoCloseConnection: verge?.auto_close_connection ?? true,
         enableBuiltinEnhanced: verge?.enable_builtin_enhanced ?? true,
-        proxyLayoutColumn: verge?.proxy_layout_column || 6,
-        defaultLatencyTest: verge?.default_latency_test || "",
-        autoLogClean: verge?.auto_log_clean || 0,
+        proxyLayoutColumn: verge?.proxy_layout_column ?? 6,
+        defaultLatencyTest: verge?.default_latency_test ?? "",
+        autoLogClean: verge?.auto_log_clean ?? 1,
         defaultLatencyTimeout: String(
           verge?.default_latency_timeout ?? 10000
         ),

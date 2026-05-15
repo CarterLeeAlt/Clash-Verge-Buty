@@ -155,7 +155,12 @@ pub struct IVergeTheme {
 impl IVerge {
     pub fn new() -> Self {
         match dirs::verge_path().and_then(|path| help::read_yaml::<IVerge>(&path)) {
-            Ok(config) => config,
+            Ok(mut config) => {
+                if config.normalize_auto_log_clean() {
+                    let _ = config.save_file();
+                }
+                config
+            }
             Err(err) => {
                 log::error!(target: "app", "{err}");
                 Self::template()
@@ -190,10 +195,24 @@ impl IVerge {
             proxy_guard_duration: Some(30),
             auto_close_connection: Some(true),
             enable_builtin_enhanced: Some(true),
-            auto_log_clean: Some(3),
+            auto_log_clean: Some(1),
             default_latency_test: Some("https://cp.cloudflare.com/generate_204".into()),
             ..Self::default()
         }
+    }
+
+    pub fn normalize_auto_log_clean(&mut self) -> bool {
+        let normalized = match self.auto_log_clean {
+            Some(0 | 1 | 2 | 3) => self.auto_log_clean,
+            _ => Some(1),
+        };
+
+        if self.auto_log_clean != normalized {
+            self.auto_log_clean = normalized;
+            return true;
+        }
+
+        false
     }
 
     /// Save IVerge App Config
