@@ -219,14 +219,38 @@ jobs:
             throw "portable artifact zip not found in workspace root"
           }
 
+          Write-Host "[INFO] portable zip path: $($portableZip.FullName)"
+          Write-Host "[INFO] portable zip entries"
+          tar -tf $portableZip.FullName
+
+          $portableConfigSources = @(
+            "src-tauri/resources/config",
+            "src-tauri/config",
+            "dist/config",
+            "src-tauri/target/${{ matrix.target }}/release/.config"
+          )
+          foreach ($src in $portableConfigSources) {
+            if (Test-Path $src) {
+              Write-Host "[INFO] config source exists: $src"
+              Get-ChildItem $src -Force -Recurse | ForEach-Object { Write-Host "   - $($_.FullName)" }
+            } else {
+              Write-Host "[INFO] config source missing: $src"
+            }
+          }
+
           Expand-Archive -Path $portableZip.FullName -DestinationPath $stage -Force
           Write-Host "[INFO] prepared portable artifact from: $($portableZip.Name)"
           Write-Host "[INFO] staged portable content"
-          Get-ChildItem $stage -Recurse | ForEach-Object { Write-Host " - $($_.FullName)" }
+          Get-ChildItem $stage -Force -Recurse | ForEach-Object { Write-Host " - $($_.FullName)" }
 
-          if (-not (Get-ChildItem $stage -Recurse -File)) {
+          if (-not (Get-ChildItem $stage -Force -Recurse -File)) {
             throw "portable artifact content not found after unzip: $($portableZip.FullName)"
           }
+          $portableMarker = Join-Path $stage ".config/PORTABLE"
+          if (-not (Test-Path $portableMarker)) {
+            throw "Portable marker missing: $portableMarker"
+          }
+          Write-Host "[INFO] portable marker found: $portableMarker"
 
       - name: Stage Windows installer artifact
         shell: pwsh
@@ -277,6 +301,7 @@ jobs:
         with:
           name: Clash-Verge-Buty-windows-alpha-portable
           if-no-files-found: error
+          include-hidden-files: true
           path: dist/windows-alpha-portable/
       - name: Upload Windows alpha installer artifact
         uses: actions/upload-artifact@v4
