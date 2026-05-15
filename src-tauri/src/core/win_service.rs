@@ -8,7 +8,7 @@ use runas::Command as RunasCommand;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::os::windows::process::CommandExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::{env::current_exe, process::Command as StdCommand};
 use tokio::time::sleep;
@@ -52,6 +52,14 @@ fn output_indicates_service_not_found(stdout: &str, stderr: &str, code: i32) -> 
         || all.contains("指定的服务未安装")
 }
 
+fn output_indicates_service_pending_removal(stdout: &str, stderr: &str) -> bool {
+    let all = format!("{stdout}\n{stderr}").to_ascii_uppercase();
+    all.contains("DELETE_PENDING")
+        || all.contains("STOP_PENDING")
+        || all.contains("MARKED FOR DELETION")
+        || all.contains("PENDING")
+}
+
 fn service_exists_detailed(name: &str) -> Result<bool> {
     let result = sc(&["query", name])?;
     if output_indicates_service_not_found(&result.stdout, &result.stderr, result.code) {
@@ -59,6 +67,55 @@ fn service_exists_detailed(name: &str) -> Result<bool> {
     }
     if result.code == 0 {
         return Ok(true);
+    }
+    Ok(false)
+}
+
+#[derive(Debug, Clone)]
+struct UninstallHelperResult {
+    elevated: bool,
+    success: bool,
+    exit_code: Option<i32>,
+    status_text: String,
+    stdout: String,
+    stderr: String,
+}
+
+fn run_uninstall_helper_sync(uninstall_path: &Path) -> Result<UninstallHelperResult> {
+    let token = Token::with_current_process()?;
+    let level = token.privilege_level()?;
+    let elevated = !matches!(level, PrivilegeLevel::NotPrivileged);
+    let output = match level {
+        PrivilegeLevel::NotPrivileged => {
+            let status = RunasCommand::new(uninstall_path).show(false).status()?;
+            std::process::Output {
+                status,
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+            }
+        }
+        _ => StdCommand::new(uninstall_path)
+            .creation_flags(0x08000000)
+            .output()?,
+    };
+    let exit_code = output.status.code();
+    let status_text = format!("{}", output.status);
+    Ok(UninstallHelperResult {
+        elevated,
+        success: output.status.success(),
+        exit_code,
+        status_text,
+        stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
+    })
+}
+
+async fn wait_until_service_removed(max_checks: usize, interval_ms: u64) -> Result<bool> {
+    for _ in 0..max_checks {
+        if !service_exists_detailed(SERVICE_NAME)? {
+            return Ok(true);
+        }
+        sleep(Duration::from_millis(interval_ms)).await;
     }
     Ok(false)
 }
@@ -199,30 +256,22 @@ pub async fn uninstall_service() -> Result<()> {
         return Ok(());
     }
 
-    let token = Token::with_current_process()?;
-    let level = token.privilege_level()?;
-    let use_runas = matches!(level, PrivilegeLevel::NotPrivileged);
-    log::info!(target: "app", "uninstall_service: helper_path={}, runas={}", uninstall_path.display(), use_runas);
-    let output = match level {
-        PrivilegeLevel::NotPrivileged => {
-            let status = RunasCommand::new(&uninstall_path).show(false).status()?;
-            std::process::Output { status, stdout: Vec::new(), stderr: Vec::new() }
-        }
-        _ => StdCommand::new(&uninstall_path)
-            .creation_flags(0x08000000)
-            .output()?,
-    };
-    let exit_code = output.status.code().unwrap_or(-1);
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    log::info!(target: "app", "uninstall_service: helper exit_code={}, stdout={}, stderr={}", exit_code, stdout, stderr);
+    log::info!(target: "app", "uninstall_service: helper_path={}", uninstall_path.display());
+    let helper_result = run_uninstall_helper_sync(&uninstall_path)?;
+    log::info!(
+        target: "app",
+        "uninstall_service: helper elevated={}, success={}, exit_code={:?}, status={}, stdout={}, stderr={}",
+        helper_result.elevated,
+        helper_result.success,
+        helper_result.exit_code,
+        helper_result.status_text,
+        helper_result.stdout,
+        helper_result.stderr
+    );
 
-    for _ in 0..10 {
-        if !service_exists_detailed(SERVICE_NAME)? {
-            log::info!(target: "app", "uninstall_service: service removed");
-            return Ok(());
-        }
-        sleep(Duration::from_millis(300)).await;
+    if wait_until_service_removed(10, 300).await? {
+        log::info!(target: "app", "uninstall_service: service removed");
+        return Ok(());
     }
 
     let query = sc(&["query", SERVICE_NAME])?;
@@ -233,16 +282,13 @@ pub async fn uninstall_service() -> Result<()> {
         return Ok(());
     }
 
-    if query_out_upper.contains("DELETE_PENDING")
-        || query_out_upper.contains("STOP_PENDING")
-        || query_out_upper.contains("MARKED FOR DELETION")
+    if output_indicates_service_pending_removal(&query.stdout, &query.stderr)
+        || output_indicates_service_pending_removal(&helper_result.stdout, &helper_result.stderr)
+        || query_out_upper.contains("PENDING")
     {
         bail!("Windows is still removing the service. Please wait a moment and try again.");
     }
 
-    if output.status.success() {
-        bail!("Failed to uninstall service. Please try again or run as administrator.");
-    }
     bail!(
         "Failed to uninstall service. Please try again or run as administrator."
     )
