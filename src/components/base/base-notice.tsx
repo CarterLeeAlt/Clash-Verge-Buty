@@ -13,7 +13,8 @@ interface InnerProps {
 }
 
 const NoticeInner = (props: InnerProps) => {
-  const { type, message, duration = 1500, onClose } = props;
+  const { type, message, onClose } = props;
+  const duration = 2000;
   const [visible, setVisible] = useState(true);
   const [isDark, setIsDark] = useState(false);
   const { verge } = useVerge();
@@ -118,7 +119,7 @@ export const Notice: NoticeInstance = (props) => {
 };
 
 (["info", "error", "success"] as const).forEach((type) => {
-  Notice[type] = (message, duration) => {
-    setTimeout(() => Notice({ type, message, duration }), 0);
+  Notice[type] = (message) => {
+    setTimeout(() => Notice({ type, message, duration: 2000 }), 0);
   };
 });
