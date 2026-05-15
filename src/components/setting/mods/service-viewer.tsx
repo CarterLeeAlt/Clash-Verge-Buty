@@ -13,10 +13,12 @@ import { BaseDialog, DialogRef, Notice } from "@/components/base";
 
 interface Props {
   enable: boolean;
+  enableTun: boolean;
+  onStatusChange?: () => Promise<void> | void;
 }
 
 export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
-  const { enable } = props;
+  const { enable, enableTun, onStatusChange } = props;
 
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -52,9 +54,10 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
   const onInstall = useLockFn(async () => {
     try {
       await installService();
-      mutateCheck();
+      await mutateCheck();
+      await onStatusChange?.();
       setOpen(false);
-      Notice.success("Service installed successfully");
+      Notice.success("Service installed successfully. You can now enable Service Mode.");
     } catch (err: any) {
       mutateCheck();
       Notice.error(err.message || err.toString());
@@ -63,12 +66,21 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
 
   const onUninstall = useLockFn(async () => {
     try {
-      if (enable) {
-        await patchVergeConfig({ enable_service_mode: false });
+      if (enableTun) {
+        throw new Error(
+          "Tun Mode is enabled. Please disable Tun Mode before uninstalling the service."
+        );
+      }
+      if (enable || enableTun) {
+        await patchVergeConfig({
+          enable_service_mode: false,
+          enable_tun_mode: false,
+        } as IVergeConfig);
       }
 
       await uninstallService();
-      mutateCheck();
+      await mutateCheck();
+      await onStatusChange?.();
       setOpen(false);
       Notice.success("Service uninstalled successfully");
     } catch (err: any) {
@@ -80,8 +92,12 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
   // fix unhandled error of the service mode
   const onDisable = useLockFn(async () => {
     try {
-      await patchVergeConfig({ enable_service_mode: false });
-      mutateCheck();
+      await patchVergeConfig({
+        enable_service_mode: false,
+        enable_tun_mode: false,
+      } as IVergeConfig);
+      await mutateCheck();
+      await onStatusChange?.();
       setOpen(false);
     } catch (err: any) {
       mutateCheck();
@@ -121,7 +137,11 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
         )}
 
         {state !== "service_not_installed" && (
-          <Button variant="outlined" onClick={onUninstall}>
+          <Button
+            variant="outlined"
+            onClick={onUninstall}
+            disabled={enableTun}
+          >
             Uninstall
           </Button>
         )}

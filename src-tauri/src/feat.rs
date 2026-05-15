@@ -187,8 +187,6 @@ pub async fn patch_clash(patch: Mapping) -> Result<()> {
 /// 修改verge的订阅
 /// 一般都是一个个的修改
 pub async fn patch_verge(patch: IVerge) -> Result<()> {
-    Config::verge().draft().patch_config(patch.clone());
-
     let tun_mode = patch.enable_tun_mode;
     let auto_launch = patch.enable_auto_launch;
     let system_proxy = patch.enable_system_proxy;
@@ -199,21 +197,48 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
     let sysproxy_tray_icon = patch.sysproxy_tray_icon;
     let tun_tray_icon = patch.tun_tray_icon;
 
+    // Validate invariants first, then apply draft so follow-up operations
+    // (e.g. run_core) can observe the target mode consistently.
+    #[cfg(target_os = "windows")]
+    {
+        let service_mode = patch.enable_service_mode;
+        let current_verge = Config::verge().latest();
+        let current_tun_enabled = current_verge.enable_tun_mode.unwrap_or(false);
+        let current_service_enabled = current_verge.enable_service_mode.unwrap_or(false);
+
+        if current_tun_enabled && service_mode.is_some() {
+            bail!("Tun Mode is enabled. Please disable Tun Mode before changing Service Mode.");
+        }
+
+        if let Some(true) = service_mode {
+            let status = super::core::win_service::check_service().await?;
+            if !status.installed {
+                bail!("Service Mode requires clash-verge-service to be installed. Please install service first.");
+            }
+        }
+
+        if let Some(true) = tun_mode {
+            let status = super::core::win_service::check_service().await?;
+            if !status.installed {
+                bail!("Tun mode on Windows requires clash-verge-service to be installed. Please install and enable Service Mode first.");
+            }
+            let service_enabled = service_mode.unwrap_or(current_service_enabled);
+            if !service_enabled && service_mode != Some(true) {
+                bail!("Tun mode on Windows requires Service Mode. Please install and enable Service Mode first.");
+            }
+
+            super::core::win_service::ensure_service_ready()
+                .await
+                .map_err(|err| anyhow::anyhow!("Tun mode on Windows requires clash-verge-service. Please install and enable Service Mode first. {err}"))?;
+        }
+    }
+
+    Config::verge().draft().patch_config(patch.clone());
+
     match {
         #[cfg(target_os = "windows")]
         {
             let service_mode = patch.enable_service_mode;
-            if let Some(true) = tun_mode {
-                let service_enabled = Config::verge().latest().enable_service_mode.unwrap_or(false);
-                if !service_enabled && service_mode != Some(true) {
-                    bail!("Tun mode on Windows requires Service Mode. Please enable Service Mode first.");
-                }
-
-                super::core::win_service::ensure_service_ready()
-                    .await
-                    .map_err(|err| anyhow::anyhow!("Tun mode on Windows requires clash-verge-service. {err}"))?;
-            }
-
             if service_mode.is_some() {
                 log::debug!(target: "app", "change service mode to {}", service_mode.unwrap());
 

@@ -1,11 +1,11 @@
 import useSWR from "swr";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IconButton, Tooltip } from "@mui/material";
 import { PrivacyTipRounded, Settings, InfoRounded } from "@mui/icons-material";
 import { checkService } from "@/services/cmds";
 import { useVerge } from "@/hooks/use-verge";
-import { DialogRef, Switch } from "@/components/base";
+import { DialogRef, Notice, Switch } from "@/components/base";
 import { SettingList, SettingItem } from "./mods/setting-comp";
 import { GuardState } from "./mods/guard-state";
 import { ServiceViewer } from "./mods/service-viewer";
@@ -18,6 +18,10 @@ interface Props {
 }
 
 const isWIN = getSystem() === "windows";
+const SWITCH_OPERATION_IN_PROGRESS =
+  "Another switch operation is already in progress";
+const isSwitchOperationInProgressError = (err: unknown) =>
+  err instanceof Error && err.message === SWITCH_OPERATION_IN_PROGRESS;
 
 const SettingSystem = ({ onError }: Props) => {
   const { t } = useTranslation();
@@ -25,7 +29,7 @@ const SettingSystem = ({ onError }: Props) => {
   const { verge, mutateVerge, patchVerge } = useVerge();
 
   // service mode
-  const { data: serviceStatus } = useSWR(
+  const { data: serviceStatus, mutate: mutateServiceStatus } = useSWR(
     isWIN ? "checkService" : null,
     checkService,
     {
@@ -48,16 +52,38 @@ const SettingSystem = ({ onError }: Props) => {
   } = verge ?? {};
 
   const onSwitchFormat = (_e: any, value: boolean) => value;
+  const [pendingSwitch, setPendingSwitch] = useState<
+    "tun" | "service" | "sysproxy" | null
+  >(null);
+  const switchesBusy = pendingSwitch !== null;
   const onChangeData = (patch: Partial<IVergeConfig>) => {
     mutateVerge({ ...verge, ...patch }, false);
   };
+  const onSwitchCatch = (err: Error) => {
+    if (isSwitchOperationInProgressError(err)) return;
+    onError?.(err);
+  };
+
+  const serviceChecking = isWIN && serviceStatus == null;
+  const serviceInstalled = !!serviceStatus?.installed;
+  const serviceReady =
+    !!serviceStatus?.installed && !!serviceStatus?.running && !!serviceStatus?.api_ready;
+  const serviceSwitchDisabled = isWIN && (serviceChecking || !serviceInstalled);
 
   return (
     <SettingList title={t("System Setting")}>
       <SysproxyViewer ref={sysproxyRef} />
       <TunViewer ref={tunRef} />
       {isWIN && (
-        <ServiceViewer ref={serviceRef} enable={!!enable_service_mode} />
+        <ServiceViewer
+          ref={serviceRef}
+          enable={!!enable_service_mode}
+          enableTun={!!enable_tun_mode}
+          onStatusChange={async () => {
+            await mutateServiceStatus();
+            await mutateVerge();
+          }}
+        />
       )}
 
       <SettingItem
@@ -93,12 +119,40 @@ const SettingSystem = ({ onError }: Props) => {
         <GuardState
           value={enable_tun_mode ?? false}
           valueProps="checked"
-          onCatch={onError}
+          onCatch={onSwitchCatch}
           onFormat={onSwitchFormat}
-          onChange={(e) => onChangeData({ enable_tun_mode: e })}
-          onGuard={(e) => patchVerge({ enable_tun_mode: e })}
+            onChange={(e) => onChangeData({ enable_tun_mode: e })}
+            onGuard={async (e) => {
+              if (pendingSwitch !== null) {
+                throw new Error(SWITCH_OPERATION_IN_PROGRESS);
+              }
+              setPendingSwitch("tun");
+              try {
+                if (isWIN && e) {
+                  const latestServiceStatus = await mutateServiceStatus();
+                  if (!latestServiceStatus?.installed) {
+                    throw new Error("Please install and enable Service Mode first.");
+                  }
+                  if (!enable_service_mode) {
+                    throw new Error("Please enable Service Mode first.");
+                  }
+                  if (!serviceReady) {
+                    Notice.info("Checking service readiness...");
+                  }
+                }
+                await patchVerge({ enable_tun_mode: e });
+                await mutateVerge();
+                if (isWIN) await mutateServiceStatus();
+              } catch (err) {
+                await mutateVerge();
+                if (isWIN) await mutateServiceStatus();
+                throw err;
+              } finally {
+                setPendingSwitch(null);
+              }
+            }}
         >
-          <Switch edge="end" />
+          <Switch edge="end" disabled={switchesBusy} />
         </GuardState>
       </SettingItem>
 
@@ -121,14 +175,41 @@ const SettingSystem = ({ onError }: Props) => {
           <GuardState
             value={enable_service_mode ?? false}
             valueProps="checked"
-            onCatch={onError}
+            onCatch={onSwitchCatch}
             onFormat={onSwitchFormat}
             onChange={(e) => onChangeData({ enable_service_mode: e })}
-            onGuard={(e) => patchVerge({ enable_service_mode: e })}
+            onGuard={async (e) => {
+              if (pendingSwitch !== null) {
+                throw new Error(SWITCH_OPERATION_IN_PROGRESS);
+              }
+              setPendingSwitch("service");
+              try {
+                if (isWIN) {
+                  const latestServiceStatus = await mutateServiceStatus();
+                  if (enable_tun_mode) {
+                    throw new Error(
+                      "Tun Mode is enabled. Please disable Tun Mode before changing Service Mode."
+                    );
+                  }
+                  if (e && !latestServiceStatus?.installed) {
+                    throw new Error("Please install Service first from the shield button.");
+                  }
+                }
+                await patchVerge({ enable_service_mode: e });
+                await mutateVerge();
+                if (isWIN) await mutateServiceStatus();
+              } catch (err) {
+                await mutateVerge();
+                if (isWIN) await mutateServiceStatus();
+                throw err;
+              } finally {
+                setPendingSwitch(null);
+              }
+            }}
           >
             <Switch
               edge="end"
-              disabled={serviceStatus ? !serviceStatus.installed : false}
+              disabled={switchesBusy || !!enable_tun_mode || serviceSwitchDisabled}
             />
           </GuardState>
         </SettingItem>
@@ -152,12 +233,27 @@ const SettingSystem = ({ onError }: Props) => {
         <GuardState
           value={enable_system_proxy ?? false}
           valueProps="checked"
-          onCatch={onError}
+          onCatch={onSwitchCatch}
           onFormat={onSwitchFormat}
           onChange={(e) => onChangeData({ enable_system_proxy: e })}
-          onGuard={(e) => patchVerge({ enable_system_proxy: e })}
+          onGuard={async (e) => {
+            if (pendingSwitch !== null) {
+              throw new Error(SWITCH_OPERATION_IN_PROGRESS);
+            }
+            setPendingSwitch("sysproxy");
+            try {
+              await patchVerge({ enable_system_proxy: e });
+              await mutateVerge();
+            } catch (err) {
+              await mutateVerge();
+              if (isWIN) await mutateServiceStatus();
+              throw err;
+            } finally {
+              setPendingSwitch(null);
+            }
+          }}
         >
-          <Switch edge="end" />
+          <Switch edge="end" disabled={switchesBusy} />
         </GuardState>
       </SettingItem>
 
