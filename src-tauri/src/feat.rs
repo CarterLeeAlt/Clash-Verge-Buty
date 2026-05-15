@@ -105,6 +105,9 @@ pub fn toggle_tun_mode() {
 /// 修改clash的订阅
 pub async fn patch_clash(patch: Mapping) -> Result<()> {
     let has_tun_patch = patch.get("tun").is_some();
+    let has_runtime_patch = patch.get("allow-lan").is_some()
+        || patch.get("ipv6").is_some()
+        || patch.get("log-level").is_some();
     if has_tun_patch {
         log::info!(target: "app", "patch clash tun config requested");
         handle::Handle::emit_log("info", "[tun] patch clash tun config requested");
@@ -161,6 +164,11 @@ pub async fn patch_clash(patch: Mapping) -> Result<()> {
         }
 
         Config::runtime().latest().patch_config(patch);
+
+        if has_runtime_patch {
+            Config::generate_file(ConfigType::Run)?;
+            handle::Handle::refresh_clash();
+        }
 
         <Result<()>>::Ok(())
     } {
