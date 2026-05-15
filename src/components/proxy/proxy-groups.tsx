@@ -41,10 +41,14 @@ export const ProxyGroups = (props: Props) => {
 
       if (verge?.auto_close_connection) {
         getConnections().then(({ connections }) => {
-          connections.forEach((conn) => {
-            if (conn.chains.includes(now!)) {
-              deleteConnection(conn.id);
-            }
+          Promise.allSettled(
+            connections
+              .filter((conn) => conn.chains.includes(now!))
+              .map((conn) => deleteConnection(conn.id))
+          ).finally(() => {
+            try {
+              window.dispatchEvent(new CustomEvent("verge://connections-refresh"));
+            } catch {}
           });
         });
       }

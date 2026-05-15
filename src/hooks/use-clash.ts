@@ -93,10 +93,11 @@ export const useClashInfo = () => {
     }
 
     await patchClashConfig(patch);
-    mutateInfo();
+    await mutateInfo();
+    await mutate("getClashInfo");
     mutate("getClashConfig");
     // 刷新接口
-    getAxios(true);
+    await getAxios(true);
   };
 
   return {
