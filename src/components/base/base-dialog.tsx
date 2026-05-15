@@ -24,6 +24,8 @@ interface Props {
   onOk?: () => void;
   onCancel?: () => void;
   onClose?: () => void;
+  disableEscapeKeyDown?: boolean;
+  disableBackdropClose?: boolean;
 }
 
 export interface DialogRef {
@@ -43,10 +45,20 @@ export const BaseDialog: React.FC<Props> = (props) => {
     disableOk,
     disableFooter,
     loading,
+    disableEscapeKeyDown,
+    disableBackdropClose,
   } = props;
 
   return (
-    <Dialog open={open} onClose={props.onClose}>
+    <Dialog
+      open={open}
+      disableEscapeKeyDown={disableEscapeKeyDown}
+      onClose={(_, reason) => {
+        if (disableBackdropClose && reason === "backdropClick") return;
+        if (disableEscapeKeyDown && reason === "escapeKeyDown") return;
+        props.onClose?.();
+      }}
+    >
       <DialogTitle>{title}</DialogTitle>
 
       <DialogContent sx={contentSx}>{children}</DialogContent>

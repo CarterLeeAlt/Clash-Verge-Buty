@@ -352,9 +352,12 @@ pub mod service {
                     .to_string(),
             );
         }
+        if let Err(err) = win_service::stop_core_by_service().await {
+            log::warn!(target: "app", "stop_core_by_service before uninstall failed: {err}");
+        }
+
         match win_service::uninstall_service().await {
             Ok(_) => {
-                let _ = win_service::stop_core_by_service().await;
                 Config::verge().draft().patch_config(IVerge {
                     enable_service_mode: Some(false),
                     enable_tun_mode: Some(false),
