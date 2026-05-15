@@ -323,7 +323,7 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
     bail!("service started clash core (pid {:?}) but external-controller 127.0.0.1:9097 is not ready", core_pid)
 }
 
-pub(super) async fn stop_core_by_service() -> Result<()> {
+pub async fn stop_core_by_service() -> Result<()> {
     let res = reqwest::ClientBuilder::new()
         .no_proxy()
         .build()?

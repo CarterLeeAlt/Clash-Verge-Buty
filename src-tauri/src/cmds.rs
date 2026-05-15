@@ -328,6 +328,7 @@ pub fn exit_app(app_handle: tauri::AppHandle) {
 pub mod service {
     use super::*;
     use crate::core::win_service;
+    use anyhow::bail;
 
     #[tauri::command]
     pub async fn check_service() -> CmdResult<win_service::ServiceStatus> {
@@ -341,7 +342,23 @@ pub mod service {
 
     #[tauri::command]
     pub async fn uninstall_service() -> CmdResult {
-        wrap_err!(win_service::uninstall_service().await)
+        let verge = Config::verge().latest();
+        if verge.enable_tun_mode.unwrap_or(false) {
+            bail!("Tun Mode is enabled. Please disable Tun Mode before uninstalling the service.");
+        }
+        match win_service::uninstall_service().await {
+            Ok(_) => {
+                let _ = win_service::stop_core_by_service().await;
+                Config::verge().draft().patch_config(IVerge {
+                    enable_service_mode: Some(false),
+                    enable_tun_mode: Some(false),
+                    ..IVerge::default()
+                });
+                Config::verge().apply();
+                wrap_err!(Config::verge().data().save_file())
+            }
+            Err(err) => Err(err.to_string()),
+        }
     }
 }
 
