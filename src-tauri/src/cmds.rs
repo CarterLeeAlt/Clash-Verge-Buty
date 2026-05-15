@@ -342,7 +342,8 @@ pub mod service {
     #[tauri::command]
     pub async fn uninstall_service() -> CmdResult {
         let tun_mode_enabled = {
-            let verge = Config::verge().latest();
+            let verge_config = Config::verge();
+            let verge = verge_config.latest();
             verge.enable_tun_mode.unwrap_or(false)
         };
         if tun_mode_enabled {

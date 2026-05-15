@@ -203,7 +203,8 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
     {
         let service_mode = patch.enable_service_mode;
         let (current_tun_enabled, current_service_enabled) = {
-            let current_verge = Config::verge().latest();
+            let verge_config = Config::verge();
+            let current_verge = verge_config.latest();
             (
                 current_verge.enable_tun_mode.unwrap_or(false),
                 current_verge.enable_service_mode.unwrap_or(false),
