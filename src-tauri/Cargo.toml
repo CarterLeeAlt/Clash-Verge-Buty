@@ -46,8 +46,6 @@ runas = "=1.0.0" # 高版本会返回错误 Status
 deelevate = "0.2.0"
 winreg = "0.52.0"
 
-[target.'cfg(target_os = "linux")'.dependencies]
-#openssl
 
 [features]
 default = ["custom-protocol"]
