@@ -22,6 +22,8 @@ const SWITCH_OPERATION_IN_PROGRESS =
   "Another switch operation is already in progress";
 const isSwitchOperationInProgressError = (err: unknown) =>
   err instanceof Error && err.message === SWITCH_OPERATION_IN_PROGRESS;
+const SYS_PROXY_WRITE_FAILED_TIP =
+  "系统代理写入失败，已回滚设置。请稍后重试，或检查是否有其他代理软件、安全软件、系统代理设置正在占用。";
 
 const SettingSystem = ({ onError }: Props) => {
   const { t } = useTranslation();
@@ -221,6 +223,7 @@ const SettingSystem = ({ onError }: Props) => {
           <IconButton
             color="inherit"
             size="small"
+            disabled={switchesBusy}
             onClick={() => sysproxyRef.current?.open()}
           >
             <Settings
@@ -247,6 +250,9 @@ const SettingSystem = ({ onError }: Props) => {
             } catch (err) {
               await mutateVerge();
               if (isWIN) await mutateServiceStatus();
+              if (err instanceof Error && !isSwitchOperationInProgressError(err)) {
+                Notice.error(SYS_PROXY_WRITE_FAILED_TIP);
+              }
               throw err;
             } finally {
               setPendingSwitch(null);
