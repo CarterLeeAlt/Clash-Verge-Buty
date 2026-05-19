@@ -1,9 +1,9 @@
 use crate::{config::Config, log_err};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use auto_launch::{AutoLaunch, AutoLaunchBuilder};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use std::sync::Arc;
+use std::{sync::Arc, thread, time::Duration};
 use sysproxy::Sysproxy;
 use tauri::{async_runtime::Mutex as TokioMutex, utils::platform::current_exe};
 
@@ -29,6 +29,66 @@ static DEFAULT_BYPASS: &str = "localhost,127.0.0.1,192.168.0.0/16,10.0.0.0/8,172
 #[cfg(target_os = "macos")]
 static DEFAULT_BYPASS: &str =
     "127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,localhost,*.local,*.crashlytics.com,<local>";
+
+fn is_sysproxy_match(actual: &Sysproxy, expected: &Sysproxy) -> bool {
+    if actual.enable != expected.enable {
+        return false;
+    }
+
+    if !expected.enable {
+        return true;
+    }
+
+    actual.host.eq_ignore_ascii_case(&expected.host)
+        && actual.port == expected.port
+        && actual.bypass == expected.bypass
+}
+
+fn is_own_proxy(proxy: &Sysproxy, port: u16) -> bool {
+    proxy.enable
+        && proxy.port == port
+        && (proxy.host == "127.0.0.1" || proxy.host.eq_ignore_ascii_case("localhost"))
+}
+
+fn set_system_proxy_with_retry(target: &Sysproxy, action: &str) -> Result<()> {
+    const BACKOFF_MS: [u64; 3] = [150, 400, 800];
+    let mut last_err = None;
+
+    for (idx, backoff) in BACKOFF_MS.iter().enumerate() {
+        match target.set_system_proxy() {
+            Ok(()) => match Sysproxy::get_system_proxy() {
+                Ok(actual) => {
+                    if is_sysproxy_match(&actual, target) {
+                        return Ok(());
+                    }
+
+                    let err = anyhow!(
+                        "{action} write verification mismatch (attempt {}/{})",
+                        idx + 1,
+                        BACKOFF_MS.len()
+                    );
+                    log::warn!(target: "app", "{err}");
+                    last_err = Some(err);
+                }
+                Err(err) => {
+                    log::warn!(target: "app", "{action}: readback failed after set succeeded, accept success: {err}");
+                    return Ok(());
+                }
+            },
+            Err(err) => {
+                log::warn!(target: "app", "{action}: set system proxy failed on attempt {}/{}: {err}", idx + 1, BACKOFF_MS.len());
+                last_err = Some(err.into());
+            }
+        }
+
+        if idx + 1 < BACKOFF_MS.len() {
+            thread::sleep(Duration::from_millis(*backoff));
+        }
+    }
+
+    Err(last_err.unwrap_or_else(|| anyhow!("{action} failed for unknown reason")))
+        .with_context(|| format!("failed to {action} after {} attempts", BACKOFF_MS.len()))
+}
 
 impl Sysopt {
     pub fn global() -> &'static Sysopt {
@@ -67,9 +127,18 @@ impl Sysopt {
 
         if enable {
             let old = Sysproxy::get_system_proxy().ok();
-            current.set_system_proxy()?;
+            let should_save_old = old
+                .as_ref()
+                .map(|proxy| !is_own_proxy(proxy, port))
+                .unwrap_or(false);
+            set_system_proxy_with_retry(&current, "enable system proxy")
+                .context("init system proxy")?;
 
-            *self.old_sysproxy.lock() = old;
+            if should_save_old {
+                *self.old_sysproxy.lock() = old;
+            }
+            *self.cur_sysproxy.lock() = Some(current);
+        } else {
             *self.cur_sysproxy.lock() = Some(current);
         }
 
@@ -80,15 +149,6 @@ impl Sysopt {
 
     /// update the system proxy
     pub fn update_sysproxy(&self) -> Result<()> {
-        let mut cur_sysproxy = self.cur_sysproxy.lock();
-        let old_sysproxy = self.old_sysproxy.lock();
-
-        if cur_sysproxy.is_none() || old_sysproxy.is_none() {
-            drop(cur_sysproxy);
-            drop(old_sysproxy);
-            return self.init_sysproxy();
-        }
-
         let (enable, bypass) = {
             let verge = Config::verge();
             let verge = verge.latest();
@@ -97,34 +157,91 @@ impl Sysopt {
                 verge.system_proxy_bypass.clone(),
             )
         };
-        let mut sysproxy = cur_sysproxy.take().unwrap();
-
-        sysproxy.enable = enable;
-        sysproxy.bypass = bypass.unwrap_or(DEFAULT_BYPASS.into());
 
         let port = Config::verge()
             .latest()
             .verge_mixed_port
             .unwrap_or(Config::clash().data().get_mixed_port());
-        sysproxy.port = port;
 
-        sysproxy.set_system_proxy()?;
-        *cur_sysproxy = Some(sysproxy);
+        let target_proxy = Sysproxy {
+            enable,
+            host: "127.0.0.1".into(),
+            port,
+            bypass: bypass.unwrap_or(DEFAULT_BYPASS.into()),
+        };
 
+        let cached_old = self.old_sysproxy.lock().clone();
+
+        if enable {
+            let before =
+                Sysproxy::get_system_proxy().context("read current system proxy before enable")?;
+            let should_save_old = !is_own_proxy(&before, port);
+
+            let set_result = set_system_proxy_with_retry(&target_proxy, "enable system proxy");
+
+            if let Err(err) = set_result {
+                if let Err(rollback_err) =
+                    set_system_proxy_with_retry(&before, "restore system proxy after failed enable")
+                {
+                    log::error!(target: "app", "enable system proxy rollback failed: {rollback_err}");
+                }
+                return Err(err);
+            }
+
+            if should_save_old {
+                *self.old_sysproxy.lock() = Some(before);
+            }
+            *self.cur_sysproxy.lock() = Some(target_proxy);
+            return Ok(());
+        }
+
+        let before =
+            Sysproxy::get_system_proxy().context("read current system proxy before disable")?;
+        if !is_own_proxy(&before, port) {
+            log::info!(target: "app", "disable system proxy skipped because current proxy is not owned by app");
+            *self.cur_sysproxy.lock() = Some(target_proxy);
+            return Ok(());
+        }
+
+        let mut restore_target = cached_old.unwrap_or_else(|| {
+            let mut disabled = before.clone();
+            disabled.enable = false;
+            disabled
+        });
+
+        if !restore_target.enable {
+            restore_target.enable = false;
+        }
+
+        set_system_proxy_with_retry(
+            &restore_target,
+            if restore_target.enable {
+                "restore original system proxy"
+            } else {
+                "disable system proxy"
+            },
+        )?;
+
+        *self.cur_sysproxy.lock() = Some(target_proxy);
         Ok(())
     }
 
     /// reset the sysproxy
     pub fn reset_sysproxy(&self) -> Result<()> {
-        let mut cur_sysproxy = self.cur_sysproxy.lock();
-        let mut old_sysproxy = self.old_sysproxy.lock();
+        let (cur_sysproxy, old_sysproxy) = {
+            let mut cur_sysproxy = self.cur_sysproxy.lock();
+            let mut old_sysproxy = self.old_sysproxy.lock();
+            (cur_sysproxy.take(), old_sysproxy.take())
+        };
 
-        let cur_sysproxy = cur_sysproxy.take();
+        let mut target = None;
 
-        if let Some(mut old) = old_sysproxy.take() {
+        if let Some(mut old) = old_sysproxy {
             // 如果原代理和当前代理 端口一致，就disable关闭，否则就恢复原代理设置
             // 当前没有设置代理的时候，不确定旧设置是否和当前一致，全关了
-            let port_same = cur_sysproxy.map_or(true, |cur| old.port == cur.port);
+            let port_same = cur_sysproxy
+                .as_ref()
+                .map_or(true, |cur| old.port == cur.port);
 
             if old.enable && port_same {
                 old.enable = false;
@@ -132,15 +249,18 @@ impl Sysopt {
             } else {
                 log::info!(target: "app", "reset proxy to the original proxy");
             }
-
-            old.set_system_proxy()?;
+            target = Some(old);
         } else if let Some(mut cur @ Sysproxy { enable: true, .. }) = cur_sysproxy {
             // 没有原代理，就按现在的代理设置disable即可
             log::info!(target: "app", "reset proxy by disabling the current proxy");
             cur.enable = false;
-            cur.set_system_proxy()?;
+            target = Some(cur);
         } else {
             log::info!(target: "app", "reset proxy with no action");
+        }
+
+        if let Some(proxy) = target {
+            proxy.set_system_proxy()?;
         }
 
         Ok(())

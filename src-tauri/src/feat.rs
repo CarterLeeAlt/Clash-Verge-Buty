@@ -263,7 +263,9 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
             sysopt::Sysopt::global().update_launch()?;
         }
         if system_proxy.is_some() || proxy_bypass.is_some() || port.is_some() {
-            sysopt::Sysopt::global().update_sysproxy()?;
+            sysopt::Sysopt::global()
+                .update_sysproxy()
+                .map_err(|err| anyhow::anyhow!("failed to update system proxy: {err}"))?;
             sysopt::Sysopt::global().guard_proxy();
         }
 
