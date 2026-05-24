@@ -19,7 +19,7 @@ const SettingPage = () => {
   };
 
   const toGithubRepo = useLockFn(() => {
-    return openWebUrl("https://github.com/flyduckfly/Clash-Verge-Buty");
+    return openWebUrl("https://github.com/CarterLeeAlt/Clash-Verge-Buty");
   });
 
   const [mode] = useRecoilState(atomThemeMode);
@@ -34,7 +34,7 @@ const SettingPage = () => {
         <IconButton
           size="medium"
           color="inherit"
-          title="@flyduckfly/Clash-Verge-Buty"
+          title="@CarterLeeAlt/Clash-Verge-Buty"
           onClick={toGithubRepo}
         >
           <GitHub fontSize="inherit" />
