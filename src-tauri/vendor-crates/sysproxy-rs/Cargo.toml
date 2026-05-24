@@ -1,0 +1,30 @@
+[package]
+name = "sysproxy"
+version = "0.3.0"
+edition = "2021"
+authors = ["zzzgydi"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/zzzgydi/sysproxy-rs.git"
+keywords = ["system-proxy", "proxy", "networksetup", "gsettings"]
+description = "A library for set/get system proxy. Supports Windows, macOS and linux (via gsettings)."
+
+[dependencies]
+log = "0.4"
+thiserror = "1"
+iptools = { version = "0.2.4", optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+interfaces = "0.0.8"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winreg = { version = "0.52", features = ["transactions"] }
+windows = { version = "0.52", features = [
+    "Win32_Networking_WinInet",
+    "Win32_NetworkManagement_Rras",
+    "Win32_Foundation",
+] }
+
+
+[features]
+default = ["iptools"]
