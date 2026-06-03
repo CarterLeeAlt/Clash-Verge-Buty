@@ -61,6 +61,11 @@ pub struct IVerge {
     /// not show the window on launch
     pub enable_silent_start: Option<bool>,
 
+    /// Use the legacy transparent frameless Windows WebView window.
+    /// Disabled by default on Windows because reliable decorated windows avoid WebView2 hangs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_custom_frameless_window: Option<bool>,
+
     /// set system proxy
     pub enable_system_proxy: Option<bool>,
 
@@ -217,7 +222,11 @@ impl IVerge {
 
     /// Save IVerge App Config
     pub fn save_file(&self) -> Result<()> {
-        help::save_yaml(&dirs::verge_path()?, &self, Some("# Clash-Verge-Buty Config"))
+        help::save_yaml(
+            &dirs::verge_path()?,
+            &self,
+            Some("# Clash-Verge-Buty Config"),
+        )
     }
 
     /// patch verge config
@@ -249,6 +258,7 @@ impl IVerge {
         patch!(enable_service_mode);
         patch!(enable_auto_launch);
         patch!(enable_silent_start);
+        patch!(enable_custom_frameless_window);
         patch!(enable_random_port);
         patch!(verge_mixed_port);
         patch!(verge_socks_port);

@@ -250,6 +250,9 @@ impl Tray {
                     return;
                 }
 
+                if resolve::is_main_window_creating() {
+                    log::warn!(target: "app", "tray main_window click recorded as pending because main window is creating");
+                }
                 log::trace!("tray main_window -> resolve::show_main_window");
                 resolve::show_main_window(app_handle);
             }
@@ -271,6 +274,9 @@ impl Tray {
                         feat::change_clash_mode(mode.into());
                     }
                     "open_window" => {
+                        if resolve::is_main_window_creating() {
+                            log::warn!(target: "app", "tray open_window menu recorded as pending because main window is creating");
+                        }
                         log::trace!("tray open_window menu -> resolve::show_main_window");
                         resolve::show_main_window(app_handle);
                     }

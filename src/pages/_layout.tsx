@@ -25,7 +25,11 @@ import { useLogSetup } from "@/components/layout/use-log-setup";
 import getSystem from "@/utils/get-system";
 import "dayjs/locale/ru";
 import "dayjs/locale/zh-cn";
-import { getPortableFlag } from "@/services/cmds";
+import {
+  frontendHeartbeat,
+  getPortableFlag,
+  reportFrontendError,
+} from "@/services/cmds";
 import { useNavigate } from "react-router-dom";
 export let portableFlag = false;
 
@@ -51,7 +55,7 @@ const Layout = () => {
     const onKeyDown = (e: KeyboardEvent) => {
       // macOS有cmd+w
       if (e.key === "Escape" && OS !== "macos") {
-        appWindow.close();
+        appWindow.hide().catch(() => undefined);
       }
     };
 
@@ -59,37 +63,64 @@ const Layout = () => {
 
     const unlistenTasks: Promise<UnlistenFn>[] = [];
 
-    unlistenTasks.push(listen("verge://refresh-clash-config", async () => {
-      // the clash info may be updated
-      await getAxios(true);
-      await mutate("getClashInfo");
-      mutate("getRuntimeConfig");
-      mutate("checkService");
-      mutate("getProxies");
-      mutate("getVersion");
-      mutate("getClashConfig");
-      mutate("getProxyProviders");
-    }));
+    unlistenTasks.push(
+      listen("verge://refresh-clash-config", async () => {
+        // the clash info may be updated
+        await getAxios(true);
+        await mutate("getClashInfo");
+        mutate("getRuntimeConfig");
+        mutate("checkService");
+        mutate("getProxies");
+        mutate("getVersion");
+        mutate("getClashConfig");
+        mutate("getProxyProviders");
+      })
+    );
 
     // update the verge config
-    unlistenTasks.push(listen("verge://refresh-verge-config", () => mutate("getVergeConfig")));
+    unlistenTasks.push(
+      listen("verge://refresh-verge-config", () => mutate("getVergeConfig"))
+    );
 
     // 设置提示监听
-    unlistenTasks.push(listen("verge://notice-message", ({ payload }) => {
-      const [status, msg] = payload as [string, string];
-      switch (status) {
-        case "set_config::ok":
-          Notice.success("Refresh clash config");
-          break;
-        case "set_config::error":
-          Notice.error(msg);
-          break;
-        default:
-          break;
-      }
-    }));
+    unlistenTasks.push(
+      listen("verge://notice-message", ({ payload }) => {
+        const [status, msg] = payload as [string, string];
+        switch (status) {
+          case "set_config::ok":
+            Notice.success("Refresh clash config");
+            break;
+          case "set_config::error":
+            Notice.error(msg);
+            break;
+          default:
+            break;
+        }
+      })
+    );
 
     emit("frontend://ready").catch(() => undefined);
+
+    frontendHeartbeat().catch(() => undefined);
+    const heartbeatTimer = window.setInterval(() => {
+      frontendHeartbeat().catch(() => undefined);
+    }, 5000);
+
+    const onError = (event: ErrorEvent) => {
+      reportFrontendError(
+        event.message || "window.onerror",
+        event.error?.stack
+      ).catch(() => undefined);
+    };
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      reportFrontendError(
+        reason?.message || String(reason || "unhandledrejection"),
+        reason?.stack
+      ).catch(() => undefined);
+    };
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
 
     getPortableFlag()
       .then((value) => {
@@ -99,6 +130,9 @@ const Layout = () => {
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
+      window.clearInterval(heartbeatTimer);
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
       unlistenTasks.forEach((task) => {
         task.then((unlisten) => unlisten()).catch(() => undefined);
       });
@@ -132,8 +166,9 @@ const Layout = () => {
             if (
               OS === "windows" &&
               !(
-                validList.includes((e.target as HTMLElement).tagName.toLowerCase()) ||
-                (e.target as HTMLElement).isContentEditable
+                validList.includes(
+                  (e.target as HTMLElement).tagName.toLowerCase()
+                ) || (e.target as HTMLElement).isContentEditable
               )
             ) {
               e.preventDefault();

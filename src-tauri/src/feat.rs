@@ -20,7 +20,7 @@ pub fn open_or_close_dashboard() {
     if let Some(app_handle) = app_handle.as_ref() {
         if let Some(window) = app_handle.get_window("main") {
             if let Ok(true) = window.is_focused() {
-                let _ = window.close();
+                let _ = window.hide();
                 return;
             }
         }
