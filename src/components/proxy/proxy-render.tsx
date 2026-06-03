@@ -36,77 +36,77 @@ export const ProxyRender = (props: RenderProps) => {
   const { verge } = useVerge();
   const enable_group_icon = verge?.enable_group_icon ?? true;
   const [mode] = useRecoilState(atomThemeMode);
-  console.log(mode);
   const isDark = mode === "light" ? false : true;
   const itembackgroundcolor = isDark ? "#282A36" : "#ffffff";
 
   if (type === 0 && !group.hidden) {
     return (
-      <ListItemButton
-        dense
-        style={{
-          background: itembackgroundcolor,
-          height: "64px",
-          margin: "8px 8px",
-          borderRadius: "8px",
-        }}
-        onClick={() => onHeadState(group.name, { open: !headState?.open })}
-      >
-        {enable_group_icon &&
-          group.icon &&
-          group.icon.trim().startsWith("http") && (
-            <img
-              src={group.icon}
-              height="32px"
-              style={{ marginRight: "12px", borderRadius: "6px" }}
-            />
-          )}
-        {enable_group_icon &&
-          group.icon &&
-          group.icon.trim().startsWith("data") && (
-            <img
-              src={group.icon}
-              height="32px"
-              style={{ marginRight: "12px", borderRadius: "6px" }}
-            />
-          )}
-        {enable_group_icon &&
-          group.icon &&
-          group.icon.trim().startsWith("<svg") && (
-            <img
-              src={`data:image/svg+xml;base64,${btoa(group.icon)}`}
-              height="32px"
-            />
-          )}
-        <ListItemText
-          primary={<StyledPrimary>{group.name}</StyledPrimary>}
-          secondary={
-            <ListItemTextChild
-              color="text.secondary"
-              sx={{
-                overflow: "hidden",
-                display: "flex",
-                alignItems: "center",
-                pt: "2px",
-              }}
-            >
-              <StyledTypeBox>{group.type}</StyledTypeBox>
-              <StyledSubtitle
+      <Box sx={{ px: 1, py: 1 }}>
+        <ListItemButton
+          dense
+          sx={{
+            background: itembackgroundcolor,
+            height: 64,
+            borderRadius: "8px",
+          }}
+          onClick={() => onHeadState(group.name, { open: !headState?.open })}
+        >
+          {enable_group_icon &&
+            group.icon &&
+            group.icon.trim().startsWith("http") && (
+              <img
+                src={group.icon}
+                height="32px"
+                style={{ marginRight: "12px", borderRadius: "6px" }}
+              />
+            )}
+          {enable_group_icon &&
+            group.icon &&
+            group.icon.trim().startsWith("data") && (
+              <img
+                src={group.icon}
+                height="32px"
+                style={{ marginRight: "12px", borderRadius: "6px" }}
+              />
+            )}
+          {enable_group_icon &&
+            group.icon &&
+            group.icon.trim().startsWith("<svg") && (
+              <img
+                src={`data:image/svg+xml;base64,${btoa(group.icon)}`}
+                height="32px"
+              />
+            )}
+          <ListItemText
+            primary={<StyledPrimary>{group.name}</StyledPrimary>}
+            secondary={
+              <ListItemTextChild
+                color="text.secondary"
                 sx={{
-                  color: isDark ? "#ffffff" : "#8c8c8c",
-                  fontWeight: "600",
+                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "center",
+                  pt: "2px",
                 }}
               >
-                {group.now}
-              </StyledSubtitle>
-            </ListItemTextChild>
-          }
-          secondaryTypographyProps={{
-            sx: { display: "flex", alignItems: "center", color: "#ccc" },
-          }}
-        />
-        {headState?.open ? <ExpandLessRounded /> : <ExpandMoreRounded />}
-      </ListItemButton>
+                <StyledTypeBox>{group.type}</StyledTypeBox>
+                <StyledSubtitle
+                  sx={{
+                    color: isDark ? "#ffffff" : "#8c8c8c",
+                    fontWeight: "600",
+                  }}
+                >
+                  {group.now}
+                </StyledSubtitle>
+              </ListItemTextChild>
+            }
+            secondaryTypographyProps={{
+              sx: { display: "flex", alignItems: "center", color: "#ccc" },
+            }}
+          />
+          {headState?.open ? <ExpandLessRounded /> : <ExpandMoreRounded />}
+        </ListItemButton>
+      </Box>
     );
   }
 
