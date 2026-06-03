@@ -125,7 +125,10 @@ pub fn enhance() -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
 }
 
 fn apply_ipv6_to_dns(mut config: Mapping) -> Mapping {
-    let ipv6_enabled = config.get("ipv6").and_then(|v| v.as_bool()).unwrap_or(false);
+    let ipv6_enabled = config
+        .get("ipv6")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let dns = config.get("dns").and_then(|v| v.as_mapping()).cloned();
     let mut dns = dns.unwrap_or_default();
     dns.insert("ipv6".into(), Value::Bool(ipv6_enabled));

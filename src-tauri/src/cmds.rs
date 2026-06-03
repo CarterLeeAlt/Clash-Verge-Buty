@@ -316,7 +316,26 @@ pub fn copy_icon_file(path: String, name: String) -> CmdResult<String> {
 }
 
 #[tauri::command]
+pub fn frontend_heartbeat() -> CmdResult<()> {
+    resolve::record_frontend_heartbeat();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn report_frontend_error(message: String, stack: Option<String>) -> CmdResult<()> {
+    resolve::record_frontend_error(message, stack);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_window_style_config() -> CmdResult<resolve::WindowStyleConfig> {
+    Ok(resolve::get_window_style_config())
+}
+
+#[tauri::command]
 pub fn exit_app(app_handle: tauri::AppHandle) {
+    log::info!(target: "app", "exit_app called, mark app as quitting");
+    resolve::set_app_quitting(true);
     let _ = resolve::save_window_size_position(&app_handle, true);
     resolve::resolve_reset();
     api::process::kill_children();

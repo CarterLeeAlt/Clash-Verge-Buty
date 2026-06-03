@@ -18,7 +18,8 @@ interface Props {
   mode: string;
 }
 
-const VirtuosoFooter = () => <div style={{ height: 4 }} />;
+const VirtuosoHeader = () => <div style={{ height: 4 }} />;
+const VirtuosoFooter = () => <div style={{ height: 6 }} />;
 
 export const ProxyGroups = (props: Props) => {
   const { mode } = props;
@@ -123,7 +124,7 @@ export const ProxyGroups = (props: Props) => {
       style={{ height: "100%" }}
       totalCount={renderList.length}
       increaseViewportBy={256}
-      components={{ Footer: VirtuosoFooter }}
+      components={{ Header: VirtuosoHeader, Footer: VirtuosoFooter }}
       itemContent={(index) => (
         <ProxyRender
           key={renderList[index].key}

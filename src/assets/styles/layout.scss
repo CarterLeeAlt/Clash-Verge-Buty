@@ -37,7 +37,7 @@
       justify-content: center;
       align-items: center;
       line-height: 1;
-      transform: translateY(-2px);
+      transform: translateY(-3px);
       align-self: stretch;
       border-bottom: 1px solid var(--divider-color);
       // max-width: $maxLogo + 32px;
@@ -140,6 +140,27 @@
     }
     .layout__right .the-content {
       top: 24px;
+    }
+  }
+}
+
+.windows.native-decorated-window {
+  &.layout {
+    .layout__left {
+      padding-top: 8px;
+    }
+
+    .layout__left .the-logo {
+      flex-basis: 58px;
+    }
+
+    .layout__right .the-bar {
+      display: none;
+      height: 0;
+    }
+
+    .layout__right .the-content {
+      top: 0;
     }
   }
 }

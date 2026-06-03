@@ -2,12 +2,12 @@ import dayjs from "dayjs";
 import i18next from "i18next";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { SWRConfig, mutate } from "swr";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
 import { alpha, List, Paper, ThemeProvider } from "@mui/material";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { appWindow } from "@tauri-apps/api/window";
 import { routers } from "./_routers";
 import { getAxios } from "@/services/api";
@@ -25,7 +25,12 @@ import { useLogSetup } from "@/components/layout/use-log-setup";
 import getSystem from "@/utils/get-system";
 import "dayjs/locale/ru";
 import "dayjs/locale/zh-cn";
-import { getPortableFlag } from "@/services/cmds";
+import {
+  frontendHeartbeat,
+  getPortableFlag,
+  getWindowStyleConfig,
+  reportFrontendError,
+} from "@/services/cmds";
 import { useNavigate } from "react-router-dom";
 export let portableFlag = false;
 
@@ -42,6 +47,13 @@ const Layout = () => {
 
   const { verge } = useVerge();
   const { language, start_page } = verge || {};
+  const [windowStyle, setWindowStyle] = useState<IWindowStyleConfig>(() => ({
+    platform: OS,
+    nativeDecorations: OS === "windows",
+    reliableMode: OS === "windows",
+    customFrameless: false,
+  }));
+  const nativeDecorations = windowStyle.nativeDecorations;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -51,7 +63,7 @@ const Layout = () => {
     const onKeyDown = (e: KeyboardEvent) => {
       // macOS有cmd+w
       if (e.key === "Escape" && OS !== "macos") {
-        appWindow.close();
+        appWindow.hide().catch(() => undefined);
       }
     };
 
@@ -59,46 +71,80 @@ const Layout = () => {
 
     const unlistenTasks: Promise<UnlistenFn>[] = [];
 
-    unlistenTasks.push(listen("verge://refresh-clash-config", async () => {
-      // the clash info may be updated
-      await getAxios(true);
-      await mutate("getClashInfo");
-      mutate("getRuntimeConfig");
-      mutate("checkService");
-      mutate("getProxies");
-      mutate("getVersion");
-      mutate("getClashConfig");
-      mutate("getProxyProviders");
-    }));
+    unlistenTasks.push(
+      listen("verge://refresh-clash-config", async () => {
+        // the clash info may be updated
+        await getAxios(true);
+        await mutate("getClashInfo");
+        mutate("getRuntimeConfig");
+        mutate("checkService");
+        mutate("getProxies");
+        mutate("getVersion");
+        mutate("getClashConfig");
+        mutate("getProxyProviders");
+      })
+    );
 
     // update the verge config
-    unlistenTasks.push(listen("verge://refresh-verge-config", () => mutate("getVergeConfig")));
+    unlistenTasks.push(
+      listen("verge://refresh-verge-config", () => mutate("getVergeConfig"))
+    );
 
     // 设置提示监听
-    unlistenTasks.push(listen("verge://notice-message", ({ payload }) => {
-      const [status, msg] = payload as [string, string];
-      switch (status) {
-        case "set_config::ok":
-          Notice.success("Refresh clash config");
-          break;
-        case "set_config::error":
-          Notice.error(msg);
-          break;
-        default:
-          break;
-      }
-    }));
+    unlistenTasks.push(
+      listen("verge://notice-message", ({ payload }) => {
+        const [status, msg] = payload as [string, string];
+        switch (status) {
+          case "set_config::ok":
+            Notice.success("Refresh clash config");
+            break;
+          case "set_config::error":
+            Notice.error(msg);
+            break;
+          default:
+            break;
+        }
+      })
+    );
 
-    const timer = window.setTimeout(async () => {
-      portableFlag = await getPortableFlag();
-      await appWindow.unminimize();
-      await appWindow.show();
-      await appWindow.setFocus();
-    }, 50);
+    emit("frontend://ready").catch(() => undefined);
+
+    frontendHeartbeat().catch(() => undefined);
+    const heartbeatTimer = window.setInterval(() => {
+      frontendHeartbeat().catch(() => undefined);
+    }, 5000);
+
+    const onError = (event: ErrorEvent) => {
+      reportFrontendError(
+        event.message || "window.onerror",
+        event.error?.stack
+      ).catch(() => undefined);
+    };
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      reportFrontendError(
+        reason?.message || String(reason || "unhandledrejection"),
+        reason?.stack
+      ).catch(() => undefined);
+    };
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+
+    getPortableFlag()
+      .then((value) => {
+        portableFlag = value;
+      })
+      .catch(() => undefined);
+
+    getWindowStyleConfig()
+      .then(setWindowStyle)
+      .catch(() => undefined);
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      window.clearTimeout(timer);
+      window.clearInterval(heartbeatTimer);
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
       unlistenTasks.forEach((task) => {
         task.then((unlisten) => unlisten()).catch(() => undefined);
       });
@@ -121,9 +167,15 @@ const Layout = () => {
         <Paper
           square
           elevation={0}
-          className={`${OS} layout`}
+          className={`${OS} layout ${
+            nativeDecorations
+              ? "native-decorated-window"
+              : "custom-frameless-window"
+          }`}
           onPointerDown={(e: any) => {
-            if (e.target?.dataset?.windrag) appWindow.startDragging();
+            if (!nativeDecorations && e.target?.dataset?.windrag) {
+              appWindow.startDragging();
+            }
           }}
           onContextMenu={(e) => {
             // only prevent it on Windows
@@ -132,8 +184,9 @@ const Layout = () => {
             if (
               OS === "windows" &&
               !(
-                validList.includes((e.target as HTMLElement).tagName.toLowerCase()) ||
-                (e.target as HTMLElement).isContentEditable
+                validList.includes(
+                  (e.target as HTMLElement).tagName.toLowerCase()
+                ) || (e.target as HTMLElement).isContentEditable
               )
             ) {
               e.preventDefault();
@@ -168,9 +221,9 @@ const Layout = () => {
           </div>
 
           <div className="layout__right" data-windrag>
-            {OS === "windows" && (
+            {OS === "windows" && !nativeDecorations && (
               <div className="the-bar">
-                <LayoutControl />
+                <LayoutControl nativeDecorations={nativeDecorations} />
               </div>
             )}
 

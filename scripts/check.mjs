@@ -32,9 +32,12 @@ const SIDECAR_HOST = target
       .match(/(?<=host: ).+(?=\s*)/g)[0];
 
 const DOWNLOAD_SOURCES = {
-  mihomoAlphaVersion: "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt",
-  mihomoAlphaPrefix: "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha",
-  mihomoStableVersion: "https://github.com/MetaCubeX/mihomo/releases/latest/download/version.txt",
+  mihomoAlphaVersion:
+    "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt",
+  mihomoAlphaPrefix:
+    "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha",
+  mihomoStableVersion:
+    "https://github.com/MetaCubeX/mihomo/releases/latest/download/version.txt",
   mihomoStablePrefix: "https://github.com/MetaCubeX/mihomo/releases/download",
   simpleScZip:
     "https://nsis.sourceforge.io/mediawiki/images/e/ef/NSIS_Simple_Service_Plugin_Unicode_1.30.zip",
@@ -297,29 +300,103 @@ async function resolveResource(binInfo) {
 /**
  * copy local windows service binaries to resources dir
  */
+const WINDOWS_SERVICE_BINARY_FILES = [
+  // Windows service binary keeps historical filename for CI/local-binaries compatibility.
+  "clash-verge-service.exe",
+  "install-service.exe",
+  "uninstall-service.exe",
+];
+
+let windowsServiceBuildPromise = null;
+let windowsServiceBinariesPromise = null;
+
+function buildWindowsServiceBinariesIfNeededOnce() {
+  if (!windowsServiceBuildPromise) {
+    windowsServiceBuildPromise = buildWindowsServiceBinariesIfNeeded().catch(
+      (err) => {
+        windowsServiceBuildPromise = null;
+        throw err;
+      }
+    );
+  }
+  return windowsServiceBuildPromise;
+}
+
 async function buildWindowsServiceBinariesIfNeeded() {
   if (process.platform !== "win32") return;
-  const manifestPath = path.join(cwd, "src-tauri", "windows-service-src", "Cargo.toml");
-  const outDir = path.join(cwd, "src-tauri", "local-binaries", "windows-service-bin");
+
+  const serviceTarget = SIDECAR_HOST || "x86_64-pc-windows-msvc";
+  const manifestPath = path.join(
+    cwd,
+    "src-tauri",
+    "windows-service-src",
+    "Cargo.toml"
+  );
+  const outDir = path.join(
+    cwd,
+    "src-tauri",
+    "local-binaries",
+    "windows-service-bin"
+  );
+  const binDir = path.join(
+    cwd,
+    "src-tauri",
+    "windows-service-src",
+    "target",
+    serviceTarget,
+    "release"
+  );
+
+  console.log(
+    `[INFO]: building Windows service binaries once target=${serviceTarget} files=${WINDOWS_SERVICE_BINARY_FILES.join(
+      ","
+    )}`
+  );
   await fs.mkdirp(outDir);
-  execSync(`cargo build --manifest-path "${manifestPath}" --release --target ${SIDECAR_HOST || "x86_64-pc-windows-msvc"}`, { stdio: "inherit" });
-  const binDir = path.join(cwd, "src-tauri", "windows-service-src", "target", SIDECAR_HOST || "x86_64-pc-windows-msvc", "release");
-  for (const f of ["clash-verge-service.exe", "install-service.exe", "uninstall-service.exe"]) {
-    await fs.copy(path.join(binDir, f), path.join(outDir, f), { overwrite: true });
+  execSync(
+    `cargo build --manifest-path "${manifestPath}" --release --target ${serviceTarget}`,
+    { stdio: "inherit" }
+  );
+
+  for (const file of WINDOWS_SERVICE_BINARY_FILES) {
+    const src = path.join(binDir, file);
+    const dst = path.join(outDir, file);
+
+    if (!(await fs.pathExists(src))) {
+      throw new Error(`Missing built service binary: ${src}`);
+    }
+
+    await fs.copy(src, dst, { overwrite: true });
   }
 }
 
-async function copyLocalWindowsServiceBinaries() {
-  await buildWindowsServiceBinariesIfNeeded();
-  const sourceDir = path.join(cwd, "src-tauri", "local-binaries", "windows-service-bin");
-  const targetDir = path.join(cwd, "src-tauri", "resources");
+function copyLocalWindowsServiceBinariesOnce() {
+  if (!windowsServiceBinariesPromise) {
+    windowsServiceBinariesPromise = copyLocalWindowsServiceBinaries().catch(
+      (err) => {
+        windowsServiceBinariesPromise = null;
+        throw err;
+      }
+    );
+  }
+  return windowsServiceBinariesPromise;
+}
 
-  const files = [
-    // Windows service binary keeps historical filename for CI/local-binaries compatibility.
-    "clash-verge-service.exe",
-    "install-service.exe",
-    "uninstall-service.exe",
-  ];
+async function copyLocalWindowsServiceBinaries() {
+  console.log(
+    `[INFO]: resolving Windows service binaries as one task files=${WINDOWS_SERVICE_BINARY_FILES.join(
+      ","
+    )}`
+  );
+  await buildWindowsServiceBinariesIfNeededOnce();
+
+  const sourceDir = path.join(
+    cwd,
+    "src-tauri",
+    "local-binaries",
+    "windows-service-bin"
+  );
+  const targetDir = path.join(cwd, "src-tauri", "resources");
 
   await fs.mkdirp(targetDir);
 
@@ -331,7 +408,7 @@ async function copyLocalWindowsServiceBinaries() {
     }
   };
 
-  for (const file of files) {
+  for (const file of WINDOWS_SERVICE_BINARY_FILES) {
     const src = path.join(sourceDir, file);
     const dst = path.join(targetDir, file);
 
@@ -345,6 +422,12 @@ async function copyLocalWindowsServiceBinaries() {
     await fs.copyFile(src, dst);
     console.log(`[INFO]: ${file} copied from local repository`);
   }
+
+  console.log(
+    `[INFO]: Windows service binaries ready in resources: ${WINDOWS_SERVICE_BINARY_FILES.join(
+      ","
+    )}`
+  );
 }
 
 /**
@@ -363,7 +446,9 @@ async function downloadFile(url, path) {
     options.agent = proxyAgent(httpProxy);
   }
 
-  console.log(`[INFO]: downloading url="${url}" -> "${path}" target="${SIDECAR_HOST}"`);
+  console.log(
+    `[INFO]: downloading url="${url}" -> "${path}" target="${SIDECAR_HOST}"`
+  );
   const response = await fetch(url, {
     ...options,
     method: "GET",
@@ -425,9 +510,8 @@ const resolvePlugin = async () => {
  * main
  */
 
-const resolveService = () => copyLocalWindowsServiceBinaries();
-const resolveInstall = () => copyLocalWindowsServiceBinaries();
-const resolveUninstall = () => copyLocalWindowsServiceBinaries();
+const resolveWindowsServiceBinaries = () =>
+  copyLocalWindowsServiceBinariesOnce();
 const resolveMmdb = () =>
   resolveResource({
     file: "Country.mmdb",
@@ -468,9 +552,12 @@ const tasks = [
     retry: 5,
   },
   { name: "plugin", func: resolvePlugin, retry: 5, winOnly: true },
-  { name: "service", func: resolveService, retry: 5, winOnly: true },
-  { name: "install", func: resolveInstall, retry: 5, winOnly: true },
-  { name: "uninstall", func: resolveUninstall, retry: 5, winOnly: true },
+  {
+    name: "windows-service-binaries",
+    func: resolveWindowsServiceBinaries,
+    retry: 5,
+    winOnly: true,
+  },
   { name: "mmdb", func: resolveMmdb, retry: 5 },
   { name: "geosite", func: resolveGeosite, retry: 5 },
   { name: "geoip", func: resolveGeoIP, retry: 5 },
