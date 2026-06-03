@@ -7,7 +7,7 @@
   > header {
     // Match the visual bottom edge of .layout__left .the-logo; its
     // translateY(-2px) moves the painted border without changing layout.
-    $pageHeaderHeight: 63px;
+    $pageHeaderHeight: 60px;
 
     flex: 0 0 $pageHeaderHeight;
     width: 100%;
