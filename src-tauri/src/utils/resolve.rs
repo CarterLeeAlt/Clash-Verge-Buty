@@ -22,6 +22,17 @@ static FRONTEND_READY_LISTENING: AtomicBool = AtomicBool::new(false);
 static FRONTEND_READY_HANDLED: AtomicBool = AtomicBool::new(false);
 static FRONTEND_SHOW_WHEN_READY: AtomicBool = AtomicBool::new(true);
 static MAIN_WINDOW_SHOW_REQUEST_ID: AtomicU64 = AtomicU64::new(0);
+static MAIN_WINDOW_SHOWING: AtomicBool = AtomicBool::new(false);
+static MAIN_WINDOW_SHOW_PENDING_ID: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Clone, Copy, Debug)]
+enum ShowReason {
+    Explicit,
+    FrontendReady,
+    FrontendReadyRestore,
+    CreateExisting,
+    CreateFallback,
+}
 
 struct MainWindowCreatingGuard;
 
@@ -43,6 +54,33 @@ impl Drop for MainWindowCreatingGuard {
     fn drop(&mut self) {
         MAIN_WINDOW_CREATING.store(false, Ordering::SeqCst);
         log::trace!("create_window creating lock released");
+    }
+}
+
+struct MainWindowShowingGuard;
+
+impl MainWindowShowingGuard {
+    fn try_lock(request_id: u64, reason: ShowReason) -> Option<Self> {
+        if MAIN_WINDOW_SHOWING
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            log::trace!(
+                "show skipped/merged because show already in progress, request_id={}, reason={:?}",
+                request_id,
+                reason
+            );
+            None
+        } else {
+            Some(Self)
+        }
+    }
+}
+
+impl Drop for MainWindowShowingGuard {
+    fn drop(&mut self) {
+        MAIN_WINDOW_SHOWING.store(false, Ordering::SeqCst);
+        log::trace!("main window show lock released");
     }
 }
 
@@ -190,10 +228,10 @@ fn register_frontend_ready_listener(app_handle: &AppHandle, show_when_ready: boo
                 show_request_id
             );
             if let Some(window) = ready_app_handle.get_window("main") {
-                show_existing_window(&window);
+                show_existing_window(&window, show_request_id, ShowReason::FrontendReady);
             } else {
                 log::trace!("frontend ready wants show but main window is missing");
-                show_main_window(&ready_app_handle);
+                create_window(&ready_app_handle, true);
             }
             return;
         }
@@ -209,7 +247,11 @@ fn register_frontend_ready_listener(app_handle: &AppHandle, show_when_ready: boo
                     "frontend ready hide skipped because show requested, show_request_id={}",
                     latest_show_request_id
                 );
-                show_existing_window(&window);
+                show_existing_window(
+                    &window,
+                    latest_show_request_id,
+                    ShowReason::FrontendReadyRestore,
+                );
                 return;
             }
 
@@ -220,7 +262,11 @@ fn register_frontend_ready_listener(app_handle: &AppHandle, show_when_ready: boo
                     "frontend ready post-hide show requested, restore main window, show_request_id={}",
                     latest_show_request_id
                 );
-                show_existing_window(&window);
+                show_existing_window(
+                    &window,
+                    latest_show_request_id,
+                    ShowReason::FrontendReadyRestore,
+                );
             } else {
                 log::trace!("frontend ready hide completed without show request");
             }
@@ -367,10 +413,56 @@ fn force_activate_window(window: &tauri::Window, context: &str) {
     }
 }
 
-fn run_show_attempt(window: &tauri::Window, attempt: usize, context: &str, final_attempt: bool) {
+fn window_state(window: &tauri::Window) -> (bool, bool, bool) {
+    let visible = window.is_visible().unwrap_or(false);
+    let minimized = window.is_minimized().unwrap_or(false);
+    let focused = window.is_focused().unwrap_or(false);
+    (visible, minimized, focused)
+}
+
+#[cfg(target_os = "windows")]
+fn window_needs_repair(window: &tauri::Window) -> bool {
+    let (visible, minimized, focused) = window_state(window);
+    !visible || minimized || !focused
+}
+
+#[cfg(not(target_os = "windows"))]
+fn window_needs_repair(window: &tauri::Window) -> bool {
+    let (visible, minimized, _) = window_state(window);
+    !visible || minimized
+}
+
+fn record_pending_show_request(request_id: u64) {
+    let mut pending = MAIN_WINDOW_SHOW_PENDING_ID.load(Ordering::SeqCst);
+    while request_id > pending {
+        match MAIN_WINDOW_SHOW_PENDING_ID.compare_exchange(
+            pending,
+            request_id,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(_) => return,
+            Err(next_pending) => pending = next_pending,
+        }
+    }
+}
+
+fn window_show_once_fast(window: &tauri::Window, request_id: u64, reason: ShowReason) {
     log::trace!(
-        "show_existing_window retry attempt number {}, context={}",
-        attempt,
+        "main window fast show attempt, request_id={}, reason={:?}",
+        request_id,
+        reason
+    );
+    trace_err!(window.unminimize(), "set win unminimize");
+    trace_err!(window.show(), "set win visible");
+    trace_err!(window.set_focus(), "set win focus");
+    ensure_main_window_onscreen(window, "fast show after show");
+}
+
+fn window_show_once_repair(window: &tauri::Window, request_id: u64, context: &str) {
+    log::trace!(
+        "main window repair show attempt, request_id={}, context={}",
+        request_id,
         context
     );
     ensure_main_window_onscreen(window, &format!("{} before show", context));
@@ -381,34 +473,108 @@ fn run_show_attempt(window: &tauri::Window, attempt: usize, context: &str, final
 
     #[cfg(target_os = "windows")]
     force_activate_window(window, context);
+}
 
-    if final_attempt {
-        log_window_state(window, context);
+fn finish_show_flow(
+    window: &tauri::Window,
+    current_request_id: u64,
+    showing_guard: MainWindowShowingGuard,
+) {
+    drop(showing_guard);
+    log_window_state(window, "show_existing_window released final");
+
+    let pending_request_id = MAIN_WINDOW_SHOW_PENDING_ID.load(Ordering::SeqCst);
+    if pending_request_id <= current_request_id {
+        return;
+    }
+
+    log::trace!(
+        "show flow processing merged pending request, current_request_id={}, pending_request_id={}",
+        current_request_id,
+        pending_request_id
+    );
+    request_show_existing_window(window, pending_request_id, ShowReason::Explicit);
+}
+
+#[cfg(target_os = "windows")]
+fn schedule_windows_show_retries(
+    window: tauri::Window,
+    request_id: u64,
+    reason: ShowReason,
+    showing_guard: MainWindowShowingGuard,
+) {
+    log::trace!(
+        "windows delayed retry scheduled, request_id={}, reason={:?}",
+        request_id,
+        reason
+    );
+    tauri::async_runtime::spawn(async move {
+        let retries = [(1usize, 200u64), (2, 600)];
+        for (attempt, delay_ms) in retries {
+            tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+            let latest_request_id = MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst);
+            if latest_request_id != request_id {
+                log::trace!(
+                    "windows delayed retry skipped because stale, request_id={}, latest_request_id={}, attempt={}, delay_ms={}",
+                    request_id,
+                    latest_request_id,
+                    attempt,
+                    delay_ms
+                );
+                break;
+            }
+
+            let (visible, minimized, focused) = window_state(&window);
+            if !window_needs_repair(&window) {
+                log::trace!(
+                    "windows delayed retry skipped because window already visible, request_id={}, attempt={}, visible={}, minimized={}, focused={}",
+                    request_id,
+                    attempt,
+                    visible,
+                    minimized,
+                    focused
+                );
+                log_window_state(&window, "windows delayed retry final healthy");
+                break;
+            }
+
+            window_show_once_repair(
+                &window,
+                request_id,
+                &format!("windows delayed {}ms", delay_ms),
+            );
+
+            if attempt == 2 {
+                log_window_state(&window, "windows delayed retry final");
+            }
+        }
+
+        finish_show_flow(&window, request_id, showing_guard);
+    });
+}
+
+fn request_show_existing_window(window: &tauri::Window, request_id: u64, reason: ShowReason) {
+    record_pending_show_request(request_id);
+
+    let Some(showing_guard) = MainWindowShowingGuard::try_lock(request_id, reason) else {
+        return;
+    };
+
+    let current_request_id = MAIN_WINDOW_SHOW_PENDING_ID.swap(0, Ordering::SeqCst);
+    window_show_once_fast(window, current_request_id, reason);
+
+    #[cfg(target_os = "windows")]
+    schedule_windows_show_retries(window.clone(), current_request_id, reason, showing_guard);
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        log_window_state(window, "show_existing_window final");
+        finish_show_flow(window, current_request_id, showing_guard);
     }
 }
 
-fn show_existing_window(window: &tauri::Window) {
-    run_show_attempt(window, 0, "immediate", false);
-
-    #[cfg(target_os = "windows")]
-    {
-        let win = window.clone();
-        tauri::async_runtime::spawn(async move {
-            let retries = [(1usize, 100u64), (2, 300), (3, 800)];
-            for (attempt, delay_ms) in retries {
-                tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
-                run_show_attempt(
-                    &win,
-                    attempt,
-                    &format!("windows delayed {}ms", delay_ms),
-                    attempt == 3,
-                );
-            }
-        });
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    log_window_state(window, "show_existing_window final");
+fn show_existing_window(window: &tauri::Window, request_id: u64, reason: ShowReason) {
+    request_show_existing_window(window, request_id, reason);
 }
 
 /// show and focus the main window
@@ -423,7 +589,7 @@ pub fn show_main_window(app_handle: &AppHandle) {
     );
 
     if let Some(window) = existing {
-        show_existing_window(&window);
+        show_existing_window(&window, show_request_id, ShowReason::Explicit);
     } else {
         log::trace!("show_main_window did not find main window, create fallback");
         create_window(app_handle, true);
@@ -480,7 +646,7 @@ fn schedule_create_window_show_fallback(
                 scheduled_show_request_id,
                 current_show_request_id
             );
-            show_existing_window(&window);
+            show_existing_window(&window, current_show_request_id, ShowReason::CreateFallback);
         } else {
             log::trace!(
                 "create_window show fallback skipped, ready already showed window, ready_handled={}, visible={}, minimized={}, show_request_id={}",
@@ -507,9 +673,13 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
     );
 
     if let Some(window) = app_handle.get_window("main") {
-        if show_when_ready || MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst) > 0 {
-            log::trace!("create_window found existing main window, show/focus it");
-            show_existing_window(&window);
+        let show_request_id = MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst);
+        if show_when_ready || show_request_id > 0 {
+            log::trace!(
+                "create_window found existing main window, show/focus it, show_request_id={}",
+                show_request_id
+            );
+            show_existing_window(&window, show_request_id, ShowReason::CreateExisting);
         } else {
             log::trace!("create_window found existing main window, leave visibility unchanged");
         }
