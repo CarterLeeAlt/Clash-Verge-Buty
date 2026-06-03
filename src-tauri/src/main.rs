@@ -11,7 +11,8 @@ mod feat;
 mod utils;
 
 use crate::utils::{init, resolve, server};
-use tauri::SystemTray;
+use std::time::Duration;
+use tauri::{Manager, SystemTray};
 
 fn main() -> std::io::Result<()> {
     // 单例检测
@@ -58,6 +59,9 @@ fn main() -> std::io::Result<()> {
             cmds::get_app_dir,
             cmds::copy_icon_file,
             cmds::exit_app,
+            cmds::frontend_heartbeat,
+            cmds::report_frontend_error,
+            cmds::get_window_style_config,
             // cmds::update_hotkeys,
             // profile
             cmds::get_profiles,
@@ -106,19 +110,66 @@ fn main() -> std::io::Result<()> {
 
     app.run(|app_handle, e| match e {
         tauri::RunEvent::ExitRequested { api, .. } => {
-            api.prevent_exit();
+            if !resolve::is_app_quitting() {
+                log::info!(target: "app", "app exit requested -> prevent_exit because app is not quitting");
+                api.prevent_exit();
+            } else {
+                log::info!(target: "app", "app exit requested -> allow because app is quitting");
+            }
         }
         tauri::RunEvent::WindowEvent { label, event, .. } => {
             if label == "main" {
                 match event {
                     tauri::WindowEvent::Destroyed => {
-                        let _ = resolve::save_window_size_position(app_handle, true);
+                        resolve::on_main_window_destroyed(app_handle);
                     }
-                    tauri::WindowEvent::CloseRequested { .. } => {
-                        let _ = resolve::save_window_size_position(app_handle, true);
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        let is_quitting = resolve::is_app_quitting();
+                        log::info!(
+                            target: "app",
+                            "main window close requested, is_quitting={}",
+                            is_quitting
+                        );
+
+                        if !is_quitting {
+                            api.prevent_close();
+                            resolve::mark_window_hiding_for(Duration::from_millis(1500));
+
+                            if let Some(window) = app_handle.get_window("main") {
+                                match window.hide() {
+                                    Ok(_) => log::info!(
+                                        target: "app",
+                                        "main window close requested -> prevent_close and hide immediately"
+                                    ),
+                                    Err(err) => log::error!(
+                                        target: "app",
+                                        "main window hide failed in CloseRequested: {err}"
+                                    ),
+                                }
+                            } else {
+                                log::warn!(
+                                    target: "app",
+                                    "main window close requested but main window not found"
+                                );
+                            }
+
+                            resolve::schedule_window_state_save(
+                                app_handle.clone(),
+                                Duration::from_millis(1000),
+                            );
+                            return;
+                        }
+
+                        log::info!(
+                            target: "app",
+                            "main window close allowed because app is quitting"
+                        );
+                    }
+                    tauri::WindowEvent::Focused(focused) => {
+                        log::debug!(target: "app", "main window focused={focused}");
                     }
                     tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
-                        let _ = resolve::save_window_size_position(app_handle, false);
+                        resolve::schedule_save_window_size_position(app_handle.clone());
                     }
                     _ => {}
                 }

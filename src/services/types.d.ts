@@ -16,6 +16,13 @@ type Platform =
  */
 declare const OS_PLATFORM: Platform;
 
+interface IWindowStyleConfig {
+  platform: string;
+  nativeDecorations: boolean;
+  reliableMode: boolean;
+  customFrameless: boolean;
+}
+
 /**
  * Some interface for clash api
  */
@@ -209,6 +216,7 @@ interface IVergeConfig {
   enable_auto_launch?: boolean;
   enable_service_mode?: boolean;
   enable_silent_start?: boolean;
+  enable_custom_frameless_window?: boolean;
   enable_system_proxy?: boolean;
   enable_random_port?: boolean;
   verge_mixed_port?: number;

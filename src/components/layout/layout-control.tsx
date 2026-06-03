@@ -8,16 +8,29 @@ import {
   PushPinOutlined,
   PushPinRounded,
 } from "@mui/icons-material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-export const LayoutControl = () => {
+interface LayoutControlProps {
+  nativeDecorations?: boolean;
+}
+
+export const LayoutControl = ({
+  nativeDecorations = false,
+}: LayoutControlProps) => {
   const minWidth = 40;
 
   const [isMaximized, setIsMaximized] = useState(false);
   const [isPined, setIsPined] = useState(false);
-  appWindow.isMaximized().then((isMaximized) => {
-    setIsMaximized(() => isMaximized);
-  });
+  useEffect(() => {
+    if (nativeDecorations) return;
+
+    appWindow
+      .isMaximized()
+      .then(setIsMaximized)
+      .catch(() => undefined);
+  }, [nativeDecorations]);
+
+  if (nativeDecorations) return null;
 
   return (
     <ButtonGroup
@@ -80,7 +93,7 @@ export const LayoutControl = () => {
           svg: { transform: "scale(1.05)" },
           ":hover": { bgcolor: "#ff000090" },
         }}
-        onClick={() => appWindow.close()}
+        onClick={() => appWindow.hide().catch(() => undefined)}
       >
         <CloseRounded fontSize="small" />
       </Button>

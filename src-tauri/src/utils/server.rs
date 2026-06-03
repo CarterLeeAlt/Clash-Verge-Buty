@@ -60,7 +60,8 @@ pub fn embed_server(app_handle: AppHandle) {
         let ping = warp::path!("commands" / "ping").map(move || "ok");
 
         let visible = warp::path!("commands" / "visible").map(move || {
-            resolve::create_window(&app_handle);
+            log::trace!("singleton visible command received -> resolve::show_main_window");
+            resolve::show_main_window(&app_handle);
             "ok"
         });
 

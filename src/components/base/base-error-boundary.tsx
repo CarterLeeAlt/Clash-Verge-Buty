@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { invoke } from "@tauri-apps/api/tauri";
 import { ErrorBoundary, FallbackProps } from "react-error-boundary";
 
 function ErrorFallback({ error }: FallbackProps) {
@@ -22,7 +23,15 @@ interface Props {
 
 export const BaseErrorBoundary = (props: Props) => {
   return (
-    <ErrorBoundary FallbackComponent={ErrorFallback}>
+    <ErrorBoundary
+      FallbackComponent={ErrorFallback}
+      onError={(error) => {
+        invoke("report_frontend_error", {
+          message: error.message,
+          stack: error.stack,
+        }).catch(() => undefined);
+      }}
+    >
       {props.children}
     </ErrorBoundary>
   );

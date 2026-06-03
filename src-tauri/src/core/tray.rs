@@ -5,10 +5,15 @@ use crate::{
     utils::{dirs, resolve},
 };
 use anyhow::Result;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{
     api, AppHandle, CustomMenuItem, Manager, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
     SystemTraySubmenu,
 };
+
+static LAST_TRAY_MAIN_WINDOW_CLICK_MS: AtomicU64 = AtomicU64::new(0);
+const TRAY_MAIN_WINDOW_DEBOUNCE_MS: u64 = 600;
 
 pub struct Tray {}
 
@@ -207,69 +212,93 @@ impl Tray {
         Ok(())
     }
 
+    fn current_time_millis() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_millis() as u64)
+            .unwrap_or_default()
+    }
+
+    fn should_ignore_main_window_click() -> bool {
+        let now = Tray::current_time_millis();
+        let last = LAST_TRAY_MAIN_WINDOW_CLICK_MS.load(Ordering::SeqCst);
+
+        if last > 0 && now.saturating_sub(last) < TRAY_MAIN_WINDOW_DEBOUNCE_MS {
+            log::debug!(
+                target: "app",
+                "tray main_window click ignored by debounce, elapsed_ms={}, debounce_ms={}",
+                now.saturating_sub(last),
+                TRAY_MAIN_WINDOW_DEBOUNCE_MS
+            );
+            return true;
+        }
+
+        LAST_TRAY_MAIN_WINDOW_CLICK_MS.store(now, Ordering::SeqCst);
+        false
+    }
+
     pub fn on_left_click(app_handle: &AppHandle) {
         let tray_event = { Config::verge().latest().tray_event.clone() };
         let tray_event = tray_event.unwrap_or("main_window".into());
         log::trace!("tray left click triggered, tray_event={}", tray_event);
 
-        #[cfg(target_os = "windows")]
-        if tray_event == "main_window" {
-            let label = "main";
-            let window = app_handle.get_window(label);
-            log::trace!(
-                "windows tray fast path check, label={}, found={}",
-                label,
-                window.is_some()
-            );
-            if let Some(window) = window {
-                crate::trace_err!(window.unminimize(), "set win unminimize");
-                crate::trace_err!(window.show(), "set win visible");
-                crate::trace_err!(window.set_focus(), "set win focus");
-
-                let win = window.clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_millis(80)).await;
-                    crate::trace_err!(win.set_focus(), "set win focus delayed");
-                });
-
-                log::trace!("windows tray fast path hit, skip create_window");
-                return;
-            }
-        }
-
-        if tray_event == "main_window" {
-            log::trace!("tray main_window fallback -> resolve::create_window");
-        }
-
         match tray_event.as_str() {
             "system_proxy" => feat::toggle_system_proxy(),
             "tun_mode" => feat::toggle_tun_mode(),
-            "main_window" => resolve::create_window(app_handle),
+            "main_window" => {
+                if Tray::should_ignore_main_window_click() {
+                    return;
+                }
+
+                if resolve::is_main_window_creating() {
+                    log::warn!(target: "app", "tray main_window click recorded as pending because main window is creating");
+                }
+                log::trace!("tray main_window -> resolve::show_main_window");
+                resolve::show_main_window_after_hide_transition(app_handle.clone());
+            }
             _ => {}
         }
     }
 
     pub fn on_system_tray_event(app_handle: &AppHandle, event: SystemTrayEvent) {
         match event {
-            SystemTrayEvent::LeftClick { .. } => Tray::on_left_click(app_handle),
-            SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-                mode @ ("rule_mode" | "global_mode" | "direct_mode") => {
-                    let mode = &mode[0..mode.len() - 5];
-                    feat::change_clash_mode(mode.into());
-                }
-                "open_window" => resolve::create_window(app_handle),
-                "system_proxy" => feat::toggle_system_proxy(),
-                "tun_mode" => feat::toggle_tun_mode(),
-                "copy_env" => feat::copy_clash_env(app_handle),
-                "open_app_dir" => crate::log_err!(cmds::open_app_dir()),
-                "open_core_dir" => crate::log_err!(cmds::open_core_dir()),
-                "open_logs_dir" => crate::log_err!(cmds::open_logs_dir()),
-                "restart_clash" => feat::restart_clash_core(),
-                "restart_app" => api::process::restart(&app_handle.env()),
-                "quit" => cmds::exit_app(app_handle.clone()),
+            SystemTrayEvent::LeftClick { .. } => {
+                log::trace!("tray event received: left click");
+                Tray::on_left_click(app_handle);
+            }
+            SystemTrayEvent::MenuItemClick { id, .. } => {
+                log::trace!("tray event received: menu item click, id={}", id.as_str());
+                match id.as_str() {
+                    mode @ ("rule_mode" | "global_mode" | "direct_mode") => {
+                        let mode = &mode[0..mode.len() - 5];
+                        feat::change_clash_mode(mode.into());
+                    }
+                    "open_window" => {
+                        if resolve::is_main_window_creating() {
+                            log::warn!(target: "app", "tray open_window menu recorded as pending because main window is creating");
+                        }
+                        log::trace!("tray open_window menu -> resolve::show_main_window");
+                        resolve::show_main_window_after_hide_transition(app_handle.clone());
+                    }
+                    "system_proxy" => feat::toggle_system_proxy(),
+                    "tun_mode" => feat::toggle_tun_mode(),
+                    "copy_env" => feat::copy_clash_env(app_handle),
+                    "open_app_dir" => crate::log_err!(cmds::open_app_dir()),
+                    "open_core_dir" => crate::log_err!(cmds::open_core_dir()),
+                    "open_logs_dir" => crate::log_err!(cmds::open_logs_dir()),
+                    "restart_clash" => feat::restart_clash_core(),
+                    "restart_app" => api::process::restart(&app_handle.env()),
+                    "quit" => cmds::exit_app(app_handle.clone()),
 
-                _ => {}
-            },
+                    _ => {}
+                }
+            }
+            SystemTrayEvent::RightClick { .. } => {
+                log::trace!("tray event received: right click");
+            }
+            SystemTrayEvent::DoubleClick { .. } => {
+                log::trace!("tray event received: double click");
+            }
             _ => {}
         }
     }
