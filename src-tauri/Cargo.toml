@@ -45,6 +45,7 @@ tauri = { version = "1.5", features = [ "path-all", "protocol-asset", "dialog-op
 runas = "=1.0.0" # 高版本会返回错误 Status
 deelevate = "0.2.0"
 winreg = "0.52.0"
+windows-sys = { version = "0.52.0", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
 
 
 [features]

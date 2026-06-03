@@ -14,6 +14,7 @@ use tauri::{AppHandle, ClipboardManager, Manager};
 
 // 打开面板
 pub fn open_or_close_dashboard() {
+    log::trace!("hotkey/dashboard entry received: open_or_close_dashboard");
     let handle = handle::Handle::global();
     let app_handle = handle.app_handle.lock();
     if let Some(app_handle) = app_handle.as_ref() {
@@ -23,6 +24,7 @@ pub fn open_or_close_dashboard() {
                 return;
             }
         }
+        log::trace!("hotkey/dashboard entry -> resolve::show_main_window");
         resolve::show_main_window(app_handle);
     }
 }

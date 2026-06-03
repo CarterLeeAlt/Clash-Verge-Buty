@@ -225,25 +225,40 @@ impl Tray {
 
     pub fn on_system_tray_event(app_handle: &AppHandle, event: SystemTrayEvent) {
         match event {
-            SystemTrayEvent::LeftClick { .. } => Tray::on_left_click(app_handle),
-            SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-                mode @ ("rule_mode" | "global_mode" | "direct_mode") => {
-                    let mode = &mode[0..mode.len() - 5];
-                    feat::change_clash_mode(mode.into());
-                }
-                "open_window" => resolve::show_main_window(app_handle),
-                "system_proxy" => feat::toggle_system_proxy(),
-                "tun_mode" => feat::toggle_tun_mode(),
-                "copy_env" => feat::copy_clash_env(app_handle),
-                "open_app_dir" => crate::log_err!(cmds::open_app_dir()),
-                "open_core_dir" => crate::log_err!(cmds::open_core_dir()),
-                "open_logs_dir" => crate::log_err!(cmds::open_logs_dir()),
-                "restart_clash" => feat::restart_clash_core(),
-                "restart_app" => api::process::restart(&app_handle.env()),
-                "quit" => cmds::exit_app(app_handle.clone()),
+            SystemTrayEvent::LeftClick { .. } => {
+                log::trace!("tray event received: left click");
+                Tray::on_left_click(app_handle);
+            }
+            SystemTrayEvent::MenuItemClick { id, .. } => {
+                log::trace!("tray event received: menu item click, id={}", id.as_str());
+                match id.as_str() {
+                    mode @ ("rule_mode" | "global_mode" | "direct_mode") => {
+                        let mode = &mode[0..mode.len() - 5];
+                        feat::change_clash_mode(mode.into());
+                    }
+                    "open_window" => {
+                        log::trace!("tray open_window menu -> resolve::show_main_window");
+                        resolve::show_main_window(app_handle);
+                    }
+                    "system_proxy" => feat::toggle_system_proxy(),
+                    "tun_mode" => feat::toggle_tun_mode(),
+                    "copy_env" => feat::copy_clash_env(app_handle),
+                    "open_app_dir" => crate::log_err!(cmds::open_app_dir()),
+                    "open_core_dir" => crate::log_err!(cmds::open_core_dir()),
+                    "open_logs_dir" => crate::log_err!(cmds::open_logs_dir()),
+                    "restart_clash" => feat::restart_clash_core(),
+                    "restart_app" => api::process::restart(&app_handle.env()),
+                    "quit" => cmds::exit_app(app_handle.clone()),
 
-                _ => {}
-            },
+                    _ => {}
+                }
+            }
+            SystemTrayEvent::RightClick { .. } => {
+                log::trace!("tray event received: right click");
+            }
+            SystemTrayEvent::DoubleClick { .. } => {
+                log::trace!("tray event received: double click");
+            }
             _ => {}
         }
     }
