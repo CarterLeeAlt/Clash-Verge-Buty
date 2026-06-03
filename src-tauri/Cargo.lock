@@ -626,6 +626,7 @@ dependencies = [
  "warp",
  "which 6.0.0",
  "window-shadows",
+ "windows-sys 0.52.0",
  "winreg 0.52.0",
 ]
 
