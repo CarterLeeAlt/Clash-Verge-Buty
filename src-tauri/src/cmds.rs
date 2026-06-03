@@ -317,6 +317,8 @@ pub fn copy_icon_file(path: String, name: String) -> CmdResult<String> {
 
 #[tauri::command]
 pub fn exit_app(app_handle: tauri::AppHandle) {
+    log::info!(target: "app", "exit_app called, mark app as quitting");
+    resolve::set_app_quitting(true);
     let _ = resolve::save_window_size_position(&app_handle, true);
     resolve::resolve_reset();
     api::process::kill_children();
