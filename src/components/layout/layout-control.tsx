@@ -16,7 +16,10 @@ export const LayoutControl = () => {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isPined, setIsPined] = useState(false);
   useEffect(() => {
-    appWindow.isMaximized().then(setIsMaximized).catch(() => undefined);
+    appWindow
+      .isMaximized()
+      .then(setIsMaximized)
+      .catch(() => undefined);
   }, []);
 
   return (
@@ -80,7 +83,7 @@ export const LayoutControl = () => {
           svg: { transform: "scale(1.05)" },
           ":hover": { bgcolor: "#ff000090" },
         }}
-        onClick={() => appWindow.close()}
+        onClick={() => appWindow.hide().catch(() => undefined)}
       >
         <CloseRounded fontSize="small" />
       </Button>
