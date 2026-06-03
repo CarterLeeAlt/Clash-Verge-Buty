@@ -4,8 +4,14 @@
   display: flex;
   flex-direction: column;
   > header {
-    flex: 0 0 58px;
+    // Keep the right-side page header aligned with the visual height of
+    // .layout__left .the-logo (58px basis shifted up by translateY(-2px)).
+    $rightHeaderHeight: 56px;
+
+    flex: 0 0 $rightHeaderHeight;
     width: 100%;
+    height: $rightHeaderHeight;
+    min-height: $rightHeaderHeight;
     // max-width: 850px;
     margin: 0 auto;
     padding: 0 20px;
@@ -14,6 +20,29 @@
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid var(--divider-color);
+
+    > .MuiTypography-root {
+      height: 100%;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      line-height: 1.2;
+    }
+
+    > :not(.MuiTypography-root) {
+      display: flex;
+      align-items: center;
+      min-height: 0;
+    }
+
+    .MuiButtonGroup-root {
+      align-items: center;
+    }
+
+    .MuiButtonGroup-grouped,
+    .MuiButton-root {
+      line-height: 1.2;
+    }
   }
 
   .base-container {
