@@ -231,6 +231,10 @@ export async function reportFrontendError(message: string, stack?: string) {
   return invoke<void>("report_frontend_error", { message, stack });
 }
 
+export async function getWindowStyleConfig() {
+  return invoke<IWindowStyleConfig>("get_window_style_config");
+}
+
 export async function copyIconFile(
   path: string,
   name: "common.png" | "sysproxy.png" | "tun.png"
