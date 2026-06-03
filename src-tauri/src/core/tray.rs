@@ -259,6 +259,7 @@ impl Tray {
             SystemTrayEvent::DoubleClick { .. } => {
                 log::trace!("tray event received: double click");
             }
+            _ => {}
         }
     }
 }
