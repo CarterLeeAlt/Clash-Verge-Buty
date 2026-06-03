@@ -80,3 +80,16 @@
     }
   }
 }
+
+.proxy-groups-virtuoso,
+.proxy-groups-virtuoso-scroller {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.proxy-groups-virtuoso::-webkit-scrollbar,
+.proxy-groups-virtuoso-scroller::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
