@@ -212,39 +212,13 @@ impl Tray {
         let tray_event = tray_event.unwrap_or("main_window".into());
         log::trace!("tray left click triggered, tray_event={}", tray_event);
 
-        #[cfg(target_os = "windows")]
-        if tray_event == "main_window" {
-            let label = "main";
-            let window = app_handle.get_window(label);
-            log::trace!(
-                "windows tray fast path check, label={}, found={}",
-                label,
-                window.is_some()
-            );
-            if let Some(window) = window {
-                crate::trace_err!(window.unminimize(), "set win unminimize");
-                crate::trace_err!(window.show(), "set win visible");
-                crate::trace_err!(window.set_focus(), "set win focus");
-
-                let win = window.clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_millis(80)).await;
-                    crate::trace_err!(win.set_focus(), "set win focus delayed");
-                });
-
-                log::trace!("windows tray fast path hit, skip create_window");
-                return;
-            }
-        }
-
-        if tray_event == "main_window" {
-            log::trace!("tray main_window fallback -> resolve::create_window");
-        }
-
         match tray_event.as_str() {
             "system_proxy" => feat::toggle_system_proxy(),
             "tun_mode" => feat::toggle_tun_mode(),
-            "main_window" => resolve::create_window(app_handle),
+            "main_window" => {
+                log::trace!("tray main_window -> resolve::show_main_window");
+                resolve::show_main_window(app_handle);
+            }
             _ => {}
         }
     }
@@ -257,7 +231,7 @@ impl Tray {
                     let mode = &mode[0..mode.len() - 5];
                     feat::change_clash_mode(mode.into());
                 }
-                "open_window" => resolve::create_window(app_handle),
+                "open_window" => resolve::show_main_window(app_handle),
                 "system_proxy" => feat::toggle_system_proxy(),
                 "tun_mode" => feat::toggle_tun_mode(),
                 "copy_env" => feat::copy_clash_env(app_handle),
