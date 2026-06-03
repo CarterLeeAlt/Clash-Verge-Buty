@@ -4,12 +4,12 @@ use crate::{config::*, utils::dirs};
 use anyhow::{bail, Context, Result};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
+#[cfg(target_os = "linux")]
+use std::path::Path;
 use std::{fs, io::Write, sync::Arc, time::Duration};
 use sysinfo::{Pid, System};
 use tauri::api::process::{Command, CommandChild, CommandEvent};
 use tokio::time::sleep;
-#[cfg(target_os = "linux")]
-use std::path::Path;
 
 #[derive(Debug)]
 pub struct CoreManager {
@@ -134,7 +134,9 @@ impl CoreManager {
                     Err(err) => {
                         log::error!(target: "app", "Service Mode failed; service could not start clash core. {err}");
                         if tun_enabled {
-                            bail!("Tun mode requires a working clash-verge-service on Windows: {err}");
+                            bail!(
+                                "Tun mode requires a working clash-verge-service on Windows: {err}"
+                            );
                         }
                         bail!("Service Mode failed; service could not start clash core. {err}");
                     }
@@ -217,17 +219,26 @@ impl CoreManager {
         #[cfg(target_os = "windows")]
         {
             use deelevate::{PrivilegeLevel, Token};
-            let service_mode = Config::verge().latest().enable_service_mode.unwrap_or(false);
+            let service_mode = Config::verge()
+                .latest()
+                .enable_service_mode
+                .unwrap_or(false);
             let privilege = Token::with_current_process()
                 .ok()
                 .and_then(|t| t.privilege_level().ok());
             let is_admin = matches!(privilege, Some(PrivilegeLevel::Elevated));
             if !service_mode {
                 log::error!(target: "app", "Tun mode is enabled but service mode is disabled on Windows. This usually fails without admin/wintun permissions.");
-                super::handle::Handle::emit_log("error", "[service] Tun mode is enabled but service mode is disabled on Windows.");
+                super::handle::Handle::emit_log(
+                    "error",
+                    "[service] Tun mode is enabled but service mode is disabled on Windows.",
+                );
             } else {
                 log::info!(target: "app", "Tun mode enabled on Windows with service mode.");
-                super::handle::Handle::emit_log("info", "[service] Tun mode enabled on Windows with service mode.");
+                super::handle::Handle::emit_log(
+                    "info",
+                    "[service] Tun mode enabled on Windows with service mode.",
+                );
             }
             if !is_admin {
                 log::warn!(target: "app", "Current process is not elevated. If service mode is unavailable, Tun setup may fail due to missing admin privileges/wintun route permissions.");

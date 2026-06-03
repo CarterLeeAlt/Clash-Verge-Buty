@@ -126,7 +126,10 @@ fn start_service_process() -> Result<()> {
         return Ok(());
     }
     let out = format!("{}\n{}", start.stdout, start.stderr).to_ascii_uppercase();
-    if start.code == 1056 || out.contains("1056") || out.contains("INSTANCE OF THE SERVICE IS ALREADY RUNNING") {
+    if start.code == 1056
+        || out.contains("1056")
+        || out.contains("INSTANCE OF THE SERVICE IS ALREADY RUNNING")
+    {
         log::info!(target: "app", "service already running, continue checking API readiness.");
         return Ok(());
     }
@@ -289,18 +292,24 @@ pub async fn uninstall_service() -> Result<()> {
         bail!("Windows is still removing the service. Please wait a moment and try again.");
     }
 
-    bail!(
-        "Failed to uninstall service. Please try again or run as administrator."
-    )
+    bail!("Failed to uninstall service. Please try again or run as administrator.")
 }
 
 pub async fn check_service() -> Result<ServiceStatus> {
     let installed = service_exists(SERVICE_NAME);
-    let running = installed && query_service_state().unwrap_or(ServiceStateHint::Other) == ServiceStateHint::Running;
+    let running = installed
+        && query_service_state().unwrap_or(ServiceStateHint::Other) == ServiceStateHint::Running;
     let health = get_service_health().await.ok();
     let api_ready = health.as_ref().map(|h| h.code == 0).unwrap_or(false);
-    let clash = if api_ready { get_service_clash_state().await.ok() } else { None };
-    let core_pid = clash.as_ref().and_then(|s| s.data.as_ref()).and_then(|d| d.pid);
+    let clash = if api_ready {
+        get_service_clash_state().await.ok()
+    } else {
+        None
+    };
+    let core_pid = clash
+        .as_ref()
+        .and_then(|s| s.data.as_ref())
+        .and_then(|d| d.pid);
     let core_managed = core_pid.is_some();
     let message = if !installed {
         "service not installed.".to_string()
@@ -311,7 +320,10 @@ pub async fn check_service() -> Result<ServiceStatus> {
     } else if !core_managed {
         "service running, API ready, core not managed by service.".to_string()
     } else {
-        format!("service running, API ready, core managed by service (pid {}).", core_pid.unwrap())
+        format!(
+            "service running, API ready, core managed by service (pid {}).",
+            core_pid.unwrap()
+        )
     };
     Ok(ServiceStatus {
         installed,
@@ -326,7 +338,11 @@ pub async fn check_service() -> Result<ServiceStatus> {
 
 pub async fn ensure_service_ready() -> Result<()> {
     if query_service_state().unwrap_or(ServiceStateHint::Other) == ServiceStateHint::Running
-        && get_service_health().await.map(|h| h.code == 0).unwrap_or(false) {
+        && get_service_health()
+            .await
+            .map(|h| h.code == 0)
+            .unwrap_or(false)
+    {
         return Ok(());
     }
 
@@ -336,7 +352,11 @@ pub async fn ensure_service_ready() -> Result<()> {
 
     loop {
         if query_service_state().unwrap_or(ServiceStateHint::Other) == ServiceStateHint::Running
-            && get_service_health().await.map(|h| h.code == 0).unwrap_or(false) {
+            && get_service_health()
+                .await
+                .map(|h| h.code == 0)
+                .unwrap_or(false)
+        {
             return Ok(());
         }
 
@@ -426,7 +446,10 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
         sleep(Duration::from_millis(300)).await;
     }
     log::error!(target: "app", "9097 ready failure");
-    bail!("service started clash core (pid {:?}) but external-controller 127.0.0.1:9097 is not ready", core_pid)
+    bail!(
+        "service started clash core (pid {:?}) but external-controller 127.0.0.1:9097 is not ready",
+        core_pid
+    )
 }
 
 pub async fn stop_core_by_service() -> Result<()> {

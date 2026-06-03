@@ -11,7 +11,7 @@ use once_cell::sync::OnceCell;
 use serde_yaml::Mapping;
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::Instant;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::api::notification;
 use tauri::{App, AppHandle, Manager};
 use window_shadows::set_shadow;
@@ -26,6 +26,251 @@ static MAIN_WINDOW_SHOW_REQUEST_ID: AtomicU64 = AtomicU64::new(0);
 static MAIN_WINDOW_SHOWING: AtomicBool = AtomicBool::new(false);
 static MAIN_WINDOW_SHOW_PENDING_ID: AtomicU64 = AtomicU64::new(0);
 static IS_APP_QUITTING: AtomicBool = AtomicBool::new(false);
+
+const MAIN_WINDOW_STATE_MISSING: u64 = 0;
+const MAIN_WINDOW_STATE_CREATING: u64 = 1;
+const MAIN_WINDOW_STATE_ALIVE: u64 = 2;
+const MAIN_WINDOW_STATE_UNEXPECTED_DESTROYED: u64 = 3;
+const MAIN_WINDOW_STATE_RECREATE_BACKOFF: u64 = 4;
+const MAIN_WINDOW_RECREATE_BACKOFF_MS: u64 = 3_000;
+const MAIN_WINDOW_DESTROY_WINDOW_MS: u64 = 60_000;
+const MAIN_WINDOW_MAX_RECREATE_DESTROYS: u64 = 3;
+const WINDOW_SAVE_DEBOUNCE_MS: u64 = 600;
+const HEARTBEAT_WARN_AFTER_MS: u64 = 15_000;
+
+static MAIN_WINDOW_STATE: AtomicU64 = AtomicU64::new(MAIN_WINDOW_STATE_MISSING);
+static MAIN_WINDOW_UNEXPECTED_DESTROY_COUNT: AtomicU64 = AtomicU64::new(0);
+static MAIN_WINDOW_UNEXPECTED_DESTROY_WINDOW_START_MS: AtomicU64 = AtomicU64::new(0);
+static MAIN_WINDOW_LAST_UNEXPECTED_DESTROY_MS: AtomicU64 = AtomicU64::new(0);
+static MAIN_WINDOW_LAST_CREATE_ATTEMPT_MS: AtomicU64 = AtomicU64::new(0);
+static WINDOW_SAVE_DEBOUNCE_ID: AtomicU64 = AtomicU64::new(0);
+static LAST_FRONTEND_HEARTBEAT_MS: AtomicU64 = AtomicU64::new(0);
+
+fn current_time_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or_default()
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WindowBuildMode {
+    NormalConfigured,
+    ForcedReliableFallback,
+}
+
+impl WindowBuildMode {
+    fn reason(self) -> &'static str {
+        match self {
+            Self::NormalConfigured => "configured",
+            Self::ForcedReliableFallback => "unexpected_destroyed",
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn configured_reliable_mode() -> bool {
+    !Config::verge()
+        .latest()
+        .enable_custom_frameless_window
+        .unwrap_or(false)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn configured_reliable_mode() -> bool {
+    false
+}
+
+fn effective_reliable_mode(build_mode: WindowBuildMode) -> bool {
+    match build_mode {
+        WindowBuildMode::ForcedReliableFallback => true,
+        WindowBuildMode::NormalConfigured => configured_reliable_mode(),
+    }
+}
+
+fn main_window_state_name(state: u64) -> &'static str {
+    match state {
+        MAIN_WINDOW_STATE_MISSING => "Missing",
+        MAIN_WINDOW_STATE_CREATING => "Creating",
+        MAIN_WINDOW_STATE_ALIVE => "Alive",
+        MAIN_WINDOW_STATE_UNEXPECTED_DESTROYED => "UnexpectedDestroyed",
+        MAIN_WINDOW_STATE_RECREATE_BACKOFF => "RecreateBackoff",
+        _ => "Unknown",
+    }
+}
+
+fn unexpected_destroy_count_in_window(now: u64) -> u64 {
+    let start = MAIN_WINDOW_UNEXPECTED_DESTROY_WINDOW_START_MS.load(Ordering::SeqCst);
+    let count = MAIN_WINDOW_UNEXPECTED_DESTROY_COUNT.load(Ordering::SeqCst);
+    if start > 0 && now.saturating_sub(start) <= MAIN_WINDOW_DESTROY_WINDOW_MS {
+        count
+    } else {
+        0
+    }
+}
+
+fn should_force_reliable_fallback(now: u64) -> bool {
+    MAIN_WINDOW_STATE.load(Ordering::SeqCst) == MAIN_WINDOW_STATE_UNEXPECTED_DESTROYED
+        || unexpected_destroy_count_in_window(now) >= 1
+}
+
+pub fn is_main_window_creating() -> bool {
+    MAIN_WINDOW_CREATING.load(Ordering::SeqCst)
+}
+
+pub fn record_frontend_heartbeat() {
+    LAST_FRONTEND_HEARTBEAT_MS.store(current_time_millis(), Ordering::SeqCst);
+}
+
+pub fn record_frontend_error(message: String, stack: Option<String>) {
+    log::error!(
+        target: "app",
+        "frontend error reported: message={}, stack={}",
+        message,
+        stack.unwrap_or_default()
+    );
+}
+
+pub fn check_main_window_health(app_handle: &AppHandle, context: &str) {
+    let Some(window) = app_handle.get_window("main") else {
+        return;
+    };
+    if !window.is_visible().unwrap_or(false) {
+        return;
+    }
+    let last = LAST_FRONTEND_HEARTBEAT_MS.load(Ordering::SeqCst);
+    let now = current_time_millis();
+    if last > 0 && now.saturating_sub(last) > HEARTBEAT_WARN_AFTER_MS {
+        log::warn!(
+            target: "app",
+            "webview may be hung: no frontend heartbeat for {}ms, context={}",
+            now.saturating_sub(last),
+            context
+        );
+    }
+}
+
+pub fn on_main_window_destroyed(app_handle: &AppHandle) {
+    let is_quitting = is_app_quitting();
+    let now = current_time_millis();
+    log::warn!(
+        target: "app",
+        "main window destroyed, is_quitting={}",
+        is_quitting
+    );
+
+    if is_quitting {
+        MAIN_WINDOW_STATE.store(MAIN_WINDOW_STATE_MISSING, Ordering::SeqCst);
+        let _ = save_window_size_position(app_handle, true);
+        return;
+    }
+
+    let window_start = MAIN_WINDOW_UNEXPECTED_DESTROY_WINDOW_START_MS.load(Ordering::SeqCst);
+    if window_start == 0 || now.saturating_sub(window_start) > MAIN_WINDOW_DESTROY_WINDOW_MS {
+        MAIN_WINDOW_UNEXPECTED_DESTROY_WINDOW_START_MS.store(now, Ordering::SeqCst);
+        MAIN_WINDOW_UNEXPECTED_DESTROY_COUNT.store(1, Ordering::SeqCst);
+    } else {
+        MAIN_WINDOW_UNEXPECTED_DESTROY_COUNT.fetch_add(1, Ordering::SeqCst);
+    }
+    let destroy_count = MAIN_WINDOW_UNEXPECTED_DESTROY_COUNT.load(Ordering::SeqCst);
+    MAIN_WINDOW_LAST_UNEXPECTED_DESTROY_MS.store(now, Ordering::SeqCst);
+    MAIN_WINDOW_STATE.store(MAIN_WINDOW_STATE_UNEXPECTED_DESTROYED, Ordering::SeqCst);
+    MAIN_WINDOW_CREATING.store(false, Ordering::SeqCst);
+    MAIN_WINDOW_SHOWING.store(false, Ordering::SeqCst);
+    MAIN_WINDOW_SHOW_PENDING_ID.store(0, Ordering::SeqCst);
+    FRONTEND_READY_HANDLED.store(false, Ordering::SeqCst);
+
+    log::error!(
+        target: "app",
+        "main window unexpected destroyed: unexpected_destroyed_count={}, last_show_request_id={}, reliable_mode={}, state={}, action=wait_for_user_backoff",
+        destroy_count,
+        MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst),
+        configured_reliable_mode(),
+        main_window_state_name(MAIN_WINDOW_STATE.load(Ordering::SeqCst))
+    );
+
+    if destroy_count >= 2 {
+        log::warn!(
+            target: "app",
+            "main window unexpected destroyed {} times within 60s; custom frameless mode will be disabled for fallback rebuilds",
+            destroy_count
+        );
+    }
+    if destroy_count >= MAIN_WINDOW_MAX_RECREATE_DESTROYS {
+        MAIN_WINDOW_STATE.store(MAIN_WINDOW_STATE_RECREATE_BACKOFF, Ordering::SeqCst);
+        log::error!(
+            target: "app",
+            "main window unexpected destroyed {} times within 60s; automatic rebuild stopped, please restart app or open logs directory",
+            destroy_count
+        );
+    }
+}
+
+fn main_window_recreate_allowed(now: u64) -> bool {
+    if MAIN_WINDOW_CREATING.load(Ordering::SeqCst) {
+        log::warn!(target: "app", "main window show ignored because creation is already in progress; pending_show recorded");
+        return false;
+    }
+
+    let state = MAIN_WINDOW_STATE.load(Ordering::SeqCst);
+    if state == MAIN_WINDOW_STATE_RECREATE_BACKOFF
+        || unexpected_destroy_count_in_window(now) >= MAIN_WINDOW_MAX_RECREATE_DESTROYS
+    {
+        log::error!(
+            target: "app",
+            "main window recreate blocked by backoff: state={}, unexpected_destroyed_count={}, last_show_request_id={}",
+            main_window_state_name(state),
+            unexpected_destroy_count_in_window(now),
+            MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst)
+        );
+        return false;
+    }
+
+    let last_create = MAIN_WINDOW_LAST_CREATE_ATTEMPT_MS.load(Ordering::SeqCst);
+    let last_destroy = MAIN_WINDOW_LAST_UNEXPECTED_DESTROY_MS.load(Ordering::SeqCst);
+    if last_destroy > 0
+        && last_create > 0
+        && now.saturating_sub(last_create) < MAIN_WINDOW_RECREATE_BACKOFF_MS
+    {
+        log::warn!(
+            target: "app",
+            "main window recreate ignored by backoff, elapsed_since_create_ms={}, backoff_ms={}, last_destroy_ms={}",
+            now.saturating_sub(last_create),
+            MAIN_WINDOW_RECREATE_BACKOFF_MS,
+            last_destroy
+        );
+        return false;
+    }
+
+    true
+}
+
+pub fn schedule_save_window_size_position(app_handle: AppHandle) {
+    let save_id = WINDOW_SAVE_DEBOUNCE_ID.fetch_add(1, Ordering::SeqCst) + 1;
+    log::trace!(
+        target: "app",
+        "window moved/resized debounce scheduled, save_id={}",
+        save_id
+    );
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(WINDOW_SAVE_DEBOUNCE_MS)).await;
+        if WINDOW_SAVE_DEBOUNCE_ID.load(Ordering::SeqCst) != save_id {
+            return;
+        }
+        match save_window_size_position(&app_handle, false) {
+            Ok(_) => log::debug!(
+                target: "app",
+                "window moved/resized saved after debounce, save_id={}, debounce_ms={}",
+                save_id,
+                WINDOW_SAVE_DEBOUNCE_MS
+            ),
+            Err(err) => log::trace!(
+                target: "app",
+                "window moved/resized save after debounce skipped: {err}"
+            ),
+        }
+    });
+}
 
 pub fn set_app_quitting(value: bool) {
     IS_APP_QUITTING.store(value, Ordering::SeqCst);
@@ -55,6 +300,7 @@ impl MainWindowCreatingGuard {
             log::trace!("create_window skipped because main window is already creating");
             None
         } else {
+            MAIN_WINDOW_STATE.store(MAIN_WINDOW_STATE_CREATING, Ordering::SeqCst);
             Some(Self)
         }
     }
@@ -433,7 +679,10 @@ fn window_state(window: &tauri::Window) -> (bool, bool, bool) {
 #[cfg(target_os = "windows")]
 fn window_needs_repair(window: &tauri::Window) -> bool {
     let (visible, minimized, focused) = window_state(window);
-    !visible || minimized || !focused
+    if !focused {
+        log::trace!("windows window focus is false but will not trigger repair by itself");
+    }
+    !visible || minimized
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -589,6 +838,7 @@ fn show_existing_window(window: &tauri::Window, request_id: u64, reason: ShowRea
 
 /// show and focus the main window
 pub fn show_main_window(app_handle: &AppHandle) {
+    check_main_window_health(app_handle, "show_main_window");
     let show_request_id = MAIN_WINDOW_SHOW_REQUEST_ID.fetch_add(1, Ordering::SeqCst) + 1;
     FRONTEND_SHOW_WHEN_READY.store(true, Ordering::SeqCst);
     let existing = app_handle.get_window("main");
@@ -601,6 +851,11 @@ pub fn show_main_window(app_handle: &AppHandle) {
     if let Some(window) = existing {
         show_existing_window(&window, show_request_id, ShowReason::Explicit);
     } else {
+        record_pending_show_request(show_request_id);
+        let now = current_time_millis();
+        if !main_window_recreate_allowed(now) {
+            return;
+        }
         log::trace!("show_main_window did not find main window, create fallback");
         create_window(app_handle, true);
     }
@@ -675,14 +930,42 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
         FRONTEND_SHOW_WHEN_READY.store(true, Ordering::SeqCst);
     }
 
+    let now = current_time_millis();
+    if !main_window_recreate_allowed(now) {
+        return;
+    }
+    let build_mode = if should_force_reliable_fallback(now) {
+        WindowBuildMode::ForcedReliableFallback
+    } else {
+        WindowBuildMode::NormalConfigured
+    };
+    let reliable_mode = effective_reliable_mode(build_mode);
+    MAIN_WINDOW_LAST_CREATE_ATTEMPT_MS.store(now, Ordering::SeqCst);
+
     log::trace!(
         "create_window called, show_when_ready={}, existing={}, show_request_id={}",
         show_when_ready,
         app_handle.get_window("main").is_some(),
         MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst)
     );
+    if reliable_mode {
+        log::info!(
+            target: "app",
+            "create_window using reliable mode, mode={:?}, reason={}, transparent=false, decorations=true, set_shadow skipped, draggable regions disabled",
+            build_mode,
+            build_mode.reason()
+        );
+    } else {
+        log::warn!(
+            target: "app",
+            "create_window using experimental custom frameless mode, mode={:?}, reason={}, transparent=true, decorations=false, set_shadow enabled, draggable regions enabled",
+            build_mode,
+            build_mode.reason()
+        );
+    }
 
     if let Some(window) = app_handle.get_window("main") {
+        MAIN_WINDOW_STATE.store(MAIN_WINDOW_STATE_ALIVE, Ordering::SeqCst);
         let show_request_id = MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst);
         if show_when_ready || show_request_id > 0 {
             log::trace!(
@@ -723,10 +1006,12 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
         _ => {
             #[cfg(target_os = "windows")]
             {
-                builder = builder
-                    .additional_browser_args("--enable-features=msWebView2EnableDraggableRegions")
-                    .inner_size(800.0, 636.0)
-                    .center();
+                builder = builder.inner_size(800.0, 636.0).center();
+                if !reliable_mode {
+                    builder = builder.additional_browser_args(
+                        "--enable-features=msWebView2EnableDraggableRegions",
+                    );
+                }
             }
 
             #[cfg(target_os = "macos")]
@@ -740,6 +1025,12 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
             }
         }
     };
+    #[cfg(target_os = "windows")]
+    if !reliable_mode && Config::verge().latest().window_size_position.is_some() {
+        builder =
+            builder.additional_browser_args("--enable-features=msWebView2EnableDraggableRegions");
+    }
+
     let build_start = Instant::now();
     log::info!(
         target: "app",
@@ -749,11 +1040,19 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
     );
 
     #[cfg(target_os = "windows")]
-    let window = builder
-        .decorations(false)
-        .transparent(true)
-        .visible(false)
-        .build();
+    let window = if reliable_mode {
+        builder
+            .decorations(true)
+            .transparent(false)
+            .visible(false)
+            .build()
+    } else {
+        builder
+            .decorations(false)
+            .transparent(true)
+            .visible(false)
+            .build()
+    };
     #[cfg(target_os = "macos")]
     let window = builder
         .decorations(true)
@@ -774,6 +1073,7 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
 
     match window {
         Ok(win) => {
+            MAIN_WINDOW_STATE.store(MAIN_WINDOW_STATE_ALIVE, Ordering::SeqCst);
             let is_maximized = Config::verge()
                 .latest()
                 .window_is_maximized
@@ -799,9 +1099,13 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
                 trace_err!(win.center(), "set win center");
             }
 
-            log::debug!(target: "app", "create_window before set_shadow");
-            trace_err!(set_shadow(&win, true), "set win shadow");
-            log::debug!(target: "app", "create_window after set_shadow");
+            if reliable_mode {
+                log::info!(target: "app", "create_window set_shadow skipped, reliable_mode=true");
+            } else {
+                log::debug!(target: "app", "create_window before set_shadow");
+                trace_err!(set_shadow(&win, true), "set win shadow");
+                log::debug!(target: "app", "create_window after set_shadow");
+            }
             if is_maximized {
                 trace_err!(win.maximize(), "set win maximize");
             }
@@ -820,6 +1124,7 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
             }
         }
         Err(err) => {
+            MAIN_WINDOW_STATE.store(MAIN_WINDOW_STATE_MISSING, Ordering::SeqCst);
             log::error!(
                 target: "app",
                 "failed to create window: {err}, show_when_ready={}, show_request_id={}",
