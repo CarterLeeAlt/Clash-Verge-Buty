@@ -41,7 +41,7 @@ export const ProxyRender = (props: RenderProps) => {
 
   if (type === 0 && !group.hidden) {
     return (
-      <Box sx={{ px: 1, py: 1 }}>
+      <Box sx={{ px: 1, py: 0.5 }}>
         <ListItemButton
           dense
           sx={{
