@@ -77,12 +77,17 @@
           overflow: hidden;
         }
       }
+
+      > section:has(.proxy-groups-virtuoso) {
+        scrollbar-gutter: auto;
+      }
     }
   }
 }
 
 .proxy-groups-virtuoso,
 .proxy-groups-virtuoso-scroller {
+  scrollbar-gutter: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
