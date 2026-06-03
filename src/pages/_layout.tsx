@@ -2,7 +2,7 @@ import dayjs from "dayjs";
 import i18next from "i18next";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { SWRConfig, mutate } from "swr";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
@@ -28,6 +28,7 @@ import "dayjs/locale/zh-cn";
 import {
   frontendHeartbeat,
   getPortableFlag,
+  getWindowStyleConfig,
   reportFrontendError,
 } from "@/services/cmds";
 import { useNavigate } from "react-router-dom";
@@ -46,6 +47,13 @@ const Layout = () => {
 
   const { verge } = useVerge();
   const { language, start_page } = verge || {};
+  const [windowStyle, setWindowStyle] = useState<IWindowStyleConfig>(() => ({
+    platform: OS,
+    nativeDecorations: OS === "windows",
+    reliableMode: OS === "windows",
+    customFrameless: false,
+  }));
+  const nativeDecorations = windowStyle.nativeDecorations;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -128,6 +136,10 @@ const Layout = () => {
       })
       .catch(() => undefined);
 
+    getWindowStyleConfig()
+      .then(setWindowStyle)
+      .catch(() => undefined);
+
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.clearInterval(heartbeatTimer);
@@ -155,9 +167,15 @@ const Layout = () => {
         <Paper
           square
           elevation={0}
-          className={`${OS} layout`}
+          className={`${OS} layout ${
+            nativeDecorations
+              ? "native-decorated-window"
+              : "custom-frameless-window"
+          }`}
           onPointerDown={(e: any) => {
-            if (e.target?.dataset?.windrag) appWindow.startDragging();
+            if (!nativeDecorations && e.target?.dataset?.windrag) {
+              appWindow.startDragging();
+            }
           }}
           onContextMenu={(e) => {
             // only prevent it on Windows
@@ -203,9 +221,9 @@ const Layout = () => {
           </div>
 
           <div className="layout__right" data-windrag>
-            {OS === "windows" && (
+            {OS === "windows" && !nativeDecorations && (
               <div className="the-bar">
-                <LayoutControl />
+                <LayoutControl nativeDecorations={nativeDecorations} />
               </div>
             )}
 

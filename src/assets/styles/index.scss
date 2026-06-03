@@ -60,3 +60,7 @@ body {
 [data-windrag] {
   app-region: drag;
 }
+
+.native-decorated-window [data-windrag] {
+  app-region: no-drag;
+}
