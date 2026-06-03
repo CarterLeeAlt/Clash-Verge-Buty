@@ -11,6 +11,7 @@ use once_cell::sync::OnceCell;
 use serde_yaml::Mapping;
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::Instant;
 use tauri::api::notification;
 use tauri::{App, AppHandle, Manager};
 use window_shadows::set_shadow;
@@ -24,6 +25,15 @@ static FRONTEND_SHOW_WHEN_READY: AtomicBool = AtomicBool::new(true);
 static MAIN_WINDOW_SHOW_REQUEST_ID: AtomicU64 = AtomicU64::new(0);
 static MAIN_WINDOW_SHOWING: AtomicBool = AtomicBool::new(false);
 static MAIN_WINDOW_SHOW_PENDING_ID: AtomicU64 = AtomicU64::new(0);
+static IS_APP_QUITTING: AtomicBool = AtomicBool::new(false);
+
+pub fn set_app_quitting(value: bool) {
+    IS_APP_QUITTING.store(value, Ordering::SeqCst);
+}
+
+pub fn is_app_quitting() -> bool {
+    IS_APP_QUITTING.load(Ordering::SeqCst)
+}
 
 #[derive(Clone, Copy, Debug)]
 enum ShowReason {
@@ -730,6 +740,14 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
             }
         }
     };
+    let build_start = Instant::now();
+    log::info!(
+        target: "app",
+        "create_window before WindowBuilder::build, show_when_ready={}, show_request_id={}",
+        show_when_ready,
+        MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst)
+    );
+
     #[cfg(target_os = "windows")]
     let window = builder
         .decorations(false)
@@ -744,6 +762,15 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
         .build();
     #[cfg(target_os = "linux")]
     let window = builder.decorations(true).transparent(false).build();
+
+    log::info!(
+        target: "app",
+        "create_window after WindowBuilder::build, result={}, elapsed_ms={}, show_when_ready={}, show_request_id={}",
+        if window.is_ok() { "ok" } else { "err" },
+        build_start.elapsed().as_millis(),
+        show_when_ready,
+        MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst)
+    );
 
     match window {
         Ok(win) => {
@@ -772,7 +799,9 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
                 trace_err!(win.center(), "set win center");
             }
 
+            log::debug!(target: "app", "create_window before set_shadow");
             trace_err!(set_shadow(&win, true), "set win shadow");
+            log::debug!(target: "app", "create_window after set_shadow");
             if is_maximized {
                 trace_err!(win.maximize(), "set win maximize");
             }
@@ -791,7 +820,12 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
             }
         }
         Err(err) => {
-            log::error!("failed to create window: {err}");
+            log::error!(
+                target: "app",
+                "failed to create window: {err}, show_when_ready={}, show_request_id={}",
+                show_when_ready,
+                MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst)
+            );
             return;
         }
     }
