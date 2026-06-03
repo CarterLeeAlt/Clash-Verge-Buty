@@ -143,3 +143,24 @@
     }
   }
 }
+
+.windows.native-decorated-window {
+  &.layout {
+    .layout__left {
+      padding-top: 8px;
+    }
+
+    .layout__left .the-logo {
+      flex-basis: 58px;
+    }
+
+    .layout__right .the-bar {
+      display: none;
+      height: 0;
+    }
+
+    .layout__right .the-content {
+      top: 0;
+    }
+  }
+}
