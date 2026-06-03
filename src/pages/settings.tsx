@@ -1,4 +1,4 @@
-import { Box, Grid, IconButton, Paper } from "@mui/material";
+import { Box, Grid, IconButton } from "@mui/material";
 import { useLockFn } from "ahooks";
 import { useTranslation } from "react-i18next";
 import { BasePage, Notice } from "@/components/base";
@@ -9,7 +9,6 @@ import SettingClash from "@/components/setting/setting-clash";
 import SettingSystem from "@/components/setting/setting-system";
 import { atomThemeMode } from "@/services/states";
 import { useRecoilState } from "recoil";
-import { useCustomTheme } from "@/components/layout/use-custom-theme";
 
 const SettingPage = () => {
   const { t } = useTranslation();
@@ -25,11 +24,15 @@ const SettingPage = () => {
   const [mode] = useRecoilState(atomThemeMode);
   console.log(mode);
   const isDark = mode === "light" ? false : true;
-  const { theme } = useCustomTheme();
 
   return (
     <BasePage
       title={t("Settings")}
+      contentStyle={{
+        marginTop: -2,
+        marginBottom: -1,
+        boxSizing: "border-box",
+      }}
       header={
         <IconButton
           size="medium"
@@ -65,7 +68,6 @@ const SettingPage = () => {
           <Box
             sx={{
               borderRadius: 2,
-              marginBottom: 1.5,
               backgroundColor: isDark ? "#282a36" : "#ffffff",
             }}
           >
