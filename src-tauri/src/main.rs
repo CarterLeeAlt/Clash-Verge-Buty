@@ -11,7 +11,7 @@ mod feat;
 mod utils;
 
 use crate::utils::{init, resolve, server};
-use tauri::SystemTray;
+use tauri::{Manager, SystemTray};
 
 fn main() -> std::io::Result<()> {
     // 单例检测
@@ -106,18 +106,66 @@ fn main() -> std::io::Result<()> {
 
     app.run(|app_handle, e| match e {
         tauri::RunEvent::ExitRequested { api, .. } => {
-            api.prevent_exit();
+            if !resolve::is_app_quitting() {
+                log::info!(target: "app", "app exit requested -> prevent_exit because app is not quitting");
+                api.prevent_exit();
+            } else {
+                log::info!(target: "app", "app exit requested -> allow because app is quitting");
+            }
         }
         tauri::RunEvent::WindowEvent { label, event, .. } => {
             if label == "main" {
                 match event {
                     tauri::WindowEvent::Destroyed => {
+                        log::warn!(
+                            target: "app",
+                            "main window destroyed, is_quitting={}",
+                            resolve::is_app_quitting()
+                        );
                         let _ = resolve::save_window_size_position(app_handle, true);
                     }
-                    tauri::WindowEvent::CloseRequested { .. } => {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        let is_quitting = resolve::is_app_quitting();
+                        log::info!(
+                            target: "app",
+                            "main window close requested, is_quitting={}",
+                            is_quitting
+                        );
+
                         let _ = resolve::save_window_size_position(app_handle, true);
+
+                        if !is_quitting {
+                            api.prevent_close();
+
+                            if let Some(window) = app_handle.get_window("main") {
+                                match window.hide() {
+                                    Ok(_) => log::info!(
+                                        target: "app",
+                                        "main window close requested -> hide instead of destroy"
+                                    ),
+                                    Err(err) => log::error!(
+                                        target: "app",
+                                        "failed to hide main window on close request: {err}"
+                                    ),
+                                }
+                            } else {
+                                log::warn!(
+                                    target: "app",
+                                    "main window close requested but get_window(main) returned none"
+                                );
+                            }
+                        } else {
+                            log::info!(
+                                target: "app",
+                                "main window close allowed because app is quitting"
+                            );
+                        }
+                    }
+                    tauri::WindowEvent::Focused(focused) => {
+                        log::debug!(target: "app", "main window focused={focused}");
                     }
                     tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+                        log::debug!(target: "app", "main window moved/resized");
                         let _ = resolve::save_window_size_position(app_handle, false);
                     }
                     _ => {}
