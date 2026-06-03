@@ -16,6 +16,13 @@ type Platform =
  */
 declare const OS_PLATFORM: Platform;
 
+interface IWindowStyleConfig {
+  platform: string;
+  nativeDecorations: boolean;
+  reliableMode: boolean;
+  customFrameless: boolean;
+}
+
 /**
  * Some interface for clash api
  */

@@ -11,6 +11,7 @@ mod feat;
 mod utils;
 
 use crate::utils::{init, resolve, server};
+use std::time::Duration;
 use tauri::{Manager, SystemTray};
 
 fn main() -> std::io::Result<()> {
@@ -60,6 +61,7 @@ fn main() -> std::io::Result<()> {
             cmds::exit_app,
             cmds::frontend_heartbeat,
             cmds::report_frontend_error,
+            cmds::get_window_style_config,
             // cmds::update_hotkeys,
             // profile
             cmds::get_profiles,
@@ -129,34 +131,39 @@ fn main() -> std::io::Result<()> {
                             is_quitting
                         );
 
-                        let _ = resolve::save_window_size_position(app_handle, true);
-
                         if !is_quitting {
                             api.prevent_close();
+                            resolve::mark_window_hiding_for(Duration::from_millis(1500));
 
                             if let Some(window) = app_handle.get_window("main") {
                                 match window.hide() {
                                     Ok(_) => log::info!(
                                         target: "app",
-                                        "main window close requested -> hide instead of destroy"
+                                        "main window close requested -> prevent_close and hide immediately"
                                     ),
                                     Err(err) => log::error!(
                                         target: "app",
-                                        "failed to hide main window on close request: {err}"
+                                        "main window hide failed in CloseRequested: {err}"
                                     ),
                                 }
                             } else {
                                 log::warn!(
                                     target: "app",
-                                    "main window close requested but get_window(main) returned none"
+                                    "main window close requested but main window not found"
                                 );
                             }
-                        } else {
-                            log::info!(
-                                target: "app",
-                                "main window close allowed because app is quitting"
+
+                            resolve::schedule_window_state_save(
+                                app_handle.clone(),
+                                Duration::from_millis(1000),
                             );
+                            return;
                         }
+
+                        log::info!(
+                            target: "app",
+                            "main window close allowed because app is quitting"
+                        );
                     }
                     tauri::WindowEvent::Focused(focused) => {
                         log::debug!(target: "app", "main window focused={focused}");

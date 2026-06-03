@@ -8,6 +8,7 @@ use crate::{
 use crate::{log_err, trace_err};
 use anyhow::Result;
 use once_cell::sync::OnceCell;
+use serde::{Deserialize, Serialize};
 use serde_yaml::Mapping;
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -43,7 +44,10 @@ static MAIN_WINDOW_UNEXPECTED_DESTROY_COUNT: AtomicU64 = AtomicU64::new(0);
 static MAIN_WINDOW_UNEXPECTED_DESTROY_WINDOW_START_MS: AtomicU64 = AtomicU64::new(0);
 static MAIN_WINDOW_LAST_UNEXPECTED_DESTROY_MS: AtomicU64 = AtomicU64::new(0);
 static MAIN_WINDOW_LAST_CREATE_ATTEMPT_MS: AtomicU64 = AtomicU64::new(0);
-static WINDOW_SAVE_DEBOUNCE_ID: AtomicU64 = AtomicU64::new(0);
+static WINDOW_SAVE_SCHEDULED: AtomicBool = AtomicBool::new(false);
+static LAST_WINDOW_MOVE_RESIZE_MS: AtomicU64 = AtomicU64::new(0);
+static WINDOW_SAVE_GENERATION: AtomicU64 = AtomicU64::new(0);
+static WINDOW_HIDE_IN_PROGRESS_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
 static LAST_FRONTEND_HEARTBEAT_MS: AtomicU64 = AtomicU64::new(0);
 
 fn current_time_millis() -> u64 {
@@ -85,6 +89,33 @@ fn effective_reliable_mode(build_mode: WindowBuildMode) -> bool {
     match build_mode {
         WindowBuildMode::ForcedReliableFallback => true,
         WindowBuildMode::NormalConfigured => configured_reliable_mode(),
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowStyleConfig {
+    pub platform: String,
+    pub native_decorations: bool,
+    pub reliable_mode: bool,
+    pub custom_frameless: bool,
+}
+
+pub fn get_window_style_config() -> WindowStyleConfig {
+    let now = current_time_millis();
+    let build_mode = if should_force_reliable_fallback(now) {
+        WindowBuildMode::ForcedReliableFallback
+    } else {
+        WindowBuildMode::NormalConfigured
+    };
+    let reliable_mode = effective_reliable_mode(build_mode);
+    let custom_frameless = cfg!(target_os = "windows") && !reliable_mode;
+
+    WindowStyleConfig {
+        platform: std::env::consts::OS.to_string(),
+        native_decorations: cfg!(target_os = "windows") && reliable_mode,
+        reliable_mode,
+        custom_frameless,
     }
 }
 
@@ -161,7 +192,7 @@ pub fn on_main_window_destroyed(app_handle: &AppHandle) {
 
     if is_quitting {
         MAIN_WINDOW_STATE.store(MAIN_WINDOW_STATE_MISSING, Ordering::SeqCst);
-        let _ = save_window_size_position(app_handle, true);
+        schedule_window_state_save(app_handle.clone(), Duration::from_millis(250));
         return;
     }
 
@@ -245,29 +276,100 @@ fn main_window_recreate_allowed(now: u64) -> bool {
     true
 }
 
-pub fn schedule_save_window_size_position(app_handle: AppHandle) {
-    let save_id = WINDOW_SAVE_DEBOUNCE_ID.fetch_add(1, Ordering::SeqCst) + 1;
-    log::trace!(
-        target: "app",
-        "window moved/resized debounce scheduled, save_id={}",
-        save_id
-    );
+pub fn mark_window_hiding_for(duration: Duration) {
+    let until = current_time_millis().saturating_add(duration.as_millis() as u64);
+    WINDOW_HIDE_IN_PROGRESS_UNTIL_MS.store(until, Ordering::SeqCst);
+}
+
+pub fn is_window_hiding_in_progress() -> bool {
+    let until = WINDOW_HIDE_IN_PROGRESS_UNTIL_MS.load(Ordering::SeqCst);
+    until > 0 && current_time_millis() < until
+}
+
+pub fn schedule_window_state_save(app_handle: AppHandle, delay: Duration) {
     tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(WINDOW_SAVE_DEBOUNCE_MS)).await;
-        if WINDOW_SAVE_DEBOUNCE_ID.load(Ordering::SeqCst) != save_id {
-            return;
-        }
-        match save_window_size_position(&app_handle, false) {
-            Ok(_) => log::debug!(
-                target: "app",
-                "window moved/resized saved after debounce, save_id={}, debounce_ms={}",
-                save_id,
-                WINDOW_SAVE_DEBOUNCE_MS
-            ),
+        tokio::time::sleep(delay).await;
+        match save_window_size_position(&app_handle, true) {
+            Ok(_) => log::debug!(target: "app", "window state saved after delayed request"),
             Err(err) => log::trace!(
                 target: "app",
-                "window moved/resized save after debounce skipped: {err}"
+                "window state delayed save skipped: {err}"
             ),
+        }
+    });
+}
+
+pub fn schedule_save_window_size_position(app_handle: AppHandle) {
+    let now = current_time_millis();
+    LAST_WINDOW_MOVE_RESIZE_MS.store(now, Ordering::SeqCst);
+    WINDOW_SAVE_GENERATION.fetch_add(1, Ordering::SeqCst);
+
+    if WINDOW_SAVE_SCHEDULED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
+    log::debug!(target: "app", "window moved/resized debounce started");
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_millis(WINDOW_SAVE_DEBOUNCE_MS)).await;
+            let now = current_time_millis();
+            let last = LAST_WINDOW_MOVE_RESIZE_MS.load(Ordering::SeqCst);
+            let elapsed = now.saturating_sub(last);
+            if elapsed < WINDOW_SAVE_DEBOUNCE_MS {
+                continue;
+            }
+
+            if is_window_hiding_in_progress() {
+                log::debug!(
+                    target: "app",
+                    "window moved/resized save skipped, reason=hiding_or_not_visible"
+                );
+                WINDOW_SAVE_SCHEDULED.store(false, Ordering::SeqCst);
+                return;
+            }
+
+            let Some(window) = app_handle.get_window("main") else {
+                log::debug!(
+                    target: "app",
+                    "window moved/resized save skipped, reason=hiding_or_not_visible"
+                );
+                WINDOW_SAVE_SCHEDULED.store(false, Ordering::SeqCst);
+                return;
+            };
+
+            if !window.is_visible().unwrap_or(false) {
+                log::debug!(
+                    target: "app",
+                    "window moved/resized save skipped, reason=hiding_or_not_visible"
+                );
+                WINDOW_SAVE_SCHEDULED.store(false, Ordering::SeqCst);
+                return;
+            }
+
+            match save_window_size_position(&app_handle, false) {
+                Ok(_) => log::debug!(
+                    target: "app",
+                    "window moved/resized saved after quiet, elapsed_ms={}",
+                    elapsed
+                ),
+                Err(err) => log::trace!(
+                    target: "app",
+                    "window moved/resized save after quiet skipped: {err}"
+                ),
+            }
+            WINDOW_SAVE_SCHEDULED.store(false, Ordering::SeqCst);
+
+            if WINDOW_SAVE_GENERATION.load(Ordering::SeqCst) != 0
+                && current_time_millis()
+                    .saturating_sub(LAST_WINDOW_MOVE_RESIZE_MS.load(Ordering::SeqCst))
+                    < WINDOW_SAVE_DEBOUNCE_MS
+            {
+                schedule_save_window_size_position(app_handle.clone());
+            }
+            return;
         }
     });
 }
@@ -836,6 +938,22 @@ fn show_existing_window(window: &tauri::Window, request_id: u64, reason: ShowRea
     request_show_existing_window(window, request_id, reason);
 }
 
+pub fn show_main_window_after_hide_transition(app_handle: AppHandle) {
+    if is_window_hiding_in_progress() {
+        log::warn!(
+            target: "app",
+            "show_main_window delayed because window hide is in progress"
+        );
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            show_main_window(&app_handle);
+        });
+        return;
+    }
+
+    show_main_window(&app_handle);
+}
+
 /// show and focus the main window
 pub fn show_main_window(app_handle: &AppHandle) {
     check_main_window_health(app_handle, "show_main_window");
@@ -1147,10 +1265,6 @@ pub fn save_window_size_position(app_handle: &AppHandle, save_to_file: bool) -> 
     let verge = Config::verge();
     let mut verge = verge.latest();
 
-    if save_to_file {
-        verge.save_file()?;
-    }
-
     let win = app_handle
         .get_window("main")
         .ok_or(anyhow::anyhow!("failed to get window"))?;
@@ -1164,6 +1278,9 @@ pub fn save_window_size_position(app_handle: &AppHandle, save_to_file: bool) -> 
     verge.window_is_maximized = Some(is_maximized);
     if !is_maximized && size.width >= 600.0 && size.height >= 520.0 {
         verge.window_size_position = Some(vec![size.width, size.height, pos.x, pos.y]);
+    }
+    if save_to_file {
+        verge.save_file()?;
     }
     Ok(())
 }
