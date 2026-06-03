@@ -29,8 +29,8 @@ const SettingPage = () => {
     <BasePage
       title={t("Settings")}
       contentStyle={{
-        paddingTop: -2,
-        paddingBottom: -1,
+        marginTop: -2,
+        marginBottom: -1,
         boxSizing: "border-box",
       }}
       header={
@@ -68,7 +68,6 @@ const SettingPage = () => {
           <Box
             sx={{
               borderRadius: 2,
-              marginBottom: 1.5,
               backgroundColor: isDark ? "#282a36" : "#ffffff",
             }}
           >
