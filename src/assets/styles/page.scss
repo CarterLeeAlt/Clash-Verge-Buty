@@ -4,14 +4,14 @@
   display: flex;
   flex-direction: column;
   > header {
-    // Keep the right-side page header aligned with the visual height of
-    // .layout__left .the-logo (58px basis shifted up by translateY(-2px)).
-    $rightHeaderHeight: 56px;
+    // Match the visual bottom edge of .layout__left .the-logo; its
+    // translateY(-2px) moves the painted border without changing layout.
+    $pageHeaderHeight: 56px;
 
-    flex: 0 0 $rightHeaderHeight;
+    flex: 0 0 $pageHeaderHeight;
     width: 100%;
-    height: $rightHeaderHeight;
-    min-height: $rightHeaderHeight;
+    height: $pageHeaderHeight;
+    min-height: $pageHeaderHeight;
     // max-width: 850px;
     margin: 0 auto;
     padding: 0 20px;
@@ -36,12 +36,8 @@
     }
 
     .MuiButtonGroup-root {
+      display: inline-flex;
       align-items: center;
-    }
-
-    .MuiButtonGroup-grouped,
-    .MuiButton-root {
-      line-height: 1.2;
     }
   }
 
