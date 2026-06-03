@@ -22,8 +22,8 @@ interface Props {
   mode: string;
 }
 
-const VirtuosoHeader = () => <div style={{ height: 5 }} />;
-const VirtuosoFooter = () => <div style={{ height: 5 }} />;
+const VirtuosoHeader = () => <div style={{ height: 8 }} />;
+const VirtuosoFooter = () => <div style={{ height: 10 }} />;
 
 type ProxyGroupsScrollerProps = ScrollerProps & { className?: string };
 
