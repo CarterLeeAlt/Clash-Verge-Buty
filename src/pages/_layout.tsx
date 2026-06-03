@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
 import { alpha, List, Paper, ThemeProvider } from "@mui/material";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { appWindow } from "@tauri-apps/api/window";
 import { routers } from "./_routers";
 import { getAxios } from "@/services/api";
@@ -89,16 +89,16 @@ const Layout = () => {
       }
     }));
 
-    const timer = window.setTimeout(async () => {
-      portableFlag = await getPortableFlag();
-      await appWindow.unminimize();
-      await appWindow.show();
-      await appWindow.setFocus();
-    }, 50);
+    emit("frontend://ready").catch(() => undefined);
+
+    getPortableFlag()
+      .then((value) => {
+        portableFlag = value;
+      })
+      .catch(() => undefined);
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      window.clearTimeout(timer);
       unlistenTasks.forEach((task) => {
         task.then((unlisten) => unlisten()).catch(() => undefined);
       });

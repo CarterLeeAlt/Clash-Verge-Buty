@@ -10,11 +10,40 @@ use anyhow::Result;
 use once_cell::sync::OnceCell;
 use serde_yaml::Mapping;
 use std::net::TcpListener;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::api::notification;
 use tauri::{App, AppHandle, Manager};
 use window_shadows::set_shadow;
 
 pub static VERSION: OnceCell<String> = OnceCell::new();
+
+static MAIN_WINDOW_CREATING: AtomicBool = AtomicBool::new(false);
+static FRONTEND_READY_LISTENING: AtomicBool = AtomicBool::new(false);
+static FRONTEND_READY_HANDLED: AtomicBool = AtomicBool::new(false);
+static FRONTEND_SHOW_WHEN_READY: AtomicBool = AtomicBool::new(true);
+
+struct MainWindowCreatingGuard;
+
+impl MainWindowCreatingGuard {
+    fn try_lock() -> Option<Self> {
+        if MAIN_WINDOW_CREATING
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            log::trace!("create_window skipped because main window is already creating");
+            None
+        } else {
+            Some(Self)
+        }
+    }
+}
+
+impl Drop for MainWindowCreatingGuard {
+    fn drop(&mut self) {
+        MAIN_WINDOW_CREATING.store(false, Ordering::SeqCst);
+        log::trace!("create_window creating lock released");
+    }
+}
 
 pub fn find_unused_port() -> Result<u16> {
     match TcpListener::bind("127.0.0.1:0") {
@@ -85,10 +114,15 @@ pub fn resolve_setup(app: &mut App) {
     log::trace!("init system tray");
     log_err!(tray::Tray::update_systray(&app.app_handle()));
 
-    let silent_start = { Config::verge().data().enable_silent_start };
-    if !silent_start.unwrap_or(false) {
-        create_window(&app.app_handle());
-    }
+    let silent_start = { Config::verge().data().enable_silent_start.unwrap_or(false) };
+    let show_when_ready = !silent_start;
+    log::trace!(
+        "resolve_setup pre-create main window, silent_start={}, show_when_ready={}",
+        silent_start,
+        show_when_ready
+    );
+    register_frontend_ready_listener(&app.app_handle(), show_when_ready);
+    create_window(&app.app_handle(), show_when_ready);
 
     log_err!(sysopt::Sysopt::global().init_launch());
     log_err!(sysopt::Sysopt::global().init_sysproxy());
@@ -111,14 +145,110 @@ pub fn resolve_reset() {
     log_err!(CoreManager::global().stop_core());
 }
 
-/// create main window
-pub fn create_window(app_handle: &AppHandle) {
-    if let Some(window) = app_handle.get_window("main") {
-        trace_err!(window.unminimize(), "set win unminimize");
-        trace_err!(window.show(), "set win visible");
-        trace_err!(window.set_focus(), "set win focus");
+fn register_frontend_ready_listener(app_handle: &AppHandle, show_when_ready: bool) {
+    FRONTEND_SHOW_WHEN_READY.store(show_when_ready, Ordering::SeqCst);
+
+    if FRONTEND_READY_LISTENING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        log::trace!(
+            "frontend ready listener already registered, show_when_ready={}",
+            show_when_ready
+        );
         return;
     }
+
+    let listener_app_handle = app_handle.clone();
+    let ready_app_handle = app_handle.clone();
+    log::trace!(
+        "register frontend ready listener, show_when_ready={}",
+        show_when_ready
+    );
+    listener_app_handle.listen_global("frontend://ready", move |_| {
+        if FRONTEND_READY_HANDLED
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            log::trace!("frontend ready already handled, skip");
+            return;
+        }
+
+        let show_when_ready = FRONTEND_SHOW_WHEN_READY.load(Ordering::SeqCst);
+        log::trace!(
+            "frontend ready received, show_when_ready={}",
+            show_when_ready
+        );
+        if show_when_ready {
+            log::trace!("frontend ready -> show main window");
+            show_main_window(&ready_app_handle);
+        } else if let Some(window) = ready_app_handle.get_window("main") {
+            log::trace!("frontend ready -> keep main window hidden");
+            trace_err!(window.hide(), "set win hidden after frontend ready");
+        } else {
+            log::trace!("frontend ready -> main window missing while silent");
+        }
+    });
+}
+
+fn focus_window_with_retry(window: &tauri::Window) {
+    trace_err!(window.set_focus(), "set win focus");
+
+    #[cfg(target_os = "windows")]
+    {
+        let win = window.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(80)).await;
+            crate::trace_err!(win.set_focus(), "set win focus delayed");
+        });
+    }
+}
+
+fn show_existing_window(window: &tauri::Window) {
+    trace_err!(window.unminimize(), "set win unminimize");
+    trace_err!(window.show(), "set win visible");
+    focus_window_with_retry(window);
+}
+
+/// show and focus the main window
+pub fn show_main_window(app_handle: &AppHandle) {
+    FRONTEND_SHOW_WHEN_READY.store(true, Ordering::SeqCst);
+    if let Some(window) = app_handle.get_window("main") {
+        log::trace!("show_main_window found existing main window");
+        show_existing_window(&window);
+    } else {
+        log::trace!("show_main_window did not find main window, create fallback");
+        create_window(app_handle, true);
+    }
+}
+
+/// create main window
+pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
+    if show_when_ready {
+        FRONTEND_SHOW_WHEN_READY.store(true, Ordering::SeqCst);
+    }
+
+    log::trace!(
+        "create_window called, show_when_ready={}, existing={}",
+        show_when_ready,
+        app_handle.get_window("main").is_some()
+    );
+
+    if let Some(window) = app_handle.get_window("main") {
+        if show_when_ready {
+            log::trace!("create_window found existing main window, show/focus it");
+            show_existing_window(&window);
+        } else {
+            log::trace!("create_window found existing main window, leave visibility unchanged");
+        }
+        return;
+    }
+
+    let Some(_creating_guard) = MainWindowCreatingGuard::try_lock() else {
+        return;
+    };
+    FRONTEND_READY_HANDLED.store(false, Ordering::SeqCst);
+    log::trace!("create_window reset frontend ready handled for new main window");
 
     let mut builder = tauri::window::WindowBuilder::new(
         app_handle,
@@ -205,11 +335,16 @@ pub fn create_window(app_handle: &AppHandle) {
                 trace_err!(win.maximize(), "set win maximize");
             }
         }
-        Err(_) => {
-            log::error!("failed to create window");
+        Err(err) => {
+            log::error!("failed to create window: {err}");
             return;
         }
     }
+
+    log::trace!(
+        "create_window finished, show_when_ready={}",
+        show_when_ready
+    );
 }
 
 /// save window size and position

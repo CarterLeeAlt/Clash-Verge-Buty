@@ -23,7 +23,7 @@ pub fn open_or_close_dashboard() {
                 return;
             }
         }
-        resolve::create_window(app_handle);
+        resolve::show_main_window(app_handle);
     }
 }
 
