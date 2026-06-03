@@ -7,10 +7,67 @@ use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
+use std::backtrace::Backtrace;
 use std::fs::{self, DirEntry};
+use std::panic;
 use std::path::PathBuf;
 use std::time::SystemTime;
 use tauri::api::process::Command;
+
+/// Initialize panic hook to persist crash diagnostics before the process exits.
+pub fn init_panic_hook() {
+    panic::set_hook(Box::new(|info| {
+        let timestamp = Local::now();
+        let thread = std::thread::current();
+        let thread_name = thread.name().unwrap_or("unnamed");
+        let payload = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|value| value.to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "<non-string panic payload>".to_string());
+        let location = info
+            .location()
+            .map(|location| {
+                format!(
+                    "{}:{}:{}",
+                    location.file(),
+                    location.line(),
+                    location.column()
+                )
+            })
+            .unwrap_or_else(|| "<unknown>".to_string());
+        let backtrace = Backtrace::force_capture();
+        let content = format!(
+            "timestamp: {}\nthread: {}\npayload: {}\nlocation: {}\n\nbacktrace:\n{}\n",
+            timestamp.to_rfc3339(),
+            thread_name,
+            payload,
+            location,
+            backtrace
+        );
+
+        match dirs::app_logs_dir() {
+            Ok(log_dir) => {
+                let file_name = format!("crash-{}.log", timestamp.format("%Y-%m-%d-%H%M%S"));
+                if let Err(err) = fs::write(log_dir.join(file_name), &content) {
+                    log::error!(target: "app", "failed to write panic crash log: {err}");
+                }
+            }
+            Err(err) => {
+                log::error!(target: "app", "failed to resolve panic crash log dir: {err}");
+            }
+        }
+
+        log::error!(
+            target: "app",
+            "panic captured, thread={}, payload={}, location={}",
+            thread_name,
+            payload,
+            location
+        );
+    }));
+}
 
 /// initialize this instance's log file
 fn init_log() -> Result<()> {
@@ -150,6 +207,7 @@ pub fn delete_log() -> Result<()> {
 pub fn init_config() -> Result<()> {
     let _ = dirs::init_portable_flag();
     let _ = init_log();
+    init_panic_hook();
     let _ = delete_log();
 
     crate::log_err!(dirs::app_home_dir().map(|app_dir| {
