@@ -1,6 +1,10 @@
-import { useRef } from "react";
+import { forwardRef, useRef } from "react";
 import { useLockFn } from "ahooks";
-import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
+import {
+  Virtuoso,
+  type ScrollerProps,
+  type VirtuosoHandle,
+} from "react-virtuoso";
 import {
   getConnections,
   providerHealthCheck,
@@ -18,8 +22,31 @@ interface Props {
   mode: string;
 }
 
-const VirtuosoHeader = () => <div style={{ height: 4 }} />;
-const VirtuosoFooter = () => <div style={{ height: 4 }} />;
+const VirtuosoHeader = () => <div style={{ height: 8 }} />;
+const VirtuosoFooter = () => <div style={{ height: 10 }} />;
+
+type ProxyGroupsScrollerProps = ScrollerProps & { className?: string };
+
+const ProxyGroupsScroller = forwardRef<
+  HTMLDivElement,
+  ProxyGroupsScrollerProps
+>(({ className, ...props }, ref) => (
+  <div
+    {...props}
+    ref={ref}
+    className={[className, "proxy-groups-virtuoso-scroller"]
+      .filter(Boolean)
+      .join(" ")}
+  />
+));
+
+ProxyGroupsScroller.displayName = "ProxyGroupsScroller";
+
+const virtuosoComponents = {
+  Header: VirtuosoHeader,
+  Footer: VirtuosoFooter,
+  Scroller: ProxyGroupsScroller,
+};
 
 export const ProxyGroups = (props: Props) => {
   const { mode } = props;
@@ -123,11 +150,12 @@ export const ProxyGroups = (props: Props) => {
   return (
     <Virtuoso
       ref={virtuosoRef}
+      className="proxy-groups-virtuoso"
       style={{ height: "100%" }}
       totalCount={renderList.length}
       defaultItemHeight={64}
       increaseViewportBy={256}
-      components={{ Header: VirtuosoHeader, Footer: VirtuosoFooter }}
+      components={virtuosoComponents}
       itemContent={(index) => (
         <ProxyRender
           key={renderList[index].key}
