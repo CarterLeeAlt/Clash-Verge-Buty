@@ -29,8 +29,8 @@ const SettingPage = () => {
     <BasePage
       title={t("Settings")}
       contentStyle={{
-        paddingTop: 0,
-        paddingBottom: 10,
+        paddingTop: -2,
+        paddingBottom: -1,
         boxSizing: "border-box",
       }}
       header={
