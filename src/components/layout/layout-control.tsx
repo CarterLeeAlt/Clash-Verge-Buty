@@ -10,17 +10,27 @@ import {
 } from "@mui/icons-material";
 import { useEffect, useState } from "react";
 
-export const LayoutControl = () => {
+interface LayoutControlProps {
+  nativeDecorations?: boolean;
+}
+
+export const LayoutControl = ({
+  nativeDecorations = false,
+}: LayoutControlProps) => {
   const minWidth = 40;
 
   const [isMaximized, setIsMaximized] = useState(false);
   const [isPined, setIsPined] = useState(false);
   useEffect(() => {
+    if (nativeDecorations) return;
+
     appWindow
       .isMaximized()
       .then(setIsMaximized)
       .catch(() => undefined);
-  }, []);
+  }, [nativeDecorations]);
+
+  if (nativeDecorations) return null;
 
   return (
     <ButtonGroup

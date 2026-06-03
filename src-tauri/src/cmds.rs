@@ -328,6 +328,11 @@ pub fn report_frontend_error(message: String, stack: Option<String>) -> CmdResul
 }
 
 #[tauri::command]
+pub fn get_window_style_config() -> CmdResult<resolve::WindowStyleConfig> {
+    Ok(resolve::get_window_style_config())
+}
+
+#[tauri::command]
 pub fn exit_app(app_handle: tauri::AppHandle) {
     log::info!(target: "app", "exit_app called, mark app as quitting");
     resolve::set_app_quitting(true);
