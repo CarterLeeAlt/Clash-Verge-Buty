@@ -18,8 +18,8 @@ interface Props {
   mode: string;
 }
 
-const VirtuosoHeader = () => <div style={{ height: 8 }} />;
-const VirtuosoFooter = () => <div style={{ height: 16 }} />;
+const VirtuosoHeader = () => <div style={{ height: 5 }} />;
+const VirtuosoFooter = () => <div style={{ height: 5 }} />;
 
 export const ProxyGroups = (props: Props) => {
   const { mode } = props;
