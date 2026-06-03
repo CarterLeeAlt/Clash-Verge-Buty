@@ -1,5 +1,5 @@
-use serde_yaml::{Mapping, Value};
 use crate::core::handle::Handle;
+use serde_yaml::{Mapping, Value};
 
 macro_rules! revise {
     ($map: expr, $key: expr, $val: expr) => {
@@ -37,7 +37,10 @@ pub fn use_tun(
             .unwrap_or_else(|| default_tun.clone());
         revise!(tun_val, "enable", true);
         revise!(config, "tun", tun_val);
-        Handle::emit_log("info", "[tun] action: inject/update tun and set enable=true");
+        Handle::emit_log(
+            "info",
+            "[tun] action: inject/update tun and set enable=true",
+        );
     } else if tun_existed || source_has_tun {
         let mut tun_val = tun_val
             .and_then(Value::as_mapping)

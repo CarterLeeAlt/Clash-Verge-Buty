@@ -58,6 +58,8 @@ fn main() -> std::io::Result<()> {
             cmds::get_app_dir,
             cmds::copy_icon_file,
             cmds::exit_app,
+            cmds::frontend_heartbeat,
+            cmds::report_frontend_error,
             // cmds::update_hotkeys,
             // profile
             cmds::get_profiles,
@@ -117,12 +119,7 @@ fn main() -> std::io::Result<()> {
             if label == "main" {
                 match event {
                     tauri::WindowEvent::Destroyed => {
-                        log::warn!(
-                            target: "app",
-                            "main window destroyed, is_quitting={}",
-                            resolve::is_app_quitting()
-                        );
-                        let _ = resolve::save_window_size_position(app_handle, true);
+                        resolve::on_main_window_destroyed(app_handle);
                     }
                     tauri::WindowEvent::CloseRequested { api, .. } => {
                         let is_quitting = resolve::is_app_quitting();
@@ -165,8 +162,7 @@ fn main() -> std::io::Result<()> {
                         log::debug!(target: "app", "main window focused={focused}");
                     }
                     tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
-                        log::debug!(target: "app", "main window moved/resized");
-                        let _ = resolve::save_window_size_position(app_handle, false);
+                        resolve::schedule_save_window_size_position(app_handle.clone());
                     }
                     _ => {}
                 }

@@ -62,7 +62,6 @@ pub fn save_yaml<T: Serialize>(path: &PathBuf, data: &T, prefix: Option<&str>) -
         .with_context(|| format!("failed to save file \"{path_str}\""))
 }
 
-
 pub fn write_file_atomic(path: &PathBuf, data: &[u8]) -> Result<()> {
     let parent = path
         .parent()
@@ -180,8 +179,6 @@ pub fn get_last_part_and_decode(url: &str) -> Option<String> {
             .to_string(),
     )
 }
-
-
 
 pub fn resolve_profile_path(file: &str) -> Result<PathBuf> {
     let file = file.trim();

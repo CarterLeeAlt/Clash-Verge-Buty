@@ -223,6 +223,14 @@ export async function exitApp() {
   return invoke("exit_app");
 }
 
+export async function frontendHeartbeat() {
+  return invoke<void>("frontend_heartbeat");
+}
+
+export async function reportFrontendError(message: string, stack?: string) {
+  return invoke<void>("report_frontend_error", { message, stack });
+}
+
 export async function copyIconFile(
   path: string,
   name: "common.png" | "sysproxy.png" | "tun.png"
