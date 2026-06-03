@@ -19,7 +19,7 @@ interface Props {
 }
 
 const VirtuosoHeader = () => <div style={{ height: 4 }} />;
-const VirtuosoFooter = () => <div style={{ height: 6 }} />;
+const VirtuosoFooter = () => <div style={{ height: 4 }} />;
 
 export const ProxyGroups = (props: Props) => {
   const { mode } = props;
@@ -50,7 +50,9 @@ export const ProxyGroups = (props: Props) => {
               .map((conn) => deleteConnection(conn.id))
           ).finally(() => {
             try {
-              window.dispatchEvent(new CustomEvent("verge://connections-refresh"));
+              window.dispatchEvent(
+                new CustomEvent("verge://connections-refresh")
+              );
             } catch {}
           });
         });
@@ -123,6 +125,7 @@ export const ProxyGroups = (props: Props) => {
       ref={virtuosoRef}
       style={{ height: "100%" }}
       totalCount={renderList.length}
+      defaultItemHeight={64}
       increaseViewportBy={256}
       components={{ Header: VirtuosoHeader, Footer: VirtuosoFooter }}
       itemContent={(index) => (
