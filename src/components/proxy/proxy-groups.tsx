@@ -101,7 +101,8 @@ export const ProxyGroups = (props: Props) => {
     }
   );
 
-  const handleCheckAll = useLockFn(async (groupName: string) => {
+  const handleCheckAll = async (groupName: string) => {
+    const task = delayManager.startGroupCheck(groupName);
     const proxies = renderList
       .filter(
         (e) => e.group?.name === groupName && (e.type === 2 || e.type === 4)
@@ -114,14 +115,24 @@ export const ProxyGroups = (props: Props) => {
     if (providers.size) {
       Promise.allSettled(
         [...providers].map((p) => providerHealthCheck(p))
-      ).then(() => onProxies());
+      ).then(() => {
+        if (delayManager.isCurrentGroupCheck(groupName, task)) {
+          onProxies();
+        }
+      });
     }
 
     const names = proxies.filter((p) => !p!.provider).map((p) => p!.name);
-    await delayManager.checkListDelay(names, groupName, timeout);
+    const isCurrent = await delayManager.checkListDelay(
+      names,
+      groupName,
+      timeout,
+      undefined,
+      task
+    );
 
-    onProxies();
-  });
+    if (isCurrent) onProxies();
+  };
 
   const handleLocation = (group: IProxyGroupItem) => {
     if (!group) return;
