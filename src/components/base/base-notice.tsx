@@ -32,7 +32,7 @@ export const NoticeManager = () => {
     <Box
       sx={{
         position: "fixed",
-        top: "88px",
+        top: "60px",
         right: "20px",
         zIndex: 1500,
         display: "flex",
