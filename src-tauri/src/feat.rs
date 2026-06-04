@@ -11,8 +11,9 @@ use crate::utils::resolve;
 use anyhow::{bail, Result};
 use serde::Serialize;
 use serde_yaml::{Mapping, Value};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use tauri::{AppHandle, ClipboardManager, Manager};
+use tokio::time::{sleep, Duration, Instant};
 
 // 打开面板
 pub fn open_or_close_dashboard() {
@@ -408,12 +409,11 @@ pub struct TestDelayResult {
 struct TestDelayMatchContext {
     group_names: HashSet<String>,
     proxy_names: HashSet<String>,
+    proxies: HashMap<String, clash_api::ProxyItemRes>,
     before_connection_ids: HashSet<String>,
 }
 
 pub async fn test_delay(url: String) -> Result<TestDelayResult> {
-    use tokio::time::{sleep, Duration, Instant};
-
     let test_url = reqwest::Url::parse(&url).ok();
     let test_host = test_url
         .as_ref()
@@ -461,15 +461,15 @@ pub async fn test_delay(url: String) -> Result<TestDelayResult> {
             response = &mut request => {
                 let delay = match response {
                     Ok(response) if response.status().is_success() => start.elapsed().as_millis() as u32,
-                    Ok(_) => 10000u32,
-                    Err(err) => return Err(err.into()),
+                    Ok(_) | Err(_) => 10000u32,
                 };
 
                 if matched_proxy.is_none() {
-                    matched_proxy = match_test_delay_proxy(
+                    matched_proxy = match_test_delay_proxy_until(
                         &match_context,
                         test_host.as_deref(),
                         test_port,
+                        Duration::from_millis(600),
                     ).await;
                 }
 
@@ -490,23 +490,23 @@ pub async fn test_delay(url: String) -> Result<TestDelayResult> {
 }
 
 async fn prepare_test_delay_match_context() -> TestDelayMatchContext {
-    let (group_names, proxy_names) = clash_api::get_proxies()
+    let proxies = clash_api::get_proxies()
         .await
-        .map(|res| {
-            res.proxies.into_iter().fold(
-                (HashSet::new(), HashSet::new()),
-                |(mut group_names, mut proxy_names), (name, proxy)| {
-                    if proxy.all.is_some() {
-                        group_names.insert(name);
-                    } else {
-                        proxy_names.insert(name);
-                    }
-
-                    (group_names, proxy_names)
-                },
-            )
-        })
+        .map(|res| res.proxies)
         .unwrap_or_default();
+
+    let (group_names, proxy_names) = proxies.iter().fold(
+        (HashSet::new(), HashSet::new()),
+        |(mut group_names, mut proxy_names), (name, proxy)| {
+            if proxy.all.is_some() {
+                group_names.insert(name.clone());
+            } else {
+                proxy_names.insert(name.clone());
+            }
+
+            (group_names, proxy_names)
+        },
+    );
 
     let before_connection_ids = clash_api::get_connections()
         .await
@@ -521,7 +521,29 @@ async fn prepare_test_delay_match_context() -> TestDelayMatchContext {
     TestDelayMatchContext {
         group_names,
         proxy_names,
+        proxies,
         before_connection_ids,
+    }
+}
+
+async fn match_test_delay_proxy_until(
+    context: &TestDelayMatchContext,
+    test_host: Option<&str>,
+    test_port: Option<u16>,
+    timeout: Duration,
+) -> Option<String> {
+    let deadline = Instant::now() + timeout;
+
+    loop {
+        if let Some(proxy) = match_test_delay_proxy(context, test_host, test_port).await {
+            return Some(proxy);
+        }
+
+        if Instant::now() >= deadline {
+            return None;
+        }
+
+        sleep(Duration::from_millis(80)).await;
     }
 }
 
@@ -536,17 +558,47 @@ async fn match_test_delay_proxy(
         .into_iter()
         .filter(|connection| !context.before_connection_ids.contains(&connection.id))
         .filter(|connection| connection_matches_test_url(connection, test_host, test_port))
-        .find_map(|connection| select_outbound_proxy(&connection.chains, context))
+        .find_map(|connection| select_outbound_proxy(&connection, context))
 }
 
-fn select_outbound_proxy(chains: &[String], context: &TestDelayMatchContext) -> Option<String> {
+fn select_outbound_proxy(
+    connection: &clash_api::ConnectionItemRes,
+    context: &TestDelayMatchContext,
+) -> Option<String> {
+    if let Some(proxy) = select_outbound_from_chains(&connection.chains, context) {
+        return Some(proxy);
+    }
+
+    connection
+        .rule
+        .as_deref()
+        .and_then(normalize_builtin_outbound)
+        .or_else(|| {
+            connection
+                .rule_payload
+                .as_deref()
+                .and_then(normalize_builtin_outbound)
+        })
+        .or_else(|| {
+            connection
+                .chains
+                .iter()
+                .rev()
+                .find_map(|chain| select_builtin_from_policy_hint(Some(chain), context))
+        })
+}
+
+fn select_outbound_from_chains(
+    chains: &[String],
+    context: &TestDelayMatchContext,
+) -> Option<String> {
     for chain in chains.iter().rev().map(|chain| chain.trim()) {
         if chain.is_empty() {
             continue;
         }
 
-        if is_builtin_outbound(chain) {
-            return Some(chain.to_string());
+        if let Some(builtin) = normalize_builtin_outbound(chain) {
+            return Some(builtin);
         }
 
         if context.proxy_names.contains(chain) && !context.group_names.contains(chain) {
@@ -562,8 +614,30 @@ fn select_outbound_proxy(chains: &[String], context: &TestDelayMatchContext) -> 
         .map(ToString::to_string)
 }
 
-fn is_builtin_outbound(name: &str) -> bool {
-    name.eq_ignore_ascii_case("DIRECT") || name.eq_ignore_ascii_case("REJECT")
+fn select_builtin_from_policy_hint(
+    policy_name: Option<&str>,
+    context: &TestDelayMatchContext,
+) -> Option<String> {
+    let policy_name = policy_name?.trim();
+
+    let proxy = context.proxies.get(policy_name)?;
+    let selected = proxy
+        .now
+        .as_deref()
+        .or(proxy.selected.as_deref())
+        .map(str::trim)?;
+
+    normalize_builtin_outbound(selected)
+}
+
+fn normalize_builtin_outbound(name: &str) -> Option<String> {
+    if name.eq_ignore_ascii_case("DIRECT") {
+        Some("DIRECT".to_string())
+    } else if name.eq_ignore_ascii_case("REJECT") {
+        Some("REJECT".to_string())
+    } else {
+        None
+    }
 }
 
 fn connection_matches_test_url(
