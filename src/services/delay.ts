@@ -17,7 +17,7 @@ class DelayManager {
   private taskSeq = 0;
 
   // 每个item的监听
-  private listenerMap = new Map<string, (time: number) => void>();
+  private listenerMap = new Map<string, Set<(time: number) => void>>();
 
   // 每个分组的监听
   private groupListenerMap = new Map<string, () => void>();
@@ -32,12 +32,27 @@ class DelayManager {
 
   setListener(name: string, group: string, listener: (time: number) => void) {
     const key = hashKey(name, group);
-    this.listenerMap.set(key, listener);
+    const listeners = this.listenerMap.get(key) ?? new Set();
+    listeners.add(listener);
+    this.listenerMap.set(key, listeners);
   }
 
-  removeListener(name: string, group: string) {
+  removeListener(
+    name: string,
+    group: string,
+    listener?: (time: number) => void
+  ) {
     const key = hashKey(name, group);
-    this.listenerMap.delete(key);
+    if (!listener) {
+      this.listenerMap.delete(key);
+      return;
+    }
+
+    const listeners = this.listenerMap.get(key);
+    if (!listeners) return;
+
+    listeners.delete(listener);
+    if (!listeners.size) this.listenerMap.delete(key);
   }
 
   setGroupListener(group: string, listener: () => void) {
@@ -71,11 +86,50 @@ class DelayManager {
     return !task.aborted && this.groupTaskMap.get(group)?.id === task.id;
   }
 
-  setDelay(name: string, group: string, delay: number) {
+  setDelay(name: string, group: string, delay: number, silent = false) {
     const key = hashKey(name, group);
     this.cache.set(key, [Date.now(), delay]);
-    this.listenerMap.get(key)?.(delay);
+    this.listenerMap.get(key)?.forEach((listener) => listener(delay));
+    if (!silent) this.groupListenerMap.get(group)?.();
+  }
+
+  notifyGroup(group: string) {
     this.groupListenerMap.get(group)?.();
+  }
+
+  clearDelay(name: string, group: string, silent = false) {
+    const key = hashKey(name, group);
+    this.cache.delete(key);
+    this.listenerMap.get(key)?.forEach((listener) => listener(-1));
+    if (!silent) this.groupListenerMap.get(group)?.();
+  }
+
+  clearGroupDelay(names: string[], group: string, task: DelayTaskState) {
+    const validNames = names.filter(Boolean);
+
+    if (!this.isCurrentGroupCheck(group, task)) return false;
+
+    for (const name of validNames) {
+      if (!this.isCurrentGroupCheck(group, task)) return false;
+      this.clearDelay(name, group, true);
+    }
+
+    this.notifyGroup(group);
+    return this.isCurrentGroupCheck(group, task);
+  }
+
+  setGroupPending(names: string[], group: string, task: DelayTaskState) {
+    const validNames = names.filter(Boolean);
+
+    if (!this.isCurrentGroupCheck(group, task)) return false;
+
+    for (const name of validNames) {
+      if (!this.isCurrentGroupCheck(group, task)) return false;
+      this.setDelay(name, group, -2, true);
+    }
+
+    this.notifyGroup(group);
+    return this.isCurrentGroupCheck(group, task);
   }
 
   getDelay(name: string, group: string) {
@@ -90,9 +144,9 @@ class DelayManager {
 
   /// 暂时修复provider的节点延迟排序的问题
   getDelayFix(proxy: IProxyItem, group: string) {
-    if (!proxy.provider) {
-      const delay = this.getDelay(proxy.name, group);
-      if (delay >= 0 || delay === -2) return delay;
+    const cachedDelay = this.getDelay(proxy.name, group);
+    if (cachedDelay === -2 || (!proxy.provider && cachedDelay >= 0)) {
+      return cachedDelay;
     }
 
     if (proxy.history.length > 0) {
@@ -163,12 +217,8 @@ class DelayManager {
   ) {
     const names = nameList.filter(Boolean);
 
-    // 设置正在延迟测试中
-    names.forEach((name) => {
-      if (this.isCurrentGroupCheck(group, task)) {
-        this.setDelay(name, group, -2);
-      }
-    });
+    // 设置正在延迟测试中，必须在任何 await 前同步覆盖上一轮结果
+    if (!this.setGroupPending(names, group, task)) return false;
 
     let nextIndex = 0;
     const workerCount = Math.min(concurrency, names.length);
