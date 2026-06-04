@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLockFn } from "ahooks";
 import { useTranslation } from "react-i18next";
 import { useSortable } from "@dnd-kit/sortable";
@@ -18,7 +18,7 @@ import { Notice } from "@/components/base";
 import { TestBox } from "./test-box";
 import delayManager from "@/services/delay";
 import { cmdTestDelay } from "@/services/cmds";
-import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
 
 interface Props {
   id: string;
@@ -26,8 +26,6 @@ interface Props {
   onEdit: () => void;
   onDelete: (uid: string) => void;
 }
-
-let eventListener: UnlistenFn | null = null;
 
 export const TestItem = (props: Props) => {
   const { itemData, onEdit, onDelete: onDeleteItem } = props;
@@ -38,14 +36,17 @@ export const TestItem = (props: Props) => {
   const [anchorEl, setAnchorEl] = useState<any>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
   const [delay, setDelay] = useState(-1);
+  const [group, setGroup] = useState<string>();
   const [iconLoadFailed, setIconLoadFailed] = useState(false);
   const { uid, name, icon, url } = itemData;
 
-  const onDelay = async () => {
+  const onDelay = useCallback(async () => {
     setDelay(-2);
+    setGroup(undefined);
     const result = await cmdTestDelay(url);
-    setDelay(result);
-  };
+    setDelay(result.delay);
+    setGroup(result.group);
+  }, [url]);
 
   const onEditTest = () => {
     setAnchorEl(null);
@@ -66,18 +67,25 @@ export const TestItem = (props: Props) => {
     { label: "Delete", handler: onDelete },
   ];
 
-  const listenTsetEvent = async () => {
-    if (eventListener !== null) {
-      eventListener();
-    }
-    eventListener = await listen("verge://test-all", () => {
-      onDelay();
-    });
-  };
-
   useEffect(() => {
-    listenTsetEvent();
-  }, []);
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    listen("verge://test-all", () => {
+      onDelay();
+    }).then((fn) => {
+      if (disposed) {
+        fn();
+        return;
+      }
+      unlisten = fn;
+    });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [onDelay]);
 
   return (
     <Box
@@ -103,9 +111,19 @@ export const TestItem = (props: Props) => {
           {...listeners}
         >
           {icon && icon.trim() !== "" && !iconLoadFailed ? (
-            <Box sx={{ display: "flex", justifyContent: "center", minHeight: "40px" }}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                minHeight: "40px",
+              }}
+            >
               <img
-                src={icon.trim().startsWith("<svg") ? `data:image/svg+xml;base64,${btoa(icon)}` : icon}
+                src={
+                  icon.trim().startsWith("<svg")
+                    ? `data:image/svg+xml;base64,${btoa(icon)}`
+                    : icon
+                }
                 alt={`${name} icon`}
                 height="40"
                 width="40"
@@ -114,7 +132,13 @@ export const TestItem = (props: Props) => {
               />
             </Box>
           ) : (
-            <Box sx={{ display: "flex", justifyContent: "center", minHeight: "40px" }}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                minHeight: "40px",
+              }}
+            >
               <LanguageTwoTone sx={{ height: "40px" }} fontSize="large" />
             </Box>
           )}
@@ -172,7 +196,7 @@ export const TestItem = (props: Props) => {
                 },
               })}
             >
-              {delayManager.formatDelay(delay)}
+              {`${delayManager.formatDelay(delay)} | ${group || t("Unknown")}`}
             </Widget>
           )}
         </Box>

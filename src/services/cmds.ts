@@ -178,8 +178,13 @@ export async function cmdGetProxyDelay(
   });
 }
 
+export interface ITestDelayResult {
+  delay: number;
+  group?: string;
+}
+
 export async function cmdTestDelay(url: string) {
-  return invoke<number>("test_delay", { url });
+  return invoke<ITestDelayResult>("test_delay", { url });
 }
 
 /// service mode
