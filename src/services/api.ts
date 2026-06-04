@@ -71,16 +71,26 @@ export const getRules = async () => {
   return response?.rules as IRuleItem[];
 };
 
+type GetProxyDelayOptions = {
+  url?: string;
+  timeout?: number;
+  signal?: AbortSignal;
+};
+
 /// Get Proxy delay
-export const getProxyDelay = async (name: string, url?: string) => {
+export const getProxyDelay = async (
+  name: string,
+  options: GetProxyDelayOptions = {}
+) => {
+  const { url, timeout = 10000, signal } = options;
   const params = {
-    timeout: 10000,
+    timeout,
     url: url || "https://cp.cloudflare.com/generate_204",
   };
   const instance = await getAxios();
   const result = await instance.get(
     `/proxies/${encodeURIComponent(name)}/delay`,
-    { params }
+    { params, signal, timeout: Math.max(timeout + 1000, 15000) }
   );
   return result as any as { delay: number };
 };
