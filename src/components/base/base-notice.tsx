@@ -52,6 +52,13 @@ export const NoticeManager = () => {
             width: "100%",
             pointerEvents: "auto",
             wordBreak: "break-word",
+            color: "#fff",
+            "& .MuiAlert-icon": {
+              color: "#fff",
+            },
+            "& .MuiAlert-action": {
+              color: "#fff",
+            },
           }}
           action={
             <IconButton
