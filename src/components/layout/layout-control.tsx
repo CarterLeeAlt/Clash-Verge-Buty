@@ -5,6 +5,8 @@ import {
   CropSquareRounded,
   FilterNoneRounded,
   HorizontalRuleRounded,
+  LockOpenRounded,
+  LockRounded,
   PushPinOutlined,
   PushPinRounded,
 } from "@mui/icons-material";
