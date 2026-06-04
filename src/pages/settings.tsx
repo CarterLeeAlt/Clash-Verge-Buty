@@ -29,8 +29,8 @@ const SettingPage = () => {
     <BasePage
       title={t("Settings")}
       contentStyle={{
-        marginTop: -2,
-        marginBottom: -1,
+        marginTop: 3,
+        marginBottom: 4,
         boxSizing: "border-box",
       }}
       header={
