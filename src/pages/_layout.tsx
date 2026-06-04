@@ -16,7 +16,7 @@ import LogoSvg from "@/assets/image/logo.svg?react";
 import LogoSvg_dark from "@/assets/image/logo_dark.svg?react";
 import { atomThemeMode } from "@/services/states";
 import { useRecoilState } from "recoil";
-import { BaseErrorBoundary, Notice } from "@/components/base";
+import { BaseErrorBoundary, Notice, NoticeManager } from "@/components/base";
 import { LayoutItem } from "@/components/layout/layout-item";
 import { LayoutControl } from "@/components/layout/layout-control";
 import { LayoutTraffic } from "@/components/layout/layout-traffic";
@@ -163,6 +163,7 @@ const Layout = () => {
   return (
     <SWRConfig value={{ errorRetryCount: 3 }}>
       <ThemeProvider theme={theme}>
+        <NoticeManager />
         <Paper
           square
           elevation={0}
