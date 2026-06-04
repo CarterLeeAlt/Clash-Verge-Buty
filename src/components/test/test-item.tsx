@@ -24,12 +24,13 @@ import { listen } from "@tauri-apps/api/event";
 interface Props {
   id: string;
   itemData: IVergeTestItem;
+  editable?: boolean;
   onEdit: () => void;
   onDelete: (uid: string) => void;
 }
 
 export const TestItem = (props: Props) => {
-  const { itemData, onEdit, onDelete: onDeleteItem } = props;
+  const { itemData, editable = true, onEdit, onDelete: onDeleteItem } = props;
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: props.id });
 
@@ -55,11 +56,21 @@ export const TestItem = (props: Props) => {
 
   const onEditTest = () => {
     setAnchorEl(null);
+
+    if (!editable) {
+      return;
+    }
+
     onEdit();
   };
 
   const onDelete = useLockFn(async () => {
     setAnchorEl(null);
+
+    if (!editable) {
+      return;
+    }
+
     try {
       onDeleteItem(uid);
     } catch (err: any) {
@@ -129,11 +140,18 @@ export const TestItem = (props: Props) => {
     >
       <TestBox
         onClick={onEditTest}
+        onDoubleClick={onEditTest}
         onContextMenu={(event) => {
+          event.preventDefault();
+
+          if (!editable) {
+            setAnchorEl(null);
+            return;
+          }
+
           const { clientX, clientY } = event;
           setPosition({ top: clientY, left: clientX });
           setAnchorEl(event.currentTarget);
-          event.preventDefault();
         }}
       >
         <Box
@@ -250,30 +268,32 @@ export const TestItem = (props: Props) => {
         </Box>
       </TestBox>
 
-      <Menu
-        open={!!anchorEl}
-        anchorEl={anchorEl}
-        onClose={() => setAnchorEl(null)}
-        anchorPosition={position}
-        anchorReference="anchorPosition"
-        transitionDuration={225}
-        MenuListProps={{ sx: { py: 0.5 } }}
-        onContextMenu={(e) => {
-          setAnchorEl(null);
-          e.preventDefault();
-        }}
-      >
-        {menu.map((item) => (
-          <MenuItem
-            key={item.label}
-            onClick={item.handler}
-            sx={{ minWidth: 120 }}
-            dense
-          >
-            {t(item.label)}
-          </MenuItem>
-        ))}
-      </Menu>
+      {editable && (
+        <Menu
+          open={!!anchorEl}
+          anchorEl={anchorEl}
+          onClose={() => setAnchorEl(null)}
+          anchorPosition={position}
+          anchorReference="anchorPosition"
+          transitionDuration={225}
+          MenuListProps={{ sx: { py: 0.5 } }}
+          onContextMenu={(e) => {
+            setAnchorEl(null);
+            e.preventDefault();
+          }}
+        >
+          {menu.map((item) => (
+            <MenuItem
+              key={item.label}
+              onClick={item.handler}
+              sx={{ minWidth: 120 }}
+              dense
+            >
+              {t(item.label)}
+            </MenuItem>
+          ))}
+        </Menu>
+      )}
     </Box>
   );
 };
