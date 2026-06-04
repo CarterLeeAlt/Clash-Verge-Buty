@@ -99,9 +99,16 @@ jobs:
             Copy-Item $src (Join-Path "src-tauri/local-binaries/windows-service-bin" $n) -Force
           }
 
-      - name: Pnpm install and check
+      - name: Pnpm install, sync version and check
+        shell: pwsh
         run: |
           pnpm i
+
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $pkg.version = $env:VERSION
+          $pkg | ConvertTo-Json -Depth 100 | Set-Content package.json -Encoding UTF8
+
+          pnpm sync-metadata
           pnpm check ${{ matrix.target }}
 
       - name: Detect signing availability
