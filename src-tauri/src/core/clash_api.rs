@@ -42,6 +42,10 @@ pub struct ProxyItemRes {
     pub name: String,
     #[serde(default)]
     pub all: Option<Vec<String>>,
+    #[serde(default)]
+    pub now: Option<String>,
+    #[serde(default)]
+    pub selected: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -54,6 +58,8 @@ pub struct ProxiesRes {
 pub struct ConnectionMetadataRes {
     #[serde(default)]
     pub network: String,
+    #[serde(default, rename = "type")]
+    pub conn_type: Option<String>,
     #[serde(default)]
     pub host: String,
     #[serde(default, rename = "destinationIP")]
@@ -71,6 +77,10 @@ pub struct ConnectionItemRes {
     pub start: String,
     #[serde(default)]
     pub chains: Vec<String>,
+    #[serde(default)]
+    pub rule: Option<String>,
+    #[serde(default, rename = "rulePayload")]
+    pub rule_payload: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
