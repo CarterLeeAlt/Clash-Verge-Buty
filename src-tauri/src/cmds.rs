@@ -276,8 +276,13 @@ pub fn get_portable_flag() -> CmdResult<bool> {
 }
 
 #[tauri::command]
-pub async fn test_delay(url: String) -> CmdResult<u32> {
-    Ok(feat::test_delay(url).await.unwrap_or(10000u32))
+pub async fn test_delay(url: String) -> CmdResult<feat::TestDelayResult> {
+    Ok(feat::test_delay(url)
+        .await
+        .unwrap_or(feat::TestDelayResult {
+            delay: 10000u32,
+            group: None,
+        }))
 }
 
 #[tauri::command]

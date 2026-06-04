@@ -117,7 +117,7 @@ class DelayManager {
     if (delay <= 0) return "Error";
     if (delay > 1e5) return "Error";
     if (delay >= timeout) return "Timeout"; // 10s
-    return `${delay}`;
+    return `${delay} ms`;
   }
 
   formatDelayColor(delay: number, timeout = 10000) {
