@@ -128,6 +128,8 @@
   "Runtime Config": "当前配置",
   "ReadOnly": "只读",
   "Restart": "重启内核",
+  "Lock Window Size": "锁定窗口大小",
+  "Unlock Window Size": "解除窗口大小锁定",
   "Upgrade": "升级内核",
 
   "Back": "返回",
