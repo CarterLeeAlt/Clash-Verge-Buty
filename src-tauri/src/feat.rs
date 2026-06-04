@@ -402,7 +402,13 @@ pub fn copy_clash_env(app_handle: &AppHandle) {
 #[derive(Default, Debug, Clone, Serialize)]
 pub struct TestDelayResult {
     pub delay: u32,
-    pub group: Option<String>,
+    pub proxy: Option<String>,
+}
+
+struct TestDelayMatchContext {
+    group_names: HashSet<String>,
+    proxy_names: HashSet<String>,
+    before_connection_ids: HashSet<String>,
 }
 
 pub async fn test_delay(url: String) -> Result<TestDelayResult> {
@@ -417,7 +423,7 @@ pub async fn test_delay(url: String) -> Result<TestDelayResult> {
         .as_ref()
         .and_then(|url| url.port_or_known_default());
 
-    let (group_names, before_connection_ids) = prepare_test_delay_match_context().await;
+    let match_context = prepare_test_delay_match_context().await;
 
     let mut builder = reqwest::ClientBuilder::new().use_rustls_tls().no_proxy();
 
@@ -448,7 +454,7 @@ pub async fn test_delay(url: String) -> Result<TestDelayResult> {
 
     let start = Instant::now();
     let mut request = Box::pin(request.send());
-    let mut matched_group = None;
+    let mut matched_proxy = None;
 
     loop {
         tokio::select! {
@@ -459,10 +465,9 @@ pub async fn test_delay(url: String) -> Result<TestDelayResult> {
                     Err(err) => return Err(err.into()),
                 };
 
-                if matched_group.is_none() {
-                    matched_group = match_test_delay_group(
-                        &group_names,
-                        &before_connection_ids,
+                if matched_proxy.is_none() {
+                    matched_proxy = match_test_delay_proxy(
+                        &match_context,
                         test_host.as_deref(),
                         test_port,
                     ).await;
@@ -470,13 +475,12 @@ pub async fn test_delay(url: String) -> Result<TestDelayResult> {
 
                 return Ok(TestDelayResult {
                     delay,
-                    group: matched_group,
+                    proxy: matched_proxy,
                 });
             }
-            _ = sleep(Duration::from_millis(100)), if matched_group.is_none() => {
-                matched_group = match_test_delay_group(
-                    &group_names,
-                    &before_connection_ids,
+            _ = sleep(Duration::from_millis(100)), if matched_proxy.is_none() => {
+                matched_proxy = match_test_delay_proxy(
+                    &match_context,
                     test_host.as_deref(),
                     test_port,
                 ).await;
@@ -485,20 +489,22 @@ pub async fn test_delay(url: String) -> Result<TestDelayResult> {
     }
 }
 
-async fn prepare_test_delay_match_context() -> (HashSet<String>, HashSet<String>) {
-    let group_names = clash_api::get_proxies()
+async fn prepare_test_delay_match_context() -> TestDelayMatchContext {
+    let (group_names, proxy_names) = clash_api::get_proxies()
         .await
         .map(|res| {
-            res.proxies
-                .into_iter()
-                .filter_map(|(name, proxy)| {
-                    if name != "GLOBAL" && proxy.all.as_ref().is_some_and(|all| !all.is_empty()) {
-                        Some(name)
+            res.proxies.into_iter().fold(
+                (HashSet::new(), HashSet::new()),
+                |(mut group_names, mut proxy_names), (name, proxy)| {
+                    if proxy.all.is_some() {
+                        group_names.insert(name);
                     } else {
-                        None
+                        proxy_names.insert(name);
                     }
-                })
-                .collect::<HashSet<_>>()
+
+                    (group_names, proxy_names)
+                },
+            )
         })
         .unwrap_or_default();
 
@@ -512,32 +518,52 @@ async fn prepare_test_delay_match_context() -> (HashSet<String>, HashSet<String>
         })
         .unwrap_or_default();
 
-    (group_names, before_connection_ids)
+    TestDelayMatchContext {
+        group_names,
+        proxy_names,
+        before_connection_ids,
+    }
 }
 
-async fn match_test_delay_group(
-    group_names: &HashSet<String>,
-    before_connection_ids: &HashSet<String>,
+async fn match_test_delay_proxy(
+    context: &TestDelayMatchContext,
     test_host: Option<&str>,
     test_port: Option<u16>,
 ) -> Option<String> {
-    if group_names.is_empty() {
-        return None;
-    }
-
     let connections = clash_api::get_connections().await.ok()?.connections;
 
     connections
         .into_iter()
-        .filter(|connection| !before_connection_ids.contains(&connection.id))
+        .filter(|connection| !context.before_connection_ids.contains(&connection.id))
         .filter(|connection| connection_matches_test_url(connection, test_host, test_port))
-        .filter_map(|connection| {
-            connection
-                .chains
-                .into_iter()
-                .find(|chain| group_names.contains(chain))
-        })
-        .next()
+        .find_map(|connection| select_outbound_proxy(&connection.chains, context))
+}
+
+fn select_outbound_proxy(chains: &[String], context: &TestDelayMatchContext) -> Option<String> {
+    for chain in chains.iter().rev().map(|chain| chain.trim()) {
+        if chain.is_empty() {
+            continue;
+        }
+
+        if is_builtin_outbound(chain) {
+            return Some(chain.to_string());
+        }
+
+        if context.proxy_names.contains(chain) && !context.group_names.contains(chain) {
+            return Some(chain.to_string());
+        }
+    }
+
+    chains
+        .iter()
+        .rev()
+        .map(|chain| chain.trim())
+        .find(|chain| !chain.is_empty() && !context.group_names.contains(*chain))
+        .map(ToString::to_string)
+}
+
+fn is_builtin_outbound(name: &str) -> bool {
+    name.eq_ignore_ascii_case("DIRECT") || name.eq_ignore_ascii_case("REJECT")
 }
 
 fn connection_matches_test_url(
