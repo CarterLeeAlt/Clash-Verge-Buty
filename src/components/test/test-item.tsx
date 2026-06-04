@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { useLockFn } from "ahooks";
 import { useTranslation } from "react-i18next";
 import { useSortable } from "@dnd-kit/sortable";
@@ -36,16 +37,20 @@ export const TestItem = (props: Props) => {
   const [anchorEl, setAnchorEl] = useState<any>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
   const [delay, setDelay] = useState(-1);
-  const [group, setGroup] = useState<string>();
+  const [proxy, setProxy] = useState<string>();
+  const [isProxyOverflowing, setIsProxyOverflowing] = useState(false);
+  const [proxyScrollDistance, setProxyScrollDistance] = useState(0);
+  const proxyContainerRef = useRef<HTMLSpanElement>(null);
+  const proxyTextRef = useRef<HTMLSpanElement>(null);
   const [iconLoadFailed, setIconLoadFailed] = useState(false);
   const { uid, name, icon, url } = itemData;
 
   const onDelay = useCallback(async () => {
     setDelay(-2);
-    setGroup(undefined);
+    setProxy(undefined);
     const result = await cmdTestDelay(url);
     setDelay(result.delay);
-    setGroup(result.group);
+    setProxy(result.proxy);
   }, [url]);
 
   const onEditTest = () => {
@@ -66,6 +71,34 @@ export const TestItem = (props: Props) => {
     { label: "Edit", handler: onEditTest },
     { label: "Delete", handler: onDelete },
   ];
+
+  useEffect(() => {
+    const proxyContainer = proxyContainerRef.current;
+    const proxyText = proxyTextRef.current;
+
+    if (!proxyContainer || !proxyText) {
+      setIsProxyOverflowing(false);
+      return;
+    }
+
+    const updateOverflow = () => {
+      const scrollDistance = proxyText.scrollWidth - proxyContainer.clientWidth;
+      setIsProxyOverflowing(scrollDistance > 0);
+      setProxyScrollDistance(Math.max(scrollDistance, 0));
+    };
+
+    updateOverflow();
+
+    const resizeObserver = new ResizeObserver(updateOverflow);
+    resizeObserver.observe(proxyContainer);
+    resizeObserver.observe(proxyText);
+    window.addEventListener("resize", updateOverflow);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateOverflow);
+    };
+  }, [proxy, delay]);
 
   useEffect(() => {
     let disposed = false;
@@ -196,7 +229,22 @@ export const TestItem = (props: Props) => {
                 },
               })}
             >
-              {`${delayManager.formatDelay(delay)} | ${group || t("Unknown")}`}
+              <DelayText>{delayManager.formatDelay(delay)}</DelayText>
+              <DelaySeparator>|</DelaySeparator>
+              <ProxyName ref={proxyContainerRef}>
+                <ProxyNameText
+                  ref={proxyTextRef}
+                  className={isProxyOverflowing ? "scrolling" : undefined}
+                  style={
+                    {
+                      "--proxy-scroll-distance": `-${proxyScrollDistance}px`,
+                    } as CSSProperties
+                  }
+                  title={proxy || t("Unknown")}
+                >
+                  {proxy || t("Unknown")}
+                </ProxyNameText>
+              </ProxyName>
             </Widget>
           )}
         </Box>
@@ -234,4 +282,45 @@ const Widget = styled(Box)(({ theme: { typography } }) => ({
   fontSize: 14,
   fontFamily: typography.fontFamily,
   borderRadius: "4px",
+  maxWidth: "100%",
+  boxSizing: "border-box",
+  "&.the-delay": {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 0,
+  },
 }));
+
+const DelayText = styled("span")({
+  flex: "0 0 auto",
+  whiteSpace: "nowrap",
+});
+
+const DelaySeparator = styled("span")({
+  flex: "0 0 auto",
+  margin: "0 4px",
+});
+
+const ProxyName = styled("span")({
+  flex: "1 1 auto",
+  minWidth: 0,
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+});
+
+const ProxyNameText = styled("span")({
+  display: "inline-block",
+  whiteSpace: "nowrap",
+  "&.scrolling": {
+    animation: "proxy-name-scroll 8s linear infinite",
+  },
+  "@keyframes proxy-name-scroll": {
+    "0%, 15%": {
+      transform: "translateX(0)",
+    },
+    "85%, 100%": {
+      transform: "translateX(var(--proxy-scroll-distance))",
+    },
+  },
+});

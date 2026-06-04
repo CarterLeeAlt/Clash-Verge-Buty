@@ -281,7 +281,7 @@ pub async fn test_delay(url: String) -> CmdResult<feat::TestDelayResult> {
         .await
         .unwrap_or(feat::TestDelayResult {
             delay: 10000u32,
-            group: None,
+            proxy: None,
         }))
 }
 
