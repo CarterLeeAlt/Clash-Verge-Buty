@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 export type NoticeType = "success" | "error" | "info";
 
 export const DEFAULT_NOTICE_DURATION = 2000;
+const MAX_NOTICES = 3;
 
 export interface NoticeItem {
   id: number;
@@ -79,16 +80,25 @@ export const showNotice = ((options: ShowNoticeOptions) => {
     hideNotice(id);
   }, duration);
 
-  notices = [
-    ...notices,
-    {
-      id,
-      type,
-      message: options.message,
-      duration,
-      timerId,
-    },
-  ];
+  const notice: NoticeItem = {
+    id,
+    type,
+    message: options.message,
+    duration,
+    timerId,
+  };
+  const nextNotices = [...notices, notice];
+
+  if (nextNotices.length > MAX_NOTICES) {
+    const overflowCount = nextNotices.length - MAX_NOTICES;
+    const removed = nextNotices.slice(0, overflowCount);
+
+    removed.forEach((item) => {
+      clearTimeout(item.timerId);
+    });
+  }
+
+  notices = nextNotices.slice(-MAX_NOTICES);
   notifySubscribers();
 
   return id;
