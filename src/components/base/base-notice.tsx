@@ -32,7 +32,7 @@ export const NoticeManager = () => {
     <Box
       sx={{
         position: "fixed",
-        top: "88px",
+        top: "60px",
         right: "20px",
         zIndex: 1500,
         display: "flex",
@@ -52,6 +52,13 @@ export const NoticeManager = () => {
             width: "100%",
             pointerEvents: "auto",
             wordBreak: "break-word",
+            color: "#fff",
+            "& .MuiAlert-icon": {
+              color: "#fff",
+            },
+            "& .MuiAlert-action": {
+              color: "#fff",
+            },
           }}
           action={
             <IconButton
