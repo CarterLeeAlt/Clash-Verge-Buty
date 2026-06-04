@@ -113,10 +113,17 @@ export const ProxyGroups = (props: Props) => {
     const providers = new Set(proxies.map((p) => p!.provider!).filter(Boolean));
 
     if (providers.size) {
+      const providerNames = proxies
+        .filter((p) => p!.provider)
+        .map((p) => p!.name);
+
+      delayManager.setGroupPending(providerNames, groupName, task);
+
       Promise.allSettled(
         [...providers].map((p) => providerHealthCheck(p))
       ).then(() => {
         if (delayManager.isCurrentGroupCheck(groupName, task)) {
+          delayManager.clearGroupDelay(providerNames, groupName, task);
           onProxies();
         }
       });

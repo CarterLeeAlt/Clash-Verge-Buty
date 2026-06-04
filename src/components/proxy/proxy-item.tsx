@@ -59,14 +59,14 @@ export const ProxyItem = (props: Props) => {
     delayManager.setListener(proxy.name, groupName, setDelay);
 
     return () => {
-      delayManager.removeListener(proxy.name, groupName);
+      delayManager.removeListener(proxy.name, groupName, setDelay);
     };
   }, [proxy.name, groupName]);
 
   useEffect(() => {
     if (!proxy) return;
     setDelay(delayManager.getDelayFix(proxy, groupName));
-  }, [proxy]);
+  }, [proxy, groupName]);
 
   const onDelay = useLockFn(async () => {
     setDelay(-2);
