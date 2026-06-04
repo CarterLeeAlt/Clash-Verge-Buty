@@ -3,13 +3,19 @@ import { useEffect, useMemo } from "react";
 import { useLockFn } from "ahooks";
 import { useTranslation } from "react-i18next";
 import { RestartAlt } from "@mui/icons-material";
+import LockRounded from "@mui/icons-material/LockRounded";
+import LockOpenRounded from "@mui/icons-material/LockOpenRounded";
 import { Box, Button, ButtonGroup, IconButton, Tooltip } from "@mui/material";
 import {
   closeAllConnections,
   getClashConfig,
   updateConfigs,
 } from "@/services/api";
-import { patchClashConfig, restartSidecar } from "@/services/cmds";
+import {
+  patchClashConfig,
+  restartSidecar,
+  setWindowSizeLocked,
+} from "@/services/cmds";
 import { useVerge } from "@/hooks/use-verge";
 import { BasePage, Notice } from "@/components/base";
 import { ProxyGroups } from "@/components/proxy/proxy-groups";
@@ -23,7 +29,9 @@ const ProxyPage = () => {
     getClashConfig
   );
 
-  const { verge } = useVerge();
+  const { verge, mutateVerge } = useVerge();
+
+  const isSizeLocked = verge?.window_size_locked ?? false;
 
   const modeList = useMemo(() => {
     if (verge?.clash_core?.includes("clash-meta")) {
@@ -53,6 +61,15 @@ const ProxyPage = () => {
     }
   });
 
+  const onToggleSizeLocked = useLockFn(async () => {
+    try {
+      await setWindowSizeLocked(!isSizeLocked);
+      await mutateVerge();
+    } catch (err: any) {
+      Notice.error(err?.message || err.toString());
+    }
+  });
+
   useEffect(() => {
     if (curMode && !modeList.includes(curMode)) {
       onChangeMode("rule");
@@ -68,24 +85,50 @@ const ProxyPage = () => {
         <Box display="flex" alignItems="center" gap={1}>
           <ProviderButton />
 
-          <Tooltip title={t("Restart")}>
-            <IconButton size="small" color="inherit" onClick={onRestartCore}>
-              <RestartAlt fontSize="small" />
-            </IconButton>
-          </Tooltip>
-
-          <ButtonGroup size="small">
-            {modeList.map((mode) => (
-              <Button
-                key={mode}
-                variant={mode === curMode ? "contained" : "outlined"}
-                onClick={() => onChangeMode(mode)}
-                sx={{ textTransform: "capitalize" }}
+          <Box display="flex" alignItems="center" gap={1}>
+            <Tooltip
+              title={
+                isSizeLocked ? t("Unlock Window Size") : t("Lock Window Size")
+              }
+            >
+              <IconButton
+                size="small"
+                color="inherit"
+                onClick={onToggleSizeLocked}
               >
-                {t(mode)}
-              </Button>
-            ))}
-          </ButtonGroup>
+                {isSizeLocked ? (
+                  <LockRounded
+                    fontSize="small"
+                    sx={{ color: "error.main", display: "block" }}
+                  />
+                ) : (
+                  <LockOpenRounded
+                    fontSize="small"
+                    sx={{ color: "text.secondary", display: "block" }}
+                  />
+                )}
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title={t("Restart")}>
+              <IconButton size="small" color="inherit" onClick={onRestartCore} sx={{ mr: 1.1 }}>
+                <RestartAlt fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
+            <ButtonGroup size="small">
+              {modeList.map((mode) => (
+                <Button
+                  key={mode}
+                  variant={mode === curMode ? "contained" : "outlined"}
+                  onClick={() => onChangeMode(mode)}
+                  sx={{ textTransform: "capitalize" }}
+                >
+                  {t(mode)}
+                </Button>
+              ))}
+            </ButtonGroup>
+          </Box>
         </Box>
       }
     >

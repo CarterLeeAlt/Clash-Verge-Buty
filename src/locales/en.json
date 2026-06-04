@@ -128,6 +128,8 @@
   "Runtime Config": "Runtime Config",
   "ReadOnly": "ReadOnly",
   "Restart": "Restart",
+  "Lock Window Size": "Lock Window Size",
+  "Unlock Window Size": "Unlock Window Size",
   "Upgrade": "Upgrade",
 
   "Back": "Back",
