@@ -38,6 +38,48 @@ pub async fn patch_configs(config: &Mapping) -> Result<()> {
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
+pub struct ProxyItemRes {
+    pub name: String,
+    #[serde(default)]
+    pub all: Option<Vec<String>>,
+}
+
+#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+pub struct ProxiesRes {
+    #[serde(default)]
+    pub proxies: HashMap<String, ProxyItemRes>,
+}
+
+#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+pub struct ConnectionMetadataRes {
+    #[serde(default)]
+    pub network: String,
+    #[serde(default)]
+    pub host: String,
+    #[serde(default, rename = "destinationIP")]
+    pub destination_ip: Option<String>,
+    #[serde(default, rename = "destinationPort")]
+    pub destination_port: String,
+}
+
+#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+pub struct ConnectionItemRes {
+    pub id: String,
+    #[serde(default)]
+    pub metadata: ConnectionMetadataRes,
+    #[serde(default)]
+    pub start: String,
+    #[serde(default)]
+    pub chains: Vec<String>,
+}
+
+#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+pub struct ConnectionsRes {
+    #[serde(default)]
+    pub connections: Vec<ConnectionItemRes>,
+}
+
+#[derive(Default, Debug, Clone, Deserialize, Serialize)]
 pub struct DelayRes {
     delay: u64,
 }
@@ -73,6 +115,28 @@ pub async fn get_proxy_delay(
     let response = builder.send().await?;
 
     Ok(response.json::<DelayRes>().await?)
+}
+
+/// GET /proxies
+pub async fn get_proxies() -> Result<ProxiesRes> {
+    let (url, headers) = clash_client_info()?;
+    let url = format!("{url}/proxies");
+
+    let client = reqwest::ClientBuilder::new().no_proxy().build()?;
+    let response = client.get(&url).headers(headers).send().await?;
+
+    Ok(response.json::<ProxiesRes>().await?)
+}
+
+/// GET /connections
+pub async fn get_connections() -> Result<ConnectionsRes> {
+    let (url, headers) = clash_client_info()?;
+    let url = format!("{url}/connections");
+
+    let client = reqwest::ClientBuilder::new().no_proxy().build()?;
+    let response = client.get(&url).headers(headers).send().await?;
+
+    Ok(response.json::<ConnectionsRes>().await?)
 }
 
 /// 根据clash info获取clash服务地址和请求头

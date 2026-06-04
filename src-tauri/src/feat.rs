@@ -9,7 +9,9 @@ use crate::core::*;
 use crate::log_err;
 use crate::utils::resolve;
 use anyhow::{bail, Result};
+use serde::Serialize;
 use serde_yaml::{Mapping, Value};
+use std::collections::HashSet;
 use tauri::{AppHandle, ClipboardManager, Manager};
 
 // 打开面板
@@ -397,8 +399,26 @@ pub fn copy_clash_env(app_handle: &AppHandle) {
     };
 }
 
-pub async fn test_delay(url: String) -> Result<u32> {
-    use tokio::time::{Duration, Instant};
+#[derive(Default, Debug, Clone, Serialize)]
+pub struct TestDelayResult {
+    pub delay: u32,
+    pub group: Option<String>,
+}
+
+pub async fn test_delay(url: String) -> Result<TestDelayResult> {
+    use tokio::time::{sleep, Duration, Instant};
+
+    let test_url = reqwest::Url::parse(&url).ok();
+    let test_host = test_url
+        .as_ref()
+        .and_then(|url| url.host_str())
+        .map(|host| host.to_string());
+    let test_port = test_url
+        .as_ref()
+        .and_then(|url| url.port_or_known_default());
+
+    let (group_names, before_connection_ids) = prepare_test_delay_match_context().await;
+
     let mut builder = reqwest::ClientBuilder::new().use_rustls_tls().no_proxy();
 
     let port = Config::verge()
@@ -425,13 +445,127 @@ pub async fn test_delay(url: String) -> Result<u32> {
         .timeout(Duration::from_millis(10000))
         .build()?
         .get(url).header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0");
-    let start = Instant::now();
 
-    let response = request.send().await?;
-    if response.status().is_success() {
-        let delay = start.elapsed().as_millis() as u32;
-        Ok(delay)
-    } else {
-        Ok(10000u32)
+    let start = Instant::now();
+    let mut request = Box::pin(request.send());
+    let mut matched_group = None;
+
+    loop {
+        tokio::select! {
+            response = &mut request => {
+                let delay = match response {
+                    Ok(response) if response.status().is_success() => start.elapsed().as_millis() as u32,
+                    Ok(_) => 10000u32,
+                    Err(err) => return Err(err.into()),
+                };
+
+                if matched_group.is_none() {
+                    matched_group = match_test_delay_group(
+                        &group_names,
+                        &before_connection_ids,
+                        test_host.as_deref(),
+                        test_port,
+                    ).await;
+                }
+
+                return Ok(TestDelayResult {
+                    delay,
+                    group: matched_group,
+                });
+            }
+            _ = sleep(Duration::from_millis(100)), if matched_group.is_none() => {
+                matched_group = match_test_delay_group(
+                    &group_names,
+                    &before_connection_ids,
+                    test_host.as_deref(),
+                    test_port,
+                ).await;
+            }
+        }
     }
+}
+
+async fn prepare_test_delay_match_context() -> (HashSet<String>, HashSet<String>) {
+    let group_names = clash_api::get_proxies()
+        .await
+        .map(|res| {
+            res.proxies
+                .into_iter()
+                .filter_map(|(name, proxy)| {
+                    if name != "GLOBAL" && proxy.all.as_ref().is_some_and(|all| !all.is_empty()) {
+                        Some(name)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<HashSet<_>>()
+        })
+        .unwrap_or_default();
+
+    let before_connection_ids = clash_api::get_connections()
+        .await
+        .map(|res| {
+            res.connections
+                .into_iter()
+                .map(|connection| connection.id)
+                .collect::<HashSet<_>>()
+        })
+        .unwrap_or_default();
+
+    (group_names, before_connection_ids)
+}
+
+async fn match_test_delay_group(
+    group_names: &HashSet<String>,
+    before_connection_ids: &HashSet<String>,
+    test_host: Option<&str>,
+    test_port: Option<u16>,
+) -> Option<String> {
+    if group_names.is_empty() {
+        return None;
+    }
+
+    let connections = clash_api::get_connections().await.ok()?.connections;
+
+    connections
+        .into_iter()
+        .filter(|connection| !before_connection_ids.contains(&connection.id))
+        .filter(|connection| connection_matches_test_url(connection, test_host, test_port))
+        .filter_map(|connection| {
+            connection
+                .chains
+                .into_iter()
+                .find(|chain| group_names.contains(chain))
+        })
+        .next()
+}
+
+fn connection_matches_test_url(
+    connection: &clash_api::ConnectionItemRes,
+    test_host: Option<&str>,
+    test_port: Option<u16>,
+) -> bool {
+    let metadata = &connection.metadata;
+
+    let host_matches = match test_host {
+        Some(host) => {
+            metadata.host.eq_ignore_ascii_case(host)
+                || metadata
+                    .host
+                    .to_ascii_lowercase()
+                    .contains(&host.to_ascii_lowercase())
+        }
+        None => true,
+    };
+
+    let port_matches = match test_port {
+        Some(port) => metadata
+            .destination_port
+            .parse::<u16>()
+            .map(|destination_port| destination_port == port)
+            .unwrap_or(true),
+        None => true,
+    };
+
+    host_matches && port_matches
 }
