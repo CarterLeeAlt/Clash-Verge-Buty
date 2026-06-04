@@ -180,7 +180,7 @@ export async function cmdGetProxyDelay(
 
 export interface ITestDelayResult {
   delay: number;
-  group?: string;
+  proxy?: string;
 }
 
 export async function cmdTestDelay(url: string) {
