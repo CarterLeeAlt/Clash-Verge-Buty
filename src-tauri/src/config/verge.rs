@@ -118,9 +118,13 @@ pub struct IVerge {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window_size_position: Option<Vec<f64>>,
 
-    /// window size and position
+    /// window maximized state
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window_is_maximized: Option<bool>,
+
+    /// window size lock state
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub window_size_locked: Option<bool>,
 
     /// 是否启用随机端口
     pub enable_random_port: Option<bool>,
@@ -282,6 +286,7 @@ impl IVerge {
         patch!(auto_log_clean);
         patch!(window_size_position);
         patch!(window_is_maximized);
+        patch!(window_size_locked);
     }
 
     /// 在初始化前尝试拿到单例端口的值
