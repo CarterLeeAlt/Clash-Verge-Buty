@@ -1,125 +1,71 @@
-import { createRoot } from "react-dom/client";
-import { ReactNode, useState, useEffect } from "react";
-import { Box, IconButton, Slide, Snackbar, Typography } from "@mui/material";
-import { Close, CheckCircleRounded, ErrorRounded } from "@mui/icons-material";
-import { useVerge } from "@/hooks/use-verge";
-import { appWindow } from "@tauri-apps/api/window";
-interface InnerProps {
-  type: string;
-  duration?: number;
-  message: ReactNode;
-  isDark?: boolean;
-  onClose: () => void;
-}
+import { useEffect, useSyncExternalStore } from "react";
+import { Alert, Box, IconButton } from "@mui/material";
+import { CloseRounded } from "@mui/icons-material";
+import {
+  clearNotices,
+  getSnapshotNotices,
+  hideNotice,
+  subscribeNotices,
+} from "@/services/notice-service";
 
-const NoticeInner = (props: InnerProps) => {
-  const { type, message, onClose } = props;
-  const duration = 2000;
-  const [visible, setVisible] = useState(true);
-  const [isDark, setIsDark] = useState(false);
-  const { verge } = useVerge();
-  const { theme_mode } = verge ?? {};
-  const onBtnClose = () => {
-    setVisible(false);
-    onClose();
-  };
-  const onAutoClose = (_e: any, reason: string) => {
-    if (reason !== "clickaway") onBtnClose();
-  };
+export {
+  DEFAULT_NOTICE_DURATION,
+  hideNotice,
+  Notice,
+} from "@/services/notice-service";
+export type { NoticeItem, NoticeType } from "@/services/notice-service";
+
+export const NoticeManager = () => {
+  const currentNotices = useSyncExternalStore(
+    subscribeNotices,
+    getSnapshotNotices,
+    getSnapshotNotices
+  );
 
   useEffect(() => {
-    const themeMode = ["light", "dark", "system"].includes(theme_mode!)
-      ? theme_mode!
-      : "light";
-
-    if (themeMode !== "system") {
-      setIsDark(themeMode === "dark");
-      return;
-    }
-
-    appWindow.theme().then((m) => m && setIsDark(m === "dark"));
-    const unlisten = appWindow.onThemeChanged((e) =>
-      setIsDark(e.payload === "dark")
-    );
-
     return () => {
-      unlisten.then((fn) => fn());
+      clearNotices();
     };
-  }, [theme_mode]);
-
-  const msgElement =
-    type === "info" ? (
-      message
-    ) : (
-      <Box sx={{ width: 328, display: "flex", alignItems: "center" }}>
-        {type === "error" && <ErrorRounded color="error" />}
-        {type === "success" && <CheckCircleRounded color="success" />}
-
-        <Typography
-          component="span"
-          sx={{ ml: 1, wordWrap: "break-word", width: "calc(100% - 35px)" }}
-        >
-          {message}
-        </Typography>
-      </Box>
-    );
+  }, []);
 
   return (
-    <Snackbar
-      open={visible}
-      anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      autoHideDuration={duration}
-      onClose={onAutoClose}
-      message={msgElement}
+    <Box
       sx={{
-        maxWidth: 360,
-        ".MuiSnackbarContent-root": {
-          bgcolor: isDark ? "#50515C" : "#ffffff",
-          color: isDark ? "#ffffff" : "#000000",
-        },
+        position: "fixed",
+        top: "88px",
+        right: "20px",
+        zIndex: 1500,
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px",
+        width: "360px",
+        maxWidth: "calc(100vw - 40px)",
+        pointerEvents: "none",
       }}
-      TransitionComponent={(p) => <Slide {...p} direction="left" />}
-      transitionDuration={200}
-      action={
-        <IconButton size="small" color="inherit" onClick={onBtnClose}>
-          <Close fontSize="inherit" />
-        </IconButton>
-      }
-    />
+    >
+      {currentNotices.map((notice) => (
+        <Alert
+          key={notice.id}
+          severity={notice.type}
+          variant="filled"
+          sx={{
+            width: "100%",
+            pointerEvents: "auto",
+            wordBreak: "break-word",
+          }}
+          action={
+            <IconButton
+              size="small"
+              color="inherit"
+              onClick={() => hideNotice(notice.id)}
+            >
+              <CloseRounded fontSize="inherit" />
+            </IconButton>
+          }
+        >
+          {notice.message}
+        </Alert>
+      ))}
+    </Box>
   );
 };
-
-interface NoticeInstance {
-  (props: Omit<InnerProps, "onClose">): void;
-
-  info(message: ReactNode, duration?: number, isDark?: boolean): void;
-  error(message: ReactNode, duration?: number, isDark?: boolean): void;
-  success(message: ReactNode, duration?: number, isDark?: boolean): void;
-}
-
-let parent: HTMLDivElement = null!;
-
-// @ts-ignore
-export const Notice: NoticeInstance = (props) => {
-  if (!parent) {
-    parent = document.createElement("div");
-    document.body.appendChild(parent);
-  }
-
-  const container = document.createElement("div");
-  parent.appendChild(container);
-  const root = createRoot(container);
-
-  const onUnmount = () => {
-    root.unmount();
-    if (parent) setTimeout(() => parent.removeChild(container), 500);
-  };
-
-  root.render(<NoticeInner {...props} onClose={onUnmount} />);
-};
-
-(["info", "error", "success"] as const).forEach((type) => {
-  Notice[type] = (message) => {
-    setTimeout(() => Notice({ type, message, duration: 2000 }), 0);
-  };
-});
