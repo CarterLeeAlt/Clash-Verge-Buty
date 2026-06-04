@@ -85,48 +85,50 @@ const ProxyPage = () => {
         <Box display="flex" alignItems="center" gap={1}>
           <ProviderButton />
 
-          <Tooltip
-            title={
-              isSizeLocked ? t("Unlock Window Size") : t("Lock Window Size")
-            }
-          >
-            <IconButton
-              size="small"
-              color="inherit"
-              onClick={onToggleSizeLocked}
+          <Box display="flex" alignItems="center" gap={1}>
+            <Tooltip
+              title={
+                isSizeLocked ? t("Unlock Window Size") : t("Lock Window Size")
+              }
             >
-              {isSizeLocked ? (
-                <LockRounded
-                  fontSize="small"
-                  sx={{ color: "error.main", display: "block" }}
-                />
-              ) : (
-                <LockOpenRounded
-                  fontSize="small"
-                  sx={{ color: "text.secondary", display: "block" }}
-                />
-              )}
-            </IconButton>
-          </Tooltip>
-
-          <Tooltip title={t("Restart")}>
-            <IconButton size="small" color="inherit" onClick={onRestartCore}>
-              <RestartAlt fontSize="small" />
-            </IconButton>
-          </Tooltip>
-
-          <ButtonGroup size="small">
-            {modeList.map((mode) => (
-              <Button
-                key={mode}
-                variant={mode === curMode ? "contained" : "outlined"}
-                onClick={() => onChangeMode(mode)}
-                sx={{ textTransform: "capitalize" }}
+              <IconButton
+                size="small"
+                color="inherit"
+                onClick={onToggleSizeLocked}
               >
-                {t(mode)}
-              </Button>
-            ))}
-          </ButtonGroup>
+                {isSizeLocked ? (
+                  <LockRounded
+                    fontSize="small"
+                    sx={{ color: "error.main", display: "block" }}
+                  />
+                ) : (
+                  <LockOpenRounded
+                    fontSize="small"
+                    sx={{ color: "text.secondary", display: "block" }}
+                  />
+                )}
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title={t("Restart")}>
+              <IconButton size="small" color="inherit" onClick={onRestartCore}>
+                <RestartAlt fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
+            <ButtonGroup size="small">
+              {modeList.map((mode) => (
+                <Button
+                  key={mode}
+                  variant={mode === curMode ? "contained" : "outlined"}
+                  onClick={() => onChangeMode(mode)}
+                  sx={{ textTransform: "capitalize" }}
+                >
+                  {t(mode)}
+                </Button>
+              ))}
+            </ButtonGroup>
+          </Box>
         </Box>
       }
     >
