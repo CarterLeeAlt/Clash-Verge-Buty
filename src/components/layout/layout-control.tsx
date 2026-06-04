@@ -10,6 +10,8 @@ import {
   PushPinOutlined,
   PushPinRounded,
 } from "@mui/icons-material";
+import LockRounded from "@mui/icons-material/LockRounded";
+import LockOpenRounded from "@mui/icons-material/LockOpenRounded";
 import { useEffect, useState } from "react";
 import { Notice } from "@/components/base";
 import { setWindowSizeLocked } from "@/services/cmds";
@@ -89,18 +91,17 @@ export const LayoutControl = ({
         },
       }}
     >
-      <Button
-        size="small"
-        sx={{
-          ...controlButtonSx,
-          color: isSizeLocked ? "error.main" : "text.secondary",
-        }}
-        onClick={onToggleSizeLocked}
-      >
+      <Button size="small" sx={controlButtonSx} onClick={onToggleSizeLocked}>
         {isSizeLocked ? (
-          <LockRounded fontSize="small" />
+          <LockRounded
+            fontSize="small"
+            sx={{ color: "error.main", display: "block" }}
+          />
         ) : (
-          <LockOpenRounded fontSize="small" />
+          <LockOpenRounded
+            fontSize="small"
+            sx={{ color: "text.secondary", display: "block" }}
+          />
         )}
       </Button>
 
