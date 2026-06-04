@@ -1113,6 +1113,11 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
     .fullscreen(false)
     .min_inner_size(600.0, 520.0);
 
+    let window_size_locked = Config::verge().latest().window_size_locked.unwrap_or(false);
+    builder = builder
+        .resizable(!window_size_locked)
+        .maximizable(!window_size_locked);
+
     match Config::verge().latest().window_size_position.clone() {
         Some(size_pos) if size_pos.len() == 4 => {
             let size = (size_pos[0], size_pos[1]);
@@ -1192,10 +1197,16 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
     match window {
         Ok(win) => {
             MAIN_WINDOW_STATE.store(MAIN_WINDOW_STATE_ALIVE, Ordering::SeqCst);
-            let is_maximized = Config::verge()
-                .latest()
-                .window_is_maximized
-                .unwrap_or(false);
+            trace_err!(win.set_resizable(!window_size_locked), "set win resizable");
+            trace_err!(
+                win.set_maximizable(!window_size_locked),
+                "set win maximizable"
+            );
+            let is_maximized = !window_size_locked
+                && Config::verge()
+                    .latest()
+                    .window_is_maximized
+                    .unwrap_or(false);
             log::trace!("try to calculate the monitor size");
             let center = (|| -> Result<bool> {
                 let mut center = false;
