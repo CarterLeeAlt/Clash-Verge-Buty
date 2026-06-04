@@ -78,7 +78,7 @@ export const TrafficGraph = forwardRef<TrafficRef>((props, ref) => {
 
     const { primary, secondary, divider } = palette;
     const refLineColor = divider || "rgba(0, 0, 0, 0.12)";
-    const upLineColor = secondary.main || "#9c27b0";
+    const upLineColor = secondary.main || "#ffac47";
     const downLineColor = primary.main || "#5b5c9d";
 
     const width = canvas.width;
