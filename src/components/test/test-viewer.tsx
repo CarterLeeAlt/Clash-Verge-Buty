@@ -44,10 +44,20 @@ export const TestViewer = forwardRef<TestViewerRef, Props>((props, ref) => {
 
   useImperativeHandle(ref, () => ({
     create: () => {
+      formIns.reset({
+        name: "",
+        icon: "",
+        url: "",
+        builtIn: false,
+      });
       setOpenType("new");
       setOpen(true);
     },
     edit: (item) => {
+      if (item?.builtIn) {
+        return;
+      }
+
       if (item) {
         Object.entries(item).forEach(([key, value]) => {
           formIns.setValue(key as any, value);
@@ -64,12 +74,12 @@ export const TestViewer = forwardRef<TestViewerRef, Props>((props, ref) => {
       try {
         if (!form.name) throw new Error("`Name` should not be null");
         if (!form.url) throw new Error("`Url` should not be null");
-        let newList;
-        let uid;
+        let newList: IVergeTestItem[];
+        let uid: string;
 
         if (openType === "new") {
           uid = nanoid();
-          const item = { ...form, uid };
+          const item = { ...form, uid, builtIn: false };
           newList = [...testList, item];
           await patchVerge({ test_list: newList });
           props.onChange(uid);
@@ -77,8 +87,14 @@ export const TestViewer = forwardRef<TestViewerRef, Props>((props, ref) => {
           if (!form.uid) throw new Error("UID not found");
           uid = form.uid;
 
-          await patchTestList(uid, form);
-          props.onChange(uid, form);
+          const target = testList.find((x) => x.uid === uid);
+          if (target?.builtIn || form.builtIn) {
+            throw new Error("Built-in test items cannot be edited");
+          }
+
+          const patch = { ...form, builtIn: false };
+          await patchTestList(uid, patch);
+          props.onChange(uid, patch);
         }
         setOpen(false);
         setLoading(false);

@@ -195,6 +195,7 @@ interface IVergeTestItem {
   name?: string;
   icon?: string;
   url: string;
+  builtIn?: boolean;
 }
 
 interface IVergeConfig {
