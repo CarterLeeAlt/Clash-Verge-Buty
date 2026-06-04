@@ -62,6 +62,7 @@ fn main() -> std::io::Result<()> {
             cmds::frontend_heartbeat,
             cmds::report_frontend_error,
             cmds::get_window_style_config,
+            cmds::set_window_size_locked,
             // cmds::update_hotkeys,
             // profile
             cmds::get_profiles,
