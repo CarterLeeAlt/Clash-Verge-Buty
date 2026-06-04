@@ -247,6 +247,9 @@ interface IVergeConfig {
   auto_log_clean?: 0 | 1 | 2 | 3;
   proxy_layout_column?: number;
   test_list?: IVergeTestItem[];
+  window_size_position?: number[];
+  window_is_maximized?: boolean;
+  window_size_locked?: boolean;
 }
 
 type IClashConfigValue = any;
