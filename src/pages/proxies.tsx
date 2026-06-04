@@ -111,7 +111,7 @@ const ProxyPage = () => {
             </Tooltip>
 
             <Tooltip title={t("Restart")}>
-              <IconButton size="small" color="inherit" onClick={onRestartCore} sx={{ mr: 1 }}>
+              <IconButton size="small" color="inherit" onClick={onRestartCore} sx={{ mr: 1.1 }}>
                 <RestartAlt fontSize="small" />
               </IconButton>
             </Tooltip>
