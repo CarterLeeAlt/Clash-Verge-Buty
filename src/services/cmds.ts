@@ -119,6 +119,10 @@ export async function patchVergeConfig(payload: IVergeConfig) {
   return invoke<void>("patch_verge_config", { payload });
 }
 
+export async function setWindowSizeLocked(locked: boolean) {
+  return invoke<void>("set_window_size_locked", { locked });
+}
+
 export async function getSystemProxy() {
   return invoke<{
     enable: boolean;
