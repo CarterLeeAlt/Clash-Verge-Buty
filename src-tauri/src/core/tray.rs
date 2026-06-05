@@ -237,34 +237,29 @@ impl Tray {
         false
     }
 
-    pub fn on_left_click(app_handle: &AppHandle) {
-        let tray_event = { Config::verge().latest().tray_event.clone() };
-        let tray_event = tray_event.unwrap_or("main_window".into());
-        log::trace!("tray left click triggered, tray_event={}", tray_event);
-
-        match tray_event.as_str() {
-            "system_proxy" => feat::toggle_system_proxy(),
-            "tun_mode" => feat::toggle_tun_mode(),
-            "main_window" => {
-                if resolve::focus_main_window_if_open(app_handle, "tray main_window already open") {
-                    log::trace!(
-                        "tray main_window click used lightweight focus because main window is already open"
-                    );
-                    return;
-                }
-
-                if Tray::should_ignore_main_window_click() {
-                    return;
-                }
-
-                if resolve::is_main_window_creating() {
-                    log::warn!(target: "app", "tray main_window click recorded as pending because main window is creating");
-                }
-                log::trace!("tray main_window -> resolve::show_main_window");
-                resolve::show_main_window_after_hide_transition(app_handle.clone());
-            }
-            _ => {}
+    fn open_or_focus_main_window(app_handle: &AppHandle) {
+        if resolve::focus_main_window_if_open(app_handle, "tray main_window already open") {
+            log::trace!(
+                "tray main_window click used lightweight focus because main window is already open"
+            );
+            return;
         }
+
+        if Tray::should_ignore_main_window_click() {
+            return;
+        }
+
+        if resolve::is_main_window_creating() {
+            log::warn!(target: "app", "tray main_window click recorded as pending because main window is creating");
+        }
+
+        log::trace!("tray main_window -> resolve::show_main_window");
+        resolve::show_main_window_after_hide_transition(app_handle.clone());
+    }
+
+    pub fn on_left_click(app_handle: &AppHandle) {
+        log::trace!("tray left click triggered, action=main_window");
+        Tray::open_or_focus_main_window(app_handle);
     }
 
     pub fn on_system_tray_event(app_handle: &AppHandle, event: SystemTrayEvent) {
@@ -305,7 +300,7 @@ impl Tray {
             }
             SystemTrayEvent::DoubleClick { .. } => {
                 log::trace!("tray event received: double click");
-                Tray::on_left_click(app_handle);
+                Tray::open_or_focus_main_window(app_handle);
             }
             _ => {}
         }
