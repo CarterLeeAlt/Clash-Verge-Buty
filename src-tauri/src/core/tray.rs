@@ -205,7 +205,7 @@ impl Tray {
             "Clash-Verge-Buty {version}\n{}: {}\n{}: {}",
             t!("System Proxy", "系统代理"),
             switch_map[system_proxy],
-            t!("TUN Mode", "Tun 模式"),
+            t!("TUN Mode", "网卡模式"),
             switch_map[tun_mode]
         ));
 
