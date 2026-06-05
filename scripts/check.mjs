@@ -31,6 +31,90 @@ const SIDECAR_HOST = target
       .toString()
       .match(/(?<=host: ).+(?=\s*)/g)[0];
 
+function getHttpProxyAgent() {
+  const httpProxy =
+    process.env.HTTP_PROXY ||
+    process.env.http_proxy ||
+    process.env.HTTPS_PROXY ||
+    process.env.https_proxy;
+
+  return httpProxy ? proxyAgent(httpProxy) : undefined;
+}
+
+function readPositiveNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+async function fetchWithRetry(url, options = {}, context = {}) {
+  const {
+    retries: configuredRetries,
+    retryDelayMs: configuredRetryDelayMs,
+    timeoutMs: configuredTimeoutMs,
+    targetPath,
+    name,
+  } = context;
+  const retries = Math.max(
+    5,
+    Math.floor(
+      readPositiveNumber(
+        configuredRetries ?? process.env.VERGE_DOWNLOAD_RETRY,
+        5
+      )
+    )
+  );
+  const retryDelayMs = readPositiveNumber(
+    configuredRetryDelayMs ?? process.env.VERGE_DOWNLOAD_RETRY_DELAY_MS,
+    3000
+  );
+  const timeoutMs = readPositiveNumber(
+    configuredTimeoutMs ?? process.env.VERGE_DOWNLOAD_TIMEOUT_MS,
+    60000
+  );
+  const targetPathLog = targetPath ? ` targetPath="${targetPath}"` : "";
+  const nameLog = name ? ` name="${name}"` : "";
+  let lastError;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      console.log(
+        `[INFO]: fetching attempt ${attempt}/${retries} url="${url}" target="${SIDECAR_HOST}"${targetPathLog}${nameLog}`
+      );
+
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `request failed url="${url}" target="${SIDECAR_HOST}" status=${response.status} statusText="${response.statusText}"${targetPathLog}${nameLog}`
+        );
+      }
+
+      return response;
+    } catch (err) {
+      lastError = err;
+      console.warn(
+        `[WARN]: fetch failed attempt ${attempt}/${retries} url="${url}" target="${SIDECAR_HOST}"${targetPathLog}${nameLog} error="${err?.message || err}"`
+      );
+
+      if (attempt >= retries) break;
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, retryDelayMs * attempt)
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  throw lastError;
+}
+
 const DOWNLOAD_SOURCES = {
   mihomoAlphaVersion:
     "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt",
@@ -63,34 +147,21 @@ const META_ALPHA_MAP = {
 
 // Fetch the latest alpha release version from the version.txt file
 async function getLatestAlphaVersion() {
-  const options = {};
-
-  const httpProxy =
-    process.env.HTTP_PROXY ||
-    process.env.http_proxy ||
-    process.env.HTTPS_PROXY ||
-    process.env.https_proxy;
-
-  if (httpProxy) {
-    options.agent = proxyAgent(httpProxy);
-  }
-  try {
-    const response = await fetch(META_ALPHA_VERSION_URL, {
+  const agent = getHttpProxyAgent();
+  const options = agent ? { agent } : {};
+  const response = await fetchWithRetry(
+    META_ALPHA_VERSION_URL,
+    {
       ...options,
       method: "GET",
-    });
-    if (!response.ok) {
-      throw new Error(
-        `failed to fetch version for "clash-meta-alpha" (url="${META_ALPHA_VERSION_URL}", target="${SIDECAR_HOST}", status=${response.status} statusText="${response.statusText}")`
-      );
+    },
+    {
+      name: "clash-meta-alpha-version",
     }
-    let v = await response.text();
-    META_ALPHA_VERSION = v.trim(); // Trim to remove extra whitespaces
-    console.log(`Latest alpha version: ${META_ALPHA_VERSION}`);
-  } catch (error) {
-    console.error("Error fetching latest alpha version:", error.message);
-    process.exit(1);
-  }
+  );
+  let v = await response.text();
+  META_ALPHA_VERSION = v.trim(); // Trim to remove extra whitespaces
+  console.log(`Latest alpha version: ${META_ALPHA_VERSION}`);
 }
 
 /* ======= clash meta stable ======= */
@@ -105,34 +176,21 @@ const META_MAP = {
 
 // Fetch the latest release version from the version.txt file
 async function getLatestReleaseVersion() {
-  const options = {};
-
-  const httpProxy =
-    process.env.HTTP_PROXY ||
-    process.env.http_proxy ||
-    process.env.HTTPS_PROXY ||
-    process.env.https_proxy;
-
-  if (httpProxy) {
-    options.agent = proxyAgent(httpProxy);
-  }
-  try {
-    const response = await fetch(META_VERSION_URL, {
+  const agent = getHttpProxyAgent();
+  const options = agent ? { agent } : {};
+  const response = await fetchWithRetry(
+    META_VERSION_URL,
+    {
       ...options,
       method: "GET",
-    });
-    if (!response.ok) {
-      throw new Error(
-        `failed to fetch version for "clash-meta" (url="${META_VERSION_URL}", target="${SIDECAR_HOST}", status=${response.status} statusText="${response.statusText}")`
-      );
+    },
+    {
+      name: "clash-meta-version",
     }
-    let v = await response.text();
-    META_VERSION = v.trim(); // Trim to remove extra whitespaces
-    console.log(`Latest release version: ${META_VERSION}`);
-  } catch (error) {
-    console.error("Error fetching latest release version:", error.message);
-    process.exit(1);
-  }
+  );
+  let v = await response.text();
+  META_VERSION = v.trim(); // Trim to remove extra whitespaces
+  console.log(`Latest release version: ${META_VERSION}`);
 }
 
 /*
@@ -434,35 +492,36 @@ async function copyLocalWindowsServiceBinaries() {
  * download file and save to `path`
  */
 async function downloadFile(url, path) {
-  const options = {};
-
-  const httpProxy =
-    process.env.HTTP_PROXY ||
-    process.env.http_proxy ||
-    process.env.HTTPS_PROXY ||
-    process.env.https_proxy;
-
-  if (httpProxy) {
-    options.agent = proxyAgent(httpProxy);
-  }
+  const agent = getHttpProxyAgent();
+  const options = agent ? { agent } : {};
+  const tempPath = `${path}.download`;
 
   console.log(
     `[INFO]: downloading url="${url}" -> "${path}" target="${SIDECAR_HOST}"`
   );
-  const response = await fetch(url, {
-    ...options,
-    method: "GET",
-    headers: { "Content-Type": "application/octet-stream" },
-  });
-  if (!response.ok) {
-    throw new Error(
-      `download failed url="${url}" targetPath="${path}" target="${SIDECAR_HOST}" status=${response.status} statusText="${response.statusText}"`
-    );
-  }
-  const buffer = await response.arrayBuffer();
-  await fs.writeFile(path, new Uint8Array(buffer));
 
-  console.log(`[INFO]: download finished "${url}"`);
+  try {
+    const response = await fetchWithRetry(
+      url,
+      {
+        ...options,
+        method: "GET",
+        headers: { "Content-Type": "application/octet-stream" },
+      },
+      {
+        name: "download-file",
+        targetPath: path,
+      }
+    );
+    const buffer = await response.arrayBuffer();
+    await fs.writeFile(tempPath, new Uint8Array(buffer));
+    await fs.rename(tempPath, path);
+
+    console.log(`[INFO]: download finished "${url}"`);
+  } catch (err) {
+    await fs.remove(tempPath).catch(() => {});
+    throw err;
+  }
 }
 
 // SimpleSC.dll
