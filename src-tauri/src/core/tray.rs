@@ -246,6 +246,13 @@ impl Tray {
             "system_proxy" => feat::toggle_system_proxy(),
             "tun_mode" => feat::toggle_tun_mode(),
             "main_window" => {
+                if resolve::focus_main_window_if_open(app_handle, "tray main_window already open") {
+                    log::trace!(
+                        "tray main_window click used lightweight focus because main window is already open"
+                    );
+                    return;
+                }
+
                 if Tray::should_ignore_main_window_click() {
                     return;
                 }
@@ -298,6 +305,7 @@ impl Tray {
             }
             SystemTrayEvent::DoubleClick { .. } => {
                 log::trace!("tray event received: double click");
+                Tray::on_left_click(app_handle);
             }
             _ => {}
         }

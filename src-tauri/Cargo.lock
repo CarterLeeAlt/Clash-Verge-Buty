@@ -612,6 +612,7 @@ dependencies = [
  "parking_lot",
  "percent-encoding",
  "port_scanner",
+ "regex 1.10.3",
  "reqwest",
  "rquickjs",
  "runas",
