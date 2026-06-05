@@ -13,7 +13,6 @@ import { ArrowForward, Settings, Shuffle } from "@mui/icons-material";
 import { DialogRef, Notice, Switch } from "@/components/base";
 import { useClash } from "@/hooks/use-clash";
 import { GuardState } from "./mods/guard-state";
-import { WebUIViewer } from "./mods/web-ui-viewer";
 import { ClashPortViewer } from "./mods/clash-port-viewer";
 import { ControllerViewer } from "./mods/controller-viewer";
 import { SettingList, SettingItem } from "./mods/setting-comp";
@@ -39,7 +38,6 @@ const SettingClash = ({ onError }: Props) => {
 
   const { enable_random_port = false, verge_mixed_port } = verge ?? {};
 
-  const webRef = useRef<DialogRef>(null);
   const portRef = useRef<DialogRef>(null);
   const ctrlRef = useRef<DialogRef>(null);
   const coreRef = useRef<DialogRef>(null);
@@ -62,7 +60,6 @@ const SettingClash = ({ onError }: Props) => {
 
   return (
     <SettingList title={t("Clash Setting")}>
-      <WebUIViewer ref={webRef} />
       <ClashPortViewer ref={portRef} />
       <ControllerViewer ref={ctrlRef} />
       <ClashCoreViewer ref={coreRef} />
@@ -152,17 +149,6 @@ const SettingClash = ({ onError }: Props) => {
           size="small"
           sx={{ my: "2px" }}
           onClick={() => ctrlRef.current?.open()}
-        >
-          <ArrowForward />
-        </IconButton>
-      </SettingItem>
-
-      <SettingItem label={t("Web UI")}>
-        <IconButton
-          color="inherit"
-          size="small"
-          sx={{ my: "2px" }}
-          onClick={() => webRef.current?.open()}
         >
           <ArrowForward />
         </IconButton>
