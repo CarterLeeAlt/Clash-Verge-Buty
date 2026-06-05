@@ -793,6 +793,31 @@ fn window_needs_repair(window: &tauri::Window) -> bool {
     !visible || minimized
 }
 
+pub fn focus_main_window_if_open(app_handle: &AppHandle, context: &str) -> bool {
+    let Some(window) = app_handle.get_window("main") else {
+        return false;
+    };
+
+    let (visible, minimized, focused) = window_state(&window);
+    if !visible || minimized {
+        return false;
+    }
+
+    log::trace!(
+        "main window lightweight focus requested, context={}, visible={}, minimized={}, focused={}",
+        context,
+        visible,
+        minimized,
+        focused
+    );
+    trace_err!(window.set_focus(), "set win focus lightweight");
+
+    #[cfg(target_os = "windows")]
+    force_activate_window(&window, context);
+
+    true
+}
+
 fn record_pending_show_request(request_id: u64) {
     let mut pending = MAIN_WINDOW_SHOW_PENDING_ID.load(Ordering::SeqCst);
     while request_id > pending {
@@ -818,6 +843,9 @@ fn window_show_once_fast(window: &tauri::Window, request_id: u64, reason: ShowRe
     trace_err!(window.show(), "set win visible");
     trace_err!(window.set_focus(), "set win focus");
     ensure_main_window_onscreen(window, "fast show after show");
+
+    #[cfg(target_os = "windows")]
+    force_activate_window(window, "fast show explicit");
 }
 
 fn window_show_once_repair(window: &tauri::Window, request_id: u64, context: &str) {
@@ -1323,6 +1351,10 @@ pub async fn resolve_scheme(param: String) {
             .show()
             .map_err(|err| log::warn!("failed to show import failed notification: {err}"))
             .ok();
-        log::error!("failed to parse url: {}", url);
+        log::error!(
+            target: "app",
+            "failed to parse url: {}",
+            crate::utils::redact::redact_log_text(url)
+        );
     }
 }
