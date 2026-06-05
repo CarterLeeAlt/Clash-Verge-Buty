@@ -1,5 +1,4 @@
 import { useRef } from "react";
-import { useLockFn } from "ahooks";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/api/dialog";
 import {
@@ -10,11 +9,11 @@ import {
   Input,
   Typography,
 } from "@mui/material";
-import { exitApp, openAppDir, openCoreDir, openLogsDir } from "@/services/cmds";
+import { openAppDir, openCoreDir, openLogsDir } from "@/services/cmds";
 import { ArrowForward } from "@mui/icons-material";
 import { useVerge } from "@/hooks/use-verge";
 import { version } from "@root/package.json";
-import { DialogRef, Notice } from "@/components/base";
+import { DialogRef } from "@/components/base";
 import { SettingList, SettingItem } from "./mods/setting-comp";
 import { ThemeModeSwitch } from "./mods/theme-mode-switch";
 import { ConfigViewer } from "./mods/config-viewer";
@@ -35,14 +34,8 @@ const SettingVerge = ({ onError }: Props) => {
   const { t } = useTranslation();
 
   const { verge, patchVerge, mutateVerge } = useVerge();
-  const {
-    theme_mode,
-    language,
-    tray_event,
-    env_type,
-    startup_script,
-    start_page,
-  } = verge ?? {};
+  const { theme_mode, language, env_type, startup_script, start_page } =
+    verge ?? {};
   const configRef = useRef<DialogRef>(null);
   const hotkeyRef = useRef<DialogRef>(null);
   const miscRef = useRef<DialogRef>(null);
@@ -52,10 +45,6 @@ const SettingVerge = ({ onError }: Props) => {
   const onChangeData = (patch: Partial<IVergeConfig>) => {
     mutateVerge({ ...verge, ...patch }, false);
   };
-
-  const onCheckUpdate = useLockFn(async () => {
-    Notice.success("当前已是最新版本");
-  });
 
   return (
     <SettingList title={t("Verge Setting")}>
@@ -91,25 +80,6 @@ const SettingVerge = ({ onError }: Props) => {
           <ThemeModeSwitch />
         </GuardState>
       </SettingItem>
-
-      {OS !== "linux" && (
-        <SettingItem label={t("Tray Click Event")}>
-          <GuardState
-            value={tray_event ?? "main_window"}
-            onCatch={onError}
-            onFormat={(e: any) => e.target.value}
-            onChange={(e) => onChangeData({ tray_event: e })}
-            onGuard={(e) => patchVerge({ tray_event: e })}
-          >
-            <Select size="small" sx={{ width: 140, "> div": { py: "7.5px" } }}>
-              <MenuItem value="main_window">{t("Show Main Window")}</MenuItem>
-              <MenuItem value="system_proxy">{t("System Proxy")}</MenuItem>
-              <MenuItem value="tun_mode">{t("Tun Mode")}</MenuItem>
-              <MenuItem value="disable">{t("Disable")}</MenuItem>
-            </Select>
-          </GuardState>
-        </SettingItem>
-      )}
 
       <SettingItem label={t("Copy Env Type")}>
         <GuardState
@@ -275,30 +245,6 @@ const SettingVerge = ({ onError }: Props) => {
           size="small"
           sx={{ my: "2px" }}
           onClick={openLogsDir}
-        >
-          <ArrowForward />
-        </IconButton>
-      </SettingItem>
-
-      <SettingItem label={t("Check for Updates")}>
-        <IconButton
-          color="inherit"
-          size="small"
-          sx={{ my: "2px" }}
-          onClick={onCheckUpdate}
-        >
-          <ArrowForward />
-        </IconButton>
-      </SettingItem>
-
-      <SettingItem label={t("Exit")}>
-        <IconButton
-          color="inherit"
-          size="small"
-          sx={{ my: "2px" }}
-          onClick={() => {
-            exitApp();
-          }}
         >
           <ArrowForward />
         </IconButton>
