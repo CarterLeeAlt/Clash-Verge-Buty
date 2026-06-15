@@ -42,3 +42,17 @@ function main(params) {
   return params;
 }
 ";
+
+/// fixed global overwrite script template
+pub const ITEM_GLOBAL_SCRIPT: &str = r#"// Add custom rules before subscription rules.
+
+function main(config, profileName) {
+  const testRules = [
+    "DOMAIN-SUFFIX,baidu.com,DIRECT",
+  ];
+
+  config.rules = testRules.concat(config.rules || []);
+
+  return config;
+}
+"#;
