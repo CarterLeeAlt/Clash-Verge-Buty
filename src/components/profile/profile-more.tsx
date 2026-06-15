@@ -224,6 +224,7 @@ export const ProfileMore = (props: Props) => {
               <Typography
                 component="span"
                 noWrap
+                fontSize={14}
                 title="Updated Time"
                 sx={rightTimeStyle}
               >
