@@ -29,6 +29,7 @@ interface Props {
   onMoveEnd: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  fixed?: boolean;
 }
 
 // profile enhanced item
@@ -44,6 +45,7 @@ export const ProfileMore = (props: Props) => {
     onMoveEnd,
     onDelete,
     onEdit,
+    fixed = false,
   } = props;
 
   const { uid, type } = itemData;
@@ -79,6 +81,11 @@ export const ProfileMore = (props: Props) => {
 
   const hasError = !!logInfo.find((e) => e[0] === "exception");
   const showMove = enableNum > 1 && !hasError;
+
+  const fixedMenu = [
+    { label: "Edit File", handler: onEditFile },
+    { label: "Open File", handler: onOpenFile },
+  ];
 
   const enableMenu = [
     { label: "Disable", handler: fnWrapper(onDisable) },
@@ -205,7 +212,7 @@ export const ProfileMore = (props: Props) => {
           e.preventDefault();
         }}
       >
-        {(selected ? enableMenu : disableMenu)
+        {(fixed ? fixedMenu : selected ? enableMenu : disableMenu)
           .filter((item: any) => item.show !== false)
           .map((item) => (
             <MenuItem
@@ -226,7 +233,7 @@ export const ProfileMore = (props: Props) => {
         onClose={() => setFileOpen(false)}
       />
 
-      {selected && (
+      {(selected || fixed) && (
         <LogViewer
           open={logOpen}
           logInfo={logInfo}
