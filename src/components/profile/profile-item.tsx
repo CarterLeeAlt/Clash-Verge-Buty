@@ -200,6 +200,17 @@ export const ProfileItem = (props: Props) => {
     columnGap: 1,
     fontSize: 14,
   };
+  const leftInfoStyle = {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+  const rightTimeStyle = {
+    flexShrink: 0,
+    minWidth: "fit-content",
+    textAlign: "right",
+    whiteSpace: "nowrap",
+  };
 
   return (
     <Box
@@ -292,7 +303,7 @@ export const ProfileItem = (props: Props) => {
         <Box sx={bottomInfoRowStyle}>
           {hasUrl ? (
             <>
-              <Typography noWrap title="Used / Total">
+              <Typography noWrap title="Used / Total" sx={leftInfoStyle}>
                 {hasExtra
                   ? `${parseTraffic(upload + download)} / ${parseTraffic(total)}`
                   : ""}
@@ -303,6 +314,7 @@ export const ProfileItem = (props: Props) => {
                 flex="1 0 auto"
                 fontSize={14}
                 textAlign="right"
+                sx={rightTimeStyle}
                 title={`Updated Time: ${parseExpire(updated)}`}
               >
                 {updated > 0 ? dayjs(updated * 1000).fromNow() : ""}
@@ -314,12 +326,21 @@ export const ProfileItem = (props: Props) => {
         </Box>
         {/* the third line aligns the subtitle with the date */}
         <Box sx={bottomInfoRowStyle}>
-          <Typography noWrap title={hasUrl ? `From: ${from}` : itemData.desc}>
+          <Typography
+            noWrap
+            title={hasUrl ? `From: ${from}` : itemData.desc}
+            sx={leftInfoStyle}
+          >
             {hasUrl ? from : itemData.desc}
           </Typography>
-          <span title={hasExtra ? "Expire Time" : "Updated Time"}>
+          <Typography
+            component="span"
+            noWrap
+            title={hasExtra ? "Expire Time" : "Updated Time"}
+            sx={rightTimeStyle}
+          >
             {hasExtra ? expire : parseExpire(updated)}
-          </span>
+          </Typography>
         </Box>
         <LinearProgress variant="determinate" value={progress} />
       </ProfileBox>
