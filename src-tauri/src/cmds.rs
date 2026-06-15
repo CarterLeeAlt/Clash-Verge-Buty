@@ -114,23 +114,72 @@ pub fn read_profile_file(index: String) -> CmdResult<String> {
 
 #[tauri::command]
 pub async fn save_profile_file(index: String, file_data: Option<String>) -> CmdResult {
-    if file_data.is_none() {
+    let Some(data) = file_data else {
         return Ok(());
-    }
+    };
 
-    let profiles = Config::profiles();
-    let profiles = profiles.latest();
-    let item = wrap_err!(profiles.get_item(&index))?.clone();
-    drop(profiles);
+    let item = {
+        let profiles = Config::profiles();
+        let profiles = profiles.latest();
+        wrap_err!(profiles.get_item(&index))?.clone()
+    };
 
-    if let Some(data) = file_data {
-        if item.is_global_script() {
-            wrap_err!(save_global_script_file(item, data).await)
-        } else {
-            wrap_err!(item.save_file(data))
-        }
+    if item.is_global_script() {
+        wrap_err!(save_global_script_file(item, data).await)
     } else {
-        Ok(())
+        wrap_err!(item.save_file(data))
+    }
+}
+
+async fn save_global_script_file(item: PrfItem, data: String) -> Result<()> {
+    let (current_config, profile_name) = {
+        let profiles = Config::profiles();
+        let profiles = profiles.latest();
+        let current_uid = profiles.get_current();
+        let profile_name = current_uid
+            .as_ref()
+            .and_then(|uid| profiles.get_item(uid).ok())
+            .and_then(|item| item.name.clone())
+            .unwrap_or_default();
+        (profiles.current_mapping().unwrap_or_default(), profile_name)
+    };
+
+    crate::enhance::script::validate_script_strict(data.clone(), current_config, &profile_name)
+        .context("global script validation failed")?;
+
+    let old_data = item.read_file()?;
+    item.save_file(data)?;
+
+    match CoreManager::global().update_config().await {
+        Ok(_) => {
+            handle::Handle::refresh_clash();
+            Ok(())
+        }
+        Err(err) => {
+            let rollback_err = item.save_file(old_data).err();
+            let recovery_err = match CoreManager::global().update_config().await {
+                Ok(_) => {
+                    handle::Handle::refresh_clash();
+                    None
+                }
+                Err(recovery_err) => {
+                    log::error!(target: "app", "failed to recover config after global script rollback: {recovery_err}");
+                    Some(recovery_err)
+                }
+            };
+            match (rollback_err, recovery_err) {
+                (Some(rollback_err), Some(recovery_err)) => bail!(
+                    "global script rejected: {err}; rollback failed: {rollback_err}; recovery update failed: {recovery_err}"
+                ),
+                (Some(rollback_err), None) => {
+                    bail!("global script rejected: {err}; rollback failed: {rollback_err}")
+                }
+                (None, Some(recovery_err)) => bail!(
+                    "global script rejected: {err}; rollback restored the old file but recovery update failed: {recovery_err}"
+                ),
+                (None, None) => bail!("global script rejected: {err}"),
+            }
+        }
     }
 }
 
