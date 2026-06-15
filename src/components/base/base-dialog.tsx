@@ -5,6 +5,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  type DialogProps,
   type SxProps,
   type Theme,
 } from "@mui/material";
@@ -19,6 +20,8 @@ interface Props {
   disableCancel?: boolean;
   disableFooter?: boolean;
   contentSx?: SxProps<Theme>;
+  maxWidth?: DialogProps["maxWidth"];
+  fullWidth?: boolean;
   children?: ReactNode;
   loading?: boolean;
   onOk?: () => void;
@@ -41,6 +44,8 @@ export const BaseDialog: React.FC<Props> = (props) => {
     okBtn,
     cancelBtn,
     contentSx,
+    maxWidth,
+    fullWidth,
     disableCancel,
     disableOk,
     disableFooter,
@@ -52,6 +57,8 @@ export const BaseDialog: React.FC<Props> = (props) => {
   return (
     <Dialog
       open={open}
+      maxWidth={maxWidth}
+      fullWidth={fullWidth}
       disableEscapeKeyDown={disableEscapeKeyDown}
       onClose={(_, reason) => {
         if (disableBackdropClose && reason === "backdropClick") return;
