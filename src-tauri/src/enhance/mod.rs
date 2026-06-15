@@ -1,7 +1,7 @@
 mod chain;
 pub mod field;
 mod merge;
-mod script;
+pub mod script;
 mod tun;
 
 use self::chain::*;
@@ -9,7 +9,7 @@ use self::field::*;
 use self::merge::*;
 use self::script::*;
 use self::tun::*;
-use crate::config::Config;
+use crate::config::{Config, GLOBAL_SCRIPT_UID};
 use serde_yaml::{Mapping, Value};
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -33,26 +33,54 @@ pub fn enhance() -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
     };
 
     // 从profiles里拿东西
-    let (mut config, chain) = {
+    let (mut config, global_script, chain, profile_name) = {
         let profiles = Config::profiles();
         let profiles = profiles.latest();
 
+        let current_uid = profiles.get_current();
+        let profile_name = current_uid
+            .as_ref()
+            .and_then(|uid| profiles.get_item(uid).ok())
+            .and_then(|item| item.name.clone())
+            .unwrap_or_default();
         let current = profiles.current_mapping().unwrap_or_default();
+
+        let global_script = profiles
+            .get_item(&GLOBAL_SCRIPT_UID.to_string())
+            .ok()
+            .and_then(<Option<ChainItem>>::from);
 
         let chain = match profiles.chain.as_ref() {
             Some(chain) => chain
                 .iter()
+                .filter(|uid| uid.as_str() != GLOBAL_SCRIPT_UID)
                 .filter_map(|uid| profiles.get_item(uid).ok())
                 .filter_map(<Option<ChainItem>>::from)
                 .collect::<Vec<ChainItem>>(),
             None => vec![],
         };
 
-        (current, chain)
+        (current, global_script, chain, profile_name)
     };
 
     let mut result_map = HashMap::new(); // 保存脚本日志
     let mut exists_keys = use_keys(&config); // 保存出现过的keys
+
+    // Run the fixed Global Script before the user-managed chain.
+    if let Some(item) = global_script {
+        if let ChainType::Script(script) = item.data {
+            let mut logs = vec![];
+            match use_script(script, config.to_owned(), &profile_name) {
+                Ok((res_config, res_logs)) => {
+                    exists_keys.extend(use_keys(&res_config));
+                    config = res_config;
+                    logs.extend(res_logs);
+                }
+                Err(err) => logs.push(("exception".into(), err.to_string())),
+            }
+            result_map.insert(item.uid, logs);
+        }
+    }
 
     // 处理用户的profile
     chain.into_iter().for_each(|item| match item.data {
@@ -63,7 +91,7 @@ pub fn enhance() -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
         ChainType::Script(script) => {
             let mut logs = vec![];
 
-            match use_script(script, config.to_owned()) {
+            match use_script(script, config.to_owned(), &profile_name) {
                 Ok((res_config, res_logs)) => {
                     exists_keys.extend(use_keys(&res_config));
                     config = res_config;
@@ -100,14 +128,16 @@ pub fn enhance() -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
                 log::debug!(target: "app", "run builtin script {}", item.uid);
 
                 match item.data {
-                    ChainType::Script(script) => match use_script(script, config.to_owned()) {
-                        Ok((res_config, _)) => {
-                            config = res_config;
+                    ChainType::Script(script) => {
+                        match use_script(script, config.to_owned(), &profile_name) {
+                            Ok((res_config, _)) => {
+                                config = res_config;
+                            }
+                            Err(err) => {
+                                log::error!(target: "app", "builtin script error `{err}`");
+                            }
                         }
-                        Err(err) => {
-                            log::error!(target: "app", "builtin script error `{err}`");
-                        }
-                    },
+                    }
                     _ => {}
                 }
             });
