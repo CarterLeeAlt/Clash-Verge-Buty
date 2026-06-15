@@ -157,7 +157,6 @@ pub struct IVergeTheme {
     pub warning_color: Option<String>,
     pub success_color: Option<String>,
 
-    pub font_family: Option<String>,
     pub css_injection: Option<String>,
 }
 
