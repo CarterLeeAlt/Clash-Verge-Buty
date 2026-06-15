@@ -21,7 +21,7 @@ import { LogViewer } from "./log-viewer";
 
 const GLOBAL_SCRIPT_UID = "__global_script__";
 
-function getProfileDisplayName(item: IProfileItem) {
+function getFixedProfileName(item: IProfileItem) {
   if (item.uid === GLOBAL_SCRIPT_UID) {
     return "全局覆写脚本";
   }
@@ -70,7 +70,7 @@ export const ProfileMore = (props: Props) => {
   } = props;
 
   const { uid, type } = itemData;
-  const displayName = getProfileDisplayName(itemData);
+  const displayName = getFixedProfileName(itemData);
   const displayDesc = getProfileDisplayDesc(itemData);
   const { t, i18n } = useTranslation();
   const [anchorEl, setAnchorEl] = useState<any>(null);
