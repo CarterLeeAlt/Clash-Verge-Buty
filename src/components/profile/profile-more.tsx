@@ -19,6 +19,16 @@ import { EditorViewer } from "./editor-viewer";
 import { ProfileBox } from "./profile-box";
 import { LogViewer } from "./log-viewer";
 
+const GLOBAL_SCRIPT_UID = "__global_script__";
+
+function getProfileDisplayName(item: IProfileItem) {
+  if (item.uid === GLOBAL_SCRIPT_UID) {
+    return "全局覆写脚本";
+  }
+
+  return item.name;
+}
+
 interface Props {
   selected: boolean;
   itemData: IProfileItem;
@@ -52,7 +62,7 @@ export const ProfileMore = (props: Props) => {
   } = props;
 
   const { uid, type } = itemData;
-  const displayName = fixed ? "Global Overwrite Script" : itemData.name;
+  const displayName = getProfileDisplayName(itemData);
   const { t, i18n } = useTranslation();
   const [anchorEl, setAnchorEl] = useState<any>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
