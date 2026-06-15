@@ -61,10 +61,7 @@ export const useCustomTheme = () => {
         },
         shadows: Array(25).fill("none") as Shadows,
         typography: {
-          // todo
-          fontFamily: setting.font_family
-            ? `${setting.font_family}, ${dt.font_family}`
-            : dt.font_family,
+          fontFamily: dt.font_family,
         },
       });
     } catch {
