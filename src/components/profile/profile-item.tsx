@@ -336,6 +336,7 @@ export const ProfileItem = (props: Props) => {
           <Typography
             component="span"
             noWrap
+            fontSize={14}
             title={hasExtra ? "Expire Time" : "Updated Time"}
             sx={rightTimeStyle}
           >
