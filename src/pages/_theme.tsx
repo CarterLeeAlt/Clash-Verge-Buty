@@ -9,7 +9,7 @@ export const defaultTheme = {
   warning_color: "#FF9500",
   success_color: "#34C759",
   background_color: "#f5f5f5",
-  font_family: `"Roboto", "Noto Sans SC", "twemoji mozilla", sans-serif`,
+  font_family: `"Roboto Slab", "Noto Sans SC", "twemoji mozilla", sans-serif`,
 };
 
 // dark mode
