@@ -33,14 +33,28 @@ impl IProfiles {
                 if profiles.items.is_none() {
                     profiles.items = Some(vec![]);
                 }
+                let mut changed = false;
+
                 // compatible with the old old old version
                 if let Some(items) = profiles.items.as_mut() {
                     for item in items.iter_mut() {
                         if item.uid.is_none() {
                             item.uid = Some(help::get_uid("d"));
+                            changed = true;
                         }
                     }
                 }
+
+                if profiles.migrate_legacy_profile_names() {
+                    changed = true;
+                }
+
+                if changed {
+                    if let Err(err) = profiles.save_file() {
+                        log::error!(target: "app", "{err}");
+                    }
+                }
+
                 if let Err(err) = profiles.ensure_global_script() {
                     log::error!(target: "app", "{err}");
                 }
@@ -62,6 +76,29 @@ impl IProfiles {
             items: Some(vec![]),
             ..Self::default()
         }
+    }
+
+    fn migrate_legacy_profile_names(&mut self) -> bool {
+        let mut changed = false;
+
+        if let Some(items) = self.items.as_mut() {
+            for item in items.iter_mut() {
+                let new_name = match (item.itype.as_deref(), item.name.as_deref()) {
+                    (Some("remote"), Some("remote file")) => Some("远程订阅"),
+                    (Some("local"), Some("local file")) => Some("本地文件"),
+                    (Some("script"), Some("script file")) => Some("脚本文件"),
+                    (Some("merge"), Some("merge file")) => Some("合并文件"),
+                    _ => None,
+                };
+
+                if let Some(new_name) = new_name {
+                    item.name = Some(new_name.into());
+                    changed = true;
+                }
+            }
+        }
+
+        changed
     }
 
     pub fn ensure_global_script(&mut self) -> Result<()> {
@@ -109,7 +146,7 @@ impl IProfiles {
         let path = help::resolve_profile_path(GLOBAL_SCRIPT_FILE)?;
         if !path.exists() {
             help::write_file_atomic(&path, tmpl::ITEM_GLOBAL_SCRIPT.as_bytes())
-                .context("failed to write global script file")?;
+                .context("failed to write global script")?;
         }
 
         if changed {
@@ -370,6 +407,87 @@ impl IProfiles {
 mod tests {
     use super::*;
     use crate::config::GLOBAL_SCRIPT_UID;
+
+    fn profile_item(itype: &str, name: &str) -> PrfItem {
+        PrfItem {
+            itype: Some(itype.into()),
+            name: Some(name.into()),
+            ..PrfItem::default()
+        }
+    }
+
+    #[test]
+    fn migrate_legacy_profile_names_updates_old_default_names_only() {
+        let mut profiles = IProfiles {
+            items: Some(vec![
+                profile_item("remote", "remote file"),
+                profile_item("local", "local file"),
+                profile_item("script", "script file"),
+                profile_item("merge", "merge file"),
+                profile_item("remote", "我的机场"),
+                profile_item("remote", "remote file backup"),
+            ]),
+            ..IProfiles::default()
+        };
+
+        assert!(profiles.migrate_legacy_profile_names());
+
+        let names: Vec<_> = profiles
+            .items
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|item| item.name.as_deref().unwrap())
+            .collect();
+
+        assert_eq!(
+            names,
+            vec![
+                "远程订阅",
+                "本地文件",
+                "脚本文件",
+                "合并文件",
+                "我的机场",
+                "remote file backup",
+            ]
+        );
+    }
+
+    #[test]
+    fn migrate_legacy_profile_names_reports_unchanged_for_custom_names() {
+        let mut profiles = IProfiles {
+            items: Some(vec![
+                profile_item("remote", "我的机场"),
+                profile_item("remote", "remote file backup"),
+                profile_item("local", "local"),
+                profile_item("script", "script"),
+                profile_item("merge", "merge"),
+                profile_item("remote", "远程订阅"),
+                profile_item("local", "本地文件"),
+                profile_item("script", "脚本文件"),
+                profile_item("merge", "合并文件"),
+            ]),
+            ..IProfiles::default()
+        };
+
+        let original_names: Vec<_> = profiles
+            .items
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|item| item.name.clone())
+            .collect();
+
+        assert!(!profiles.migrate_legacy_profile_names());
+        let migrated_names: Vec<_> = profiles
+            .items
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|item| item.name.clone())
+            .collect();
+        assert_eq!(migrated_names, original_names);
+    }
 
     #[test]
     fn patch_config_filters_global_script_from_chain() {
