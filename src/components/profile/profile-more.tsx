@@ -137,6 +137,17 @@ export const ProfileMore = (props: Props) => {
     columnGap: 1,
     fontSize: 14,
   };
+  const leftInfoStyle = {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+  const rightTimeStyle = {
+    flexShrink: 0,
+    minWidth: "fit-content",
+    textAlign: "right",
+    whiteSpace: "nowrap",
+  };
 
   return (
     <>
@@ -194,7 +205,7 @@ export const ProfileMore = (props: Props) => {
                 component="span"
                 textAlign="right"
                 title={`Updated Time: ${parseExpire(itemData.updated)}`}
-                style={{ fontSize: 14 }}
+                sx={{ ...rightTimeStyle, fontSize: 14 }}
               >
                 {!!itemData.updated
                   ? dayjs(itemData.updated! * 1000).fromNow()
@@ -206,13 +217,18 @@ export const ProfileMore = (props: Props) => {
               <Typography
                 noWrap
                 title={displayDesc}
-                sx={
-                  i18n.language === "zh" ? { width: "calc(100% - 75px)" } : {}
-                }
+                sx={leftInfoStyle}
               >
                 {displayDesc}
               </Typography>
-              <span title="Updated Time">{parseExpire(itemData.updated)}</span>
+              <Typography
+                component="span"
+                noWrap
+                title="Updated Time"
+                sx={rightTimeStyle}
+              >
+                {parseExpire(itemData.updated)}
+              </Typography>
             </Box>
             <LinearProgress
               variant="determinate"
