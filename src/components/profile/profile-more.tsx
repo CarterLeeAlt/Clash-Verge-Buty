@@ -29,6 +29,14 @@ function getProfileDisplayName(item: IProfileItem) {
   return item.name;
 }
 
+function getProfileDisplayDesc(item: IProfileItem) {
+  if (item.uid === GLOBAL_SCRIPT_UID) {
+    return "User Global Script";
+  }
+
+  return item.desc;
+}
+
 interface Props {
   selected: boolean;
   itemData: IProfileItem;
@@ -63,6 +71,7 @@ export const ProfileMore = (props: Props) => {
 
   const { uid, type } = itemData;
   const displayName = getProfileDisplayName(itemData);
+  const displayDesc = getProfileDisplayDesc(itemData);
   const { t, i18n } = useTranslation();
   const [anchorEl, setAnchorEl] = useState<any>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
@@ -123,6 +132,11 @@ export const ProfileMore = (props: Props) => {
     justifyContent: "space-between",
     lineHeight: 1,
   };
+  const bottomInfoRowStyle = {
+    ...boxStyle,
+    columnGap: 1,
+    fontSize: 14,
+  };
 
   return (
     <>
@@ -172,17 +186,8 @@ export const ProfileMore = (props: Props) => {
               </Typography>
             </Box>
 
-            <Box sx={boxStyle}>
-              <Typography
-                noWrap
-                title={itemData.desc}
-                sx={
-                  i18n.language === "zh" ? { width: "calc(100% - 75px)" } : {}
-                }
-              >
-                {itemData.desc}
-              </Typography>
-
+            <Box sx={bottomInfoRowStyle}>
+              <Box />
               <Typography
                 noWrap
                 flex="1 0 auto"
@@ -197,13 +202,16 @@ export const ProfileMore = (props: Props) => {
               </Typography>
             </Box>
 
-            <Box
-              sx={{
-                ...boxStyle,
-                fontSize: 14,
-                justifyContent: "flex-end",
-              }}
-            >
+            <Box sx={bottomInfoRowStyle}>
+              <Typography
+                noWrap
+                title={displayDesc}
+                sx={
+                  i18n.language === "zh" ? { width: "calc(100% - 75px)" } : {}
+                }
+              >
+                {displayDesc}
+              </Typography>
               <span title="Updated Time">{parseExpire(itemData.updated)}</span>
             </Box>
             <LinearProgress
@@ -268,12 +276,12 @@ export const ProfileMore = (props: Props) => {
               ) : (
                 <Typography
                   noWrap
-                  title={itemData.desc}
+                  title={displayDesc}
                   sx={
                     i18n.language === "zh" ? { width: "calc(100% - 75px)" } : {}
                   }
                 >
-                  {itemData.desc}
+                  {displayDesc}
                 </Typography>
               )}
 

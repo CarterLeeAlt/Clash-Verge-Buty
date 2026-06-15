@@ -195,6 +195,11 @@ export const ProfileItem = (props: Props) => {
     alignItems: "center",
     justifyContent: "space-between",
   };
+  const bottomInfoRowStyle = {
+    ...boxStyle,
+    columnGap: 1,
+    fontSize: 14,
+  };
 
   return (
     <Box
@@ -283,12 +288,14 @@ export const ProfileItem = (props: Props) => {
             </IconButton>
           )}
         </Box>
-        {/* the second line show url's info or description */}
-        <Box sx={boxStyle}>
+        {/* the second line shows usage info and relative updated time */}
+        <Box sx={bottomInfoRowStyle}>
           {hasUrl ? (
             <>
-              <Typography noWrap title={`From: ${from}`}>
-                {from}
+              <Typography noWrap title="Used / Total">
+                {hasExtra
+                  ? `${parseTraffic(upload + download)} / ${parseTraffic(total)}`
+                  : ""}
               </Typography>
 
               <Typography
@@ -302,24 +309,18 @@ export const ProfileItem = (props: Props) => {
               </Typography>
             </>
           ) : (
-            <Typography noWrap title={itemData.desc}>
-              {itemData.desc}
-            </Typography>
+            <Box />
           )}
         </Box>
-        {/* the third line show extra info or last updated time */}
-        {hasExtra ? (
-          <Box sx={{ ...boxStyle, fontSize: 14 }}>
-            <span title="Used / Total">
-              {parseTraffic(upload + download)} / {parseTraffic(total)}
-            </span>
-            <span title="Expire Time">{expire}</span>
-          </Box>
-        ) : (
-          <Box sx={{ ...boxStyle, fontSize: 14, justifyContent: "flex-end" }}>
-            <span title="Updated Time">{parseExpire(updated)}</span>
-          </Box>
-        )}
+        {/* the third line aligns the subtitle with the date */}
+        <Box sx={bottomInfoRowStyle}>
+          <Typography noWrap title={hasUrl ? `From: ${from}` : itemData.desc}>
+            {hasUrl ? from : itemData.desc}
+          </Typography>
+          <span title={hasExtra ? "Expire Time" : "Updated Time"}>
+            {hasExtra ? expire : parseExpire(updated)}
+          </span>
+        </Box>
         <LinearProgress variant="determinate" value={progress} />
       </ProfileBox>
 
