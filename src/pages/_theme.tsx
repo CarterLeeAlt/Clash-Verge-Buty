@@ -1,6 +1,3 @@
-import getSystem from "@/utils/get-system";
-const OS = getSystem();
-
 // default theme setting
 export const defaultTheme = {
   primary_color: "#007AFF",
@@ -12,9 +9,7 @@ export const defaultTheme = {
   warning_color: "#FF9500",
   success_color: "#34C759",
   background_color: "#f5f5f5",
-  font_family: `"Roboto", "Helvetica", "Arial", sans-serif, ${
-    OS === "windows" ? "twemoji mozilla" : ""
-  }`,
+  font_family: `"Inter", "Noto Sans SC", "twemoji mozilla", sans-serif`,
 };
 
 // dark mode
