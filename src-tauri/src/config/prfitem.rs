@@ -8,6 +8,11 @@ use sysproxy::Sysproxy;
 
 use super::Config;
 
+pub const GLOBAL_SCRIPT_UID: &str = "__global_script__";
+pub const GLOBAL_SCRIPT_FILE: &str = "global-script.js";
+pub const GLOBAL_SCRIPT_NAME: &str = "Global Script";
+pub const GLOBAL_SCRIPT_DESC: &str = "Global Script";
+
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct PrfItem {
     pub uid: Option<String>,
@@ -346,6 +351,28 @@ impl PrfItem {
         })
     }
 
+    /// ## Global Script type (enhance)
+    /// create the fixed global script item
+    pub fn global_script() -> PrfItem {
+        PrfItem {
+            uid: Some(GLOBAL_SCRIPT_UID.into()),
+            itype: Some("script".into()),
+            name: Some(GLOBAL_SCRIPT_NAME.into()),
+            desc: Some(GLOBAL_SCRIPT_DESC.into()),
+            file: Some(GLOBAL_SCRIPT_FILE.into()),
+            url: None,
+            selected: None,
+            extra: None,
+            option: None,
+            updated: Some(chrono::Local::now().timestamp() as usize),
+            file_data: None,
+        }
+    }
+
+    pub fn is_global_script(&self) -> bool {
+        self.uid.as_deref() == Some(GLOBAL_SCRIPT_UID) && self.itype.as_deref() == Some("script")
+    }
+
     /// ## Script type (enhance)
     /// create the enhanced item by using javascript quick.js
     pub fn from_script(name: String, desc: String) -> Result<PrfItem> {
@@ -387,5 +414,21 @@ impl PrfItem {
         let file = self.file.clone().unwrap();
         let path = help::resolve_profile_path(&file)?;
         help::write_file_atomic(&path, data.as_bytes()).context("failed to save the file")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn uid_script_is_not_global_script() {
+        let item = PrfItem {
+            uid: Some("Script".into()),
+            itype: Some("script".into()),
+            ..PrfItem::default()
+        };
+
+        assert!(!item.is_global_script());
     }
 }
