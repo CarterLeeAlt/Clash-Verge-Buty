@@ -108,7 +108,7 @@ impl IProfiles {
 
         let path = help::resolve_profile_path(GLOBAL_SCRIPT_FILE)?;
         if !path.exists() {
-            help::write_file_atomic(&path, tmpl::ITEM_SCRIPT.as_bytes())
+            help::write_file_atomic(&path, tmpl::ITEM_GLOBAL_SCRIPT.as_bytes())
                 .context("failed to write global script file")?;
         }
 
