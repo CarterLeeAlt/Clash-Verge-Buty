@@ -12,7 +12,7 @@ import {
   IconButton,
   LinearProgress,
 } from "@mui/material";
-import { FeaturedPlayListRounded } from "@mui/icons-material";
+import { DragIndicator, FeaturedPlayListRounded } from "@mui/icons-material";
 import { viewProfile } from "@/services/cmds";
 import { Notice } from "@/components/base";
 import { EditorViewer } from "./editor-viewer";
@@ -86,9 +86,7 @@ export const ProfileMore = (props: Props) => {
   const hasError = !!logInfo.find((e) => e[0] === "exception");
   const showMove = enableNum > 1 && !hasError;
 
-  const fixedMenu = [
-    { label: "Edit File", handler: onEditFile },
-  ];
+  const fixedMenu = [{ label: "Edit File", handler: onEditFile }];
 
   const enableMenu = [
     { label: "Disable", handler: fnWrapper(onDisable) },
@@ -138,80 +136,56 @@ export const ProfileMore = (props: Props) => {
           event.preventDefault();
         }}
       >
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={0.5}
-        >
-          <Typography
-            width="calc(100% - 52px)"
-            variant="h6"
-            component="h2"
-            noWrap
-            title={displayName}
-          >
-            {displayName}
-          </Typography>
-
-          <Chip
-            label={type}
-            color="primary"
-            size="small"
-            variant="outlined"
-            sx={{ height: 20, textTransform: "capitalize" }}
-          />
-        </Box>
-
-        <Box sx={boxStyle}>
-          {selected && type === "script" ? (
-            hasError ? (
-              <Badge color="error" variant="dot" overlap="circular">
-                <IconButton
-                  size="small"
-                  edge="start"
-                  color="error"
-                  title="Console"
-                  onClick={() => setLogOpen(true)}
-                >
-                  <FeaturedPlayListRounded fontSize="inherit" />
-                </IconButton>
-              </Badge>
-            ) : (
-              <IconButton
-                size="small"
-                edge="start"
-                color="inherit"
-                title="Console"
-                onClick={() => setLogOpen(true)}
-              >
-                <FeaturedPlayListRounded fontSize="inherit" />
-              </IconButton>
-            )
-          ) : (
-            <Typography
-              noWrap
-              title={itemData.desc}
-              sx={i18n.language === "zh" ? { width: "calc(100% - 75px)" } : {}}
-            >
-              {itemData.desc}
-            </Typography>
-          )}
-
-          <Typography
-            noWrap
-            component="span"
-            title={`Updated Time: ${parseExpire(itemData.updated)}`}
-            style={{ fontSize: 14 }}
-          >
-            {!!itemData.updated
-              ? dayjs(itemData.updated! * 1000).fromNow()
-              : ""}
-          </Typography>
-        </Box>
-
-        {fixed && (
+        {fixed ? (
           <>
+            <Box sx={{ display: "flex", justifyContent: "start" }}>
+              <Box sx={{ display: "flex", margin: "auto 0" }}>
+                <DragIndicator
+                  sx={[
+                    { visibility: "hidden", marginLeft: "-6px" },
+                    ({ palette: { text } }) => {
+                      return { color: text.primary };
+                    },
+                  ]}
+                />
+              </Box>
+
+              <Typography
+                width="calc(100% - 36px)"
+                variant="h6"
+                component="h2"
+                noWrap
+                title={displayName}
+              >
+                {displayName}
+              </Typography>
+            </Box>
+
+            <Box sx={boxStyle}>
+              <Typography
+                noWrap
+                title={itemData.desc}
+                sx={
+                  i18n.language === "zh" ? { width: "calc(100% - 75px)" } : {}
+                }
+              >
+                {itemData.desc}
+              </Typography>
+
+              <Typography
+                noWrap
+                flex="1 0 auto"
+                component="span"
+                textAlign="right"
+                title={`Updated Time: ${parseExpire(itemData.updated)}`}
+                style={{ fontSize: 14 }}
+              >
+                {!!itemData.updated
+                  ? dayjs(itemData.updated! * 1000).fromNow()
+                  : ""}
+              </Typography>
+            </Box>
+
             <Box
               sx={{
                 ...boxStyle,
@@ -226,6 +200,82 @@ export const ProfileMore = (props: Props) => {
               value={0}
               sx={{ visibility: "hidden" }}
             />
+          </>
+        ) : (
+          <>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              mb={0.5}
+            >
+              <Typography
+                width="calc(100% - 52px)"
+                variant="h6"
+                component="h2"
+                noWrap
+                title={displayName}
+              >
+                {displayName}
+              </Typography>
+
+              <Chip
+                label={type}
+                color="primary"
+                size="small"
+                variant="outlined"
+                sx={{ height: 20, textTransform: "capitalize" }}
+              />
+            </Box>
+
+            <Box sx={boxStyle}>
+              {selected && type === "script" ? (
+                hasError ? (
+                  <Badge color="error" variant="dot" overlap="circular">
+                    <IconButton
+                      size="small"
+                      edge="start"
+                      color="error"
+                      title="Console"
+                      onClick={() => setLogOpen(true)}
+                    >
+                      <FeaturedPlayListRounded fontSize="inherit" />
+                    </IconButton>
+                  </Badge>
+                ) : (
+                  <IconButton
+                    size="small"
+                    edge="start"
+                    color="inherit"
+                    title="Console"
+                    onClick={() => setLogOpen(true)}
+                  >
+                    <FeaturedPlayListRounded fontSize="inherit" />
+                  </IconButton>
+                )
+              ) : (
+                <Typography
+                  noWrap
+                  title={itemData.desc}
+                  sx={
+                    i18n.language === "zh" ? { width: "calc(100% - 75px)" } : {}
+                  }
+                >
+                  {itemData.desc}
+                </Typography>
+              )}
+
+              <Typography
+                noWrap
+                component="span"
+                title={`Updated Time: ${parseExpire(itemData.updated)}`}
+                style={{ fontSize: 14 }}
+              >
+                {!!itemData.updated
+                  ? dayjs(itemData.updated! * 1000).fromNow()
+                  : ""}
+              </Typography>
+            </Box>
           </>
         )}
       </ProfileBox>
