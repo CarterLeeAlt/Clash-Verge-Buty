@@ -195,6 +195,22 @@ export const ProfileItem = (props: Props) => {
     alignItems: "center",
     justifyContent: "space-between",
   };
+  const bottomInfoRowStyle = {
+    ...boxStyle,
+    columnGap: 1,
+    fontSize: 14,
+  };
+  const leftInfoStyle = {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+  const rightTimeStyle = {
+    flexShrink: 0,
+    minWidth: "fit-content",
+    textAlign: "right",
+    whiteSpace: "nowrap",
+  };
 
   return (
     <Box
@@ -283,12 +299,14 @@ export const ProfileItem = (props: Props) => {
             </IconButton>
           )}
         </Box>
-        {/* the second line show url's info or description */}
-        <Box sx={boxStyle}>
+        {/* the second line shows usage info and relative updated time */}
+        <Box sx={bottomInfoRowStyle}>
           {hasUrl ? (
             <>
-              <Typography noWrap title={`From: ${from}`}>
-                {from}
+              <Typography noWrap title="Used / Total" sx={leftInfoStyle}>
+                {hasExtra
+                  ? `${parseTraffic(upload + download)} / ${parseTraffic(total)}`
+                  : ""}
               </Typography>
 
               <Typography
@@ -296,30 +314,34 @@ export const ProfileItem = (props: Props) => {
                 flex="1 0 auto"
                 fontSize={14}
                 textAlign="right"
+                sx={rightTimeStyle}
                 title={`Updated Time: ${parseExpire(updated)}`}
               >
                 {updated > 0 ? dayjs(updated * 1000).fromNow() : ""}
               </Typography>
             </>
           ) : (
-            <Typography noWrap title={itemData.desc}>
-              {itemData.desc}
-            </Typography>
+            <Box />
           )}
         </Box>
-        {/* the third line show extra info or last updated time */}
-        {hasExtra ? (
-          <Box sx={{ ...boxStyle, fontSize: 14 }}>
-            <span title="Used / Total">
-              {parseTraffic(upload + download)} / {parseTraffic(total)}
-            </span>
-            <span title="Expire Time">{expire}</span>
-          </Box>
-        ) : (
-          <Box sx={{ ...boxStyle, fontSize: 14, justifyContent: "flex-end" }}>
-            <span title="Updated Time">{parseExpire(updated)}</span>
-          </Box>
-        )}
+        {/* the third line aligns the subtitle with the date */}
+        <Box sx={bottomInfoRowStyle}>
+          <Typography
+            noWrap
+            title={hasUrl ? `From: ${from}` : itemData.desc}
+            sx={leftInfoStyle}
+          >
+            {hasUrl ? from : itemData.desc}
+          </Typography>
+          <Typography
+            component="span"
+            noWrap
+            title={hasExtra ? "Expire Time" : "Updated Time"}
+            sx={rightTimeStyle}
+          >
+            {hasExtra ? expire : parseExpire(updated)}
+          </Typography>
+        </Box>
         <LinearProgress variant="determinate" value={progress} />
       </ProfileBox>
 
