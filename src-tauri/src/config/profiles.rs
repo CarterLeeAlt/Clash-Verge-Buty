@@ -1,5 +1,5 @@
-use super::prfitem::PrfItem;
-use crate::utils::{dirs, help};
+use super::prfitem::{PrfItem, GLOBAL_SCRIPT_FILE, GLOBAL_SCRIPT_UID};
+use crate::utils::{dirs, help, tmpl};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Mapping;
@@ -41,11 +41,18 @@ impl IProfiles {
                         }
                     }
                 }
+                if let Err(err) = profiles.ensure_global_script() {
+                    log::error!(target: "app", "{err}");
+                }
                 profiles
             }
             Err(err) => {
                 log::error!(target: "app", "{err}");
-                Self::template()
+                let mut profiles = Self::template();
+                if let Err(err) = profiles.ensure_global_script() {
+                    log::error!(target: "app", "{err}");
+                }
+                profiles
             }
         }
     }
@@ -55,6 +62,60 @@ impl IProfiles {
             items: Some(vec![]),
             ..Self::default()
         }
+    }
+
+    pub fn ensure_global_script(&mut self) -> Result<()> {
+        if self.items.is_none() {
+            self.items = Some(vec![]);
+        }
+
+        let mut changed = false;
+        if let Some(items) = self.items.as_mut() {
+            match items
+                .iter_mut()
+                .find(|item| item.uid.as_deref() == Some(GLOBAL_SCRIPT_UID))
+            {
+                Some(item) => {
+                    if item.itype.as_deref() != Some("script") {
+                        item.itype = Some("script".into());
+                        changed = true;
+                    }
+                    if item.name.as_deref() != Some(super::prfitem::GLOBAL_SCRIPT_NAME) {
+                        item.name = Some(super::prfitem::GLOBAL_SCRIPT_NAME.into());
+                        changed = true;
+                    }
+                    if item.desc.as_deref() != Some(super::prfitem::GLOBAL_SCRIPT_DESC) {
+                        item.desc = Some(super::prfitem::GLOBAL_SCRIPT_DESC.into());
+                        changed = true;
+                    }
+                    if item.file.as_deref() != Some(GLOBAL_SCRIPT_FILE) {
+                        item.file = Some(GLOBAL_SCRIPT_FILE.into());
+                        changed = true;
+                    }
+                }
+                None => {
+                    items.insert(0, PrfItem::global_script());
+                    changed = true;
+                }
+            }
+        }
+
+        if let Some(chain) = self.chain.as_mut() {
+            let old_len = chain.len();
+            chain.retain(|uid| uid != GLOBAL_SCRIPT_UID);
+            changed |= old_len != chain.len();
+        }
+
+        let path = help::resolve_profile_path(GLOBAL_SCRIPT_FILE)?;
+        if !path.exists() {
+            help::write_file_atomic(&path, tmpl::ITEM_GLOBAL_SCRIPT.as_bytes())
+                .context("failed to write global script file")?;
+        }
+
+        if changed {
+            self.save_file()?;
+        }
+        Ok(())
     }
 
     pub fn save_file(&self) -> Result<()> {
@@ -81,7 +142,12 @@ impl IProfiles {
         }
 
         if let Some(chain) = patch.chain {
-            self.chain = Some(chain);
+            self.chain = Some(
+                chain
+                    .into_iter()
+                    .filter(|uid| uid != GLOBAL_SCRIPT_UID)
+                    .collect(),
+            );
         }
 
         Ok(())
@@ -169,6 +235,10 @@ impl IProfiles {
 
     /// update the item value
     pub fn patch_item(&mut self, uid: String, item: PrfItem) -> Result<()> {
+        if uid == GLOBAL_SCRIPT_UID {
+            bail!("Global Script identity cannot be modified");
+        }
+
         let mut items = self.items.take().unwrap_or_default();
 
         for each in items.iter_mut() {
@@ -237,6 +307,10 @@ impl IProfiles {
     /// delete item
     /// if delete the current then return true
     pub fn delete_item(&mut self, uid: String) -> Result<bool> {
+        if uid == GLOBAL_SCRIPT_UID {
+            bail!("Global Script cannot be deleted");
+        }
+
         let current = self.current.as_ref().unwrap_or(&uid);
         let current = current.clone();
 
@@ -289,5 +363,34 @@ impl IProfiles {
             }
             _ => Ok(Mapping::new()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::GLOBAL_SCRIPT_UID;
+
+    #[test]
+    fn patch_config_filters_global_script_from_chain() {
+        let mut profiles = IProfiles {
+            chain: Some(vec!["user-script".into()]),
+            ..IProfiles::default()
+        };
+        let patch = IProfiles {
+            chain: Some(vec![
+                "merge-a".into(),
+                GLOBAL_SCRIPT_UID.into(),
+                "script-b".into(),
+            ]),
+            ..IProfiles::default()
+        };
+
+        profiles.patch_config(patch).unwrap();
+
+        assert_eq!(
+            profiles.chain,
+            Some(vec![String::from("merge-a"), String::from("script-b")])
+        );
     }
 }

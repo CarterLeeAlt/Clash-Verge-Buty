@@ -21,13 +21,21 @@ import { atomLoadingCache } from "@/services/states";
 import { updateProfile, deleteProfile, viewProfile } from "@/services/cmds";
 import { Notice } from "@/components/base";
 import { EditorViewer } from "./editor-viewer";
-import { ProfileBox } from "./profile-box";
+import { PROFILE_CARD_TITLE_FONT_SIZE, ProfileBox } from "./profile-box";
 import parseTraffic from "@/utils/parse-traffic";
 
 const round = keyframes`
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 `;
+
+function getProfileDisplayName(item: IProfileItem, fallbackName: string) {
+  if (item.type === "remote" && item.name === "remote file") {
+    return "远程订阅";
+  }
+
+  return fallbackName;
+}
 
 interface Props {
   id: string;
@@ -49,6 +57,7 @@ export const ProfileItem = (props: Props) => {
   const [loadingCache, setLoadingCache] = useRecoilState(atomLoadingCache);
 
   const { uid, name = "Profile", extra, updated = 0 } = itemData;
+  const displayName = getProfileDisplayName(itemData, name);
 
   // local file mode
   // remote file mode
@@ -186,6 +195,22 @@ export const ProfileItem = (props: Props) => {
     alignItems: "center",
     justifyContent: "space-between",
   };
+  const bottomInfoRowStyle = {
+    ...boxStyle,
+    columnGap: 1,
+    fontSize: 14,
+  };
+  const leftInfoStyle = {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+  const rightTimeStyle = {
+    flexShrink: 0,
+    minWidth: "fit-content",
+    textAlign: "right",
+    whiteSpace: "nowrap",
+  };
 
   return (
     <Box
@@ -242,12 +267,13 @@ export const ProfileItem = (props: Props) => {
 
             <Typography
               width="calc(100% - 36px)"
-              variant="h6"
+              variant="subtitle1"
               component="h2"
               noWrap
-              title={name}
+              title={displayName}
+              sx={{ fontSize: PROFILE_CARD_TITLE_FONT_SIZE, fontWeight: 600 }}
             >
-              {name}
+              {displayName}
             </Typography>
           </Box>
 
@@ -273,12 +299,14 @@ export const ProfileItem = (props: Props) => {
             </IconButton>
           )}
         </Box>
-        {/* the second line show url's info or description */}
-        <Box sx={boxStyle}>
+        {/* the second line shows usage info and relative updated time */}
+        <Box sx={bottomInfoRowStyle}>
           {hasUrl ? (
             <>
-              <Typography noWrap title={`From: ${from}`}>
-                {from}
+              <Typography noWrap title="Used / Total" sx={leftInfoStyle}>
+                {hasExtra
+                  ? `${parseTraffic(upload + download)} / ${parseTraffic(total)}`
+                  : ""}
               </Typography>
 
               <Typography
@@ -286,30 +314,35 @@ export const ProfileItem = (props: Props) => {
                 flex="1 0 auto"
                 fontSize={14}
                 textAlign="right"
+                sx={rightTimeStyle}
                 title={`Updated Time: ${parseExpire(updated)}`}
               >
                 {updated > 0 ? dayjs(updated * 1000).fromNow() : ""}
               </Typography>
             </>
           ) : (
-            <Typography noWrap title={itemData.desc}>
-              {itemData.desc}
-            </Typography>
+            <Box />
           )}
         </Box>
-        {/* the third line show extra info or last updated time */}
-        {hasExtra ? (
-          <Box sx={{ ...boxStyle, fontSize: 14 }}>
-            <span title="Used / Total">
-              {parseTraffic(upload + download)} / {parseTraffic(total)}
-            </span>
-            <span title="Expire Time">{expire}</span>
-          </Box>
-        ) : (
-          <Box sx={{ ...boxStyle, fontSize: 14, justifyContent: "flex-end" }}>
-            <span title="Updated Time">{parseExpire(updated)}</span>
-          </Box>
-        )}
+        {/* the third line aligns the subtitle with the date */}
+        <Box sx={bottomInfoRowStyle}>
+          <Typography
+            noWrap
+            title={hasUrl ? `From: ${from}` : itemData.desc}
+            sx={leftInfoStyle}
+          >
+            {hasUrl ? from : itemData.desc}
+          </Typography>
+          <Typography
+            component="span"
+            noWrap
+            fontSize={14}
+            title={hasExtra ? "Expire Time" : "Updated Time"}
+            sx={rightTimeStyle}
+          >
+            {hasExtra ? expire : parseExpire(updated)}
+          </Typography>
+        </Box>
         <LinearProgress variant="determinate" value={progress} />
       </ProfileBox>
 
