@@ -65,13 +65,15 @@ export const ConfigViewer = forwardRef<DialogRef>((props, ref) => {
           {t("Runtime Config")} <Chip label={t("ReadOnly")} size="small" />
         </>
       }
-      contentSx={{ width: 520, pb: 1, userSelect: "text" }}
+      maxWidth="xl"
+      fullWidth
+      contentSx={{ width: "95%", pb: 1, userSelect: "text" }}
       cancelBtn={t("Back")}
       disableOk
       onClose={() => setOpen(false)}
       onCancel={() => setOpen(false)}
     >
-      <div style={{ width: "100%", height: "420px" }} ref={editorRef} />
+      <div style={{ width: "100%", height: "500px" }} ref={editorRef} />
     </BaseDialog>
   );
 });
