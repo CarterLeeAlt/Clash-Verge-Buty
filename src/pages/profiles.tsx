@@ -57,22 +57,6 @@ import { throttle } from "lodash-es";
 
 const GLOBAL_SCRIPT_UID = "__global_script__";
 
-function normalizeProfileName(item: IProfileItem) {
-  if (item.type === "remote" && item.name === "remote file") {
-    return { ...item, name: "远程订阅" };
-  }
-  if (item.type === "local" && item.name === "local file") {
-    return { ...item, name: "本地文件" };
-  }
-  if (item.type === "script" && item.name === "script file") {
-    return { ...item, name: "脚本文件" };
-  }
-  if (item.type === "merge" && item.name === "merge file") {
-    return { ...item, name: "合并文件" };
-  }
-  return item;
-}
-
 const ProfilePage = () => {
   const { t } = useTranslation();
 
@@ -104,19 +88,15 @@ const ProfilePage = () => {
 
   // distinguish type
   const { regularItems, globalScriptItem, enhanceItems } = useMemo(() => {
-    const normalizedItems = (profiles.items || []).map(normalizeProfileName);
+    const items = profiles.items || [];
     const chain = profiles.chain || [];
 
     const type1 = ["local", "remote"];
     const type2 = ["merge", "script"];
 
-    const globalScriptItem = normalizedItems.find(
-      (i) => i.uid === GLOBAL_SCRIPT_UID
-    );
-    const regularItems = normalizedItems.filter((i) =>
-      i && type1.includes(i.type!)
-    );
-    const restItems = normalizedItems.filter(
+    const globalScriptItem = items.find((i) => i.uid === GLOBAL_SCRIPT_UID);
+    const regularItems = items.filter((i) => i && type1.includes(i.type!));
+    const restItems = items.filter(
       (i) => i && type2.includes(i.type!) && i.uid !== GLOBAL_SCRIPT_UID
     );
     const restMap = Object.fromEntries(restItems.map((i) => [i.uid, i]));
