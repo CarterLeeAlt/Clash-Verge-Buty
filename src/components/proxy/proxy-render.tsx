@@ -86,7 +86,7 @@ export const ProxyRender = (props: RenderProps) => {
                   overflow: "hidden",
                   display: "flex",
                   alignItems: "center",
-                  pt: "2px",
+                  pt: "5px",
                 }}
               >
                 <StyledTypeBox>{group.type}</StyledTypeBox>
