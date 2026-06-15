@@ -53,7 +53,7 @@ pub fn enhance() -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
         let chain = match profiles.chain.as_ref() {
             Some(chain) => chain
                 .iter()
-                .filter(|uid| uid.as_str() != GLOBAL_SCRIPT_UID)
+                .filter(|uid| is_not_global_script_uid(uid.as_str()))
                 .filter_map(|uid| profiles.get_item(uid).ok())
                 .filter_map(<Option<ChainItem>>::from)
                 .collect::<Vec<ChainItem>>(),
@@ -152,6 +152,26 @@ pub fn enhance() -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
     exists_keys = exists_set.into_iter().collect();
 
     (config, exists_keys, result_map)
+}
+
+fn is_not_global_script_uid(uid: &str) -> bool {
+    uid != GLOBAL_SCRIPT_UID
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn enhance_chain_filter_skips_global_script_uid() {
+        let chain = ["merge-a", GLOBAL_SCRIPT_UID, "script-b"];
+        let filtered = chain
+            .into_iter()
+            .filter(|uid| is_not_global_script_uid(uid))
+            .collect::<Vec<_>>();
+
+        assert_eq!(filtered, vec!["merge-a", "script-b"]);
+    }
 }
 
 fn apply_ipv6_to_dns(mut config: Mapping) -> Mapping {
