@@ -16,7 +16,7 @@ import { DragIndicator, FeaturedPlayListRounded } from "@mui/icons-material";
 import { viewProfile } from "@/services/cmds";
 import { Notice } from "@/components/base";
 import { EditorViewer } from "./editor-viewer";
-import { ProfileBox } from "./profile-box";
+import { PROFILE_CARD_TITLE_FONT_SIZE, ProfileBox } from "./profile-box";
 import { LogViewer } from "./log-viewer";
 
 const GLOBAL_SCRIPT_UID = "__global_script__";
@@ -152,9 +152,9 @@ export const ProfileMore = (props: Props) => {
               <Box sx={{ display: "flex", margin: "auto 0" }}>
                 <DragIndicator
                   sx={[
-                    { visibility: "hidden", marginLeft: "-6px" },
+                    { marginLeft: "-6px", opacity: 0.55 },
                     ({ palette: { text } }) => {
-                      return { color: text.primary };
+                      return { color: text.secondary };
                     },
                   ]}
                 />
@@ -162,10 +162,11 @@ export const ProfileMore = (props: Props) => {
 
               <Typography
                 width="calc(100% - 36px)"
-                variant="h6"
+                variant="subtitle1"
                 component="h2"
                 noWrap
                 title={displayName}
+                sx={{ fontSize: PROFILE_CARD_TITLE_FONT_SIZE, fontWeight: 600 }}
               >
                 {displayName}
               </Typography>
@@ -221,10 +222,11 @@ export const ProfileMore = (props: Props) => {
             >
               <Typography
                 width="calc(100% - 52px)"
-                variant="h6"
+                variant="subtitle1"
                 component="h2"
                 noWrap
                 title={displayName}
+                sx={{ fontSize: PROFILE_CARD_TITLE_FONT_SIZE, fontWeight: 600 }}
               >
                 {displayName}
               </Typography>
