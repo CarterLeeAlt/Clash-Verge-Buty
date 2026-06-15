@@ -21,7 +21,7 @@ import { atomLoadingCache } from "@/services/states";
 import { updateProfile, deleteProfile, viewProfile } from "@/services/cmds";
 import { Notice } from "@/components/base";
 import { EditorViewer } from "./editor-viewer";
-import { ProfileBox } from "./profile-box";
+import { PROFILE_CARD_TITLE_FONT_SIZE, ProfileBox } from "./profile-box";
 import parseTraffic from "@/utils/parse-traffic";
 
 const round = keyframes`
@@ -251,10 +251,11 @@ export const ProfileItem = (props: Props) => {
 
             <Typography
               width="calc(100% - 36px)"
-              variant="h6"
+              variant="subtitle1"
               component="h2"
               noWrap
               title={displayName}
+              sx={{ fontSize: PROFILE_CARD_TITLE_FONT_SIZE, fontWeight: 600 }}
             >
               {displayName}
             </Typography>

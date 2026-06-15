@@ -1,5 +1,7 @@
 import { alpha, Box, styled } from "@mui/material";
 
+export const PROFILE_CARD_TITLE_FONT_SIZE = "1.05rem";
+
 export const ProfileBox = styled(Box)(
   ({ theme, "aria-selected": selected }) => {
     const { mode, primary, text } = theme.palette;
