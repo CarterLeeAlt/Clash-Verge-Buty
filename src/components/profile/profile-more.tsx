@@ -31,7 +31,7 @@ function getProfileDisplayName(item: IProfileItem) {
 
 function getProfileDisplayDesc(item: IProfileItem) {
   if (item.uid === GLOBAL_SCRIPT_UID) {
-    return "User Global Script";
+    return "user global script";
   }
 
   return item.desc;
