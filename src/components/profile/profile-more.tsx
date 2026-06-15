@@ -29,6 +29,14 @@ function getProfileDisplayName(item: IProfileItem) {
   return item.name;
 }
 
+function getProfileDisplayDesc(item: IProfileItem) {
+  if (item.uid === GLOBAL_SCRIPT_UID) {
+    return "User Global Script";
+  }
+
+  return item.desc;
+}
+
 interface Props {
   selected: boolean;
   itemData: IProfileItem;
@@ -63,6 +71,7 @@ export const ProfileMore = (props: Props) => {
 
   const { uid, type } = itemData;
   const displayName = getProfileDisplayName(itemData);
+  const displayDesc = getProfileDisplayDesc(itemData);
   const { t, i18n } = useTranslation();
   const [anchorEl, setAnchorEl] = useState<any>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
@@ -123,6 +132,22 @@ export const ProfileMore = (props: Props) => {
     justifyContent: "space-between",
     lineHeight: 1,
   };
+  const bottomInfoRowStyle = {
+    ...boxStyle,
+    columnGap: 1,
+    fontSize: 14,
+  };
+  const leftInfoStyle = {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+  const rightTimeStyle = {
+    flexShrink: 0,
+    minWidth: "fit-content",
+    textAlign: "right",
+    whiteSpace: "nowrap",
+  };
 
   return (
     <>
@@ -172,24 +197,15 @@ export const ProfileMore = (props: Props) => {
               </Typography>
             </Box>
 
-            <Box sx={boxStyle}>
-              <Typography
-                noWrap
-                title={itemData.desc}
-                sx={
-                  i18n.language === "zh" ? { width: "calc(100% - 75px)" } : {}
-                }
-              >
-                {itemData.desc}
-              </Typography>
-
+            <Box sx={bottomInfoRowStyle}>
+              <Box />
               <Typography
                 noWrap
                 flex="1 0 auto"
                 component="span"
                 textAlign="right"
                 title={`Updated Time: ${parseExpire(itemData.updated)}`}
-                style={{ fontSize: 14 }}
+                sx={{ ...rightTimeStyle, fontSize: 14 }}
               >
                 {!!itemData.updated
                   ? dayjs(itemData.updated! * 1000).fromNow()
@@ -197,14 +213,22 @@ export const ProfileMore = (props: Props) => {
               </Typography>
             </Box>
 
-            <Box
-              sx={{
-                ...boxStyle,
-                fontSize: 14,
-                justifyContent: "flex-end",
-              }}
-            >
-              <span title="Updated Time">{parseExpire(itemData.updated)}</span>
+            <Box sx={bottomInfoRowStyle}>
+              <Typography
+                noWrap
+                title={displayDesc}
+                sx={leftInfoStyle}
+              >
+                {displayDesc}
+              </Typography>
+              <Typography
+                component="span"
+                noWrap
+                title="Updated Time"
+                sx={rightTimeStyle}
+              >
+                {parseExpire(itemData.updated)}
+              </Typography>
             </Box>
             <LinearProgress
               variant="determinate"
@@ -268,12 +292,12 @@ export const ProfileMore = (props: Props) => {
               ) : (
                 <Typography
                   noWrap
-                  title={itemData.desc}
+                  title={displayDesc}
                   sx={
                     i18n.language === "zh" ? { width: "calc(100% - 75px)" } : {}
                   }
                 >
-                  {itemData.desc}
+                  {displayDesc}
                 </Typography>
               )}
 
