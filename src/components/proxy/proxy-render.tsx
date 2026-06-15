@@ -185,7 +185,7 @@ export const ProxyRender = (props: RenderProps) => {
 };
 
 const StyledPrimary = styled("span")`
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.5;
   overflow: hidden;
@@ -193,7 +193,7 @@ const StyledPrimary = styled("span")`
   white-space: nowrap;
 `;
 const StyledSubtitle = styled("span")`
-  font-size: 12px;
+  font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
