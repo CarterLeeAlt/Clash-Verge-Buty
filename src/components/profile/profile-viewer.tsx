@@ -27,6 +27,14 @@ interface Props {
   onChange: () => void;
 }
 
+function getDefaultProfileName(type?: IProfileItem["type"]) {
+  if (type === "remote") return "远程订阅";
+  if (type === "local") return "本地文件";
+  if (type === "script") return "脚本文件";
+  if (type === "merge") return "合并文件";
+  return "配置文件";
+}
+
 export interface ProfileViewerRef {
   create: () => void;
   edit: (item: IProfileItem) => void;
@@ -99,7 +107,7 @@ export const ProfileViewer = forwardRef<ProfileViewerRef, Props>(
           if (form.option?.update_interval) {
             form.option.update_interval = +form.option.update_interval;
           }
-          const name = form.name || `${form.type} file`;
+          const name = form.name || getDefaultProfileName(form.type);
           const item = { ...form, name };
 
           // 创建

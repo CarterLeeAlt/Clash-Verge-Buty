@@ -29,14 +29,6 @@ const round = keyframes`
   to { transform: rotate(360deg); }
 `;
 
-function getProfileDisplayName(item: IProfileItem, fallbackName: string) {
-  if (item.type === "remote" && item.name === "remote file") {
-    return "远程订阅";
-  }
-
-  return fallbackName;
-}
-
 interface Props {
   id: string;
   selected: boolean;
@@ -57,10 +49,8 @@ export const ProfileItem = (props: Props) => {
   const [loadingCache, setLoadingCache] = useRecoilState(atomLoadingCache);
 
   const { uid, name = "Profile", extra, updated = 0 } = itemData;
-  const displayName = getProfileDisplayName(itemData, name);
+  const displayName = name;
 
-  // local file mode
-  // remote file mode
   const hasUrl = !!itemData.url;
   const hasExtra = !!extra; // only subscription url has extra info
 
@@ -385,7 +375,7 @@ function parseUrl(url?: string) {
   if (!url) return "";
   const regex = /https?:\/\/(.+?)\//;
   const result = url.match(regex);
-  return result ? result[1] : "local file";
+  return result ? result[1] : "";
 }
 
 function parseExpire(expire?: number) {
