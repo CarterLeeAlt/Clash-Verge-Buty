@@ -47,6 +47,8 @@ import { useProfiles } from "@/hooks/use-profiles";
 import { ConfigViewer } from "@/components/setting/mods/config-viewer";
 import { throttle } from "lodash-es";
 
+const GLOBAL_SCRIPT_UID = "__global_script__";
+
 const ProfilePage = () => {
   const { t } = useTranslation();
 
@@ -77,22 +79,25 @@ const ProfilePage = () => {
   const configRef = useRef<DialogRef>(null);
 
   // distinguish type
-  const { regularItems, enhanceItems } = useMemo(() => {
+  const { regularItems, globalScriptItem, enhanceItems } = useMemo(() => {
     const items = profiles.items || [];
     const chain = profiles.chain || [];
 
     const type1 = ["local", "remote"];
     const type2 = ["merge", "script"];
 
+    const globalScriptItem = items.find((i) => i.uid === GLOBAL_SCRIPT_UID);
     const regularItems = items.filter((i) => i && type1.includes(i.type!));
-    const restItems = items.filter((i) => i && type2.includes(i.type!));
+    const restItems = items.filter(
+      (i) => i && type2.includes(i.type!) && i.uid !== GLOBAL_SCRIPT_UID
+    );
     const restMap = Object.fromEntries(restItems.map((i) => [i.uid, i]));
     const enhanceItems = chain
       .map((i) => restMap[i]!)
       .filter(Boolean)
       .concat(restItems.filter((i) => !chain.includes(i.uid)));
 
-    return { regularItems, enhanceItems };
+    return { regularItems, globalScriptItem, enhanceItems };
   }, [profiles]);
 
   const onImport = async () => {
@@ -351,8 +356,25 @@ const ProfilePage = () => {
         </Box>
       </DndContext>
 
-      {enhanceItems.length > 0 && (
+      {(globalScriptItem || enhanceItems.length > 0) && (
         <Grid container spacing={{ xs: 2, lg: 2 }}>
+          {globalScriptItem && (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={globalScriptItem.file}>
+              <ProfileMore
+                fixed
+                selected
+                itemData={globalScriptItem}
+                enableNum={chain.length || 0}
+                logInfo={chainLogs[globalScriptItem.uid]}
+                onEnable={() => {}}
+                onDisable={() => {}}
+                onDelete={() => {}}
+                onMoveTop={() => {}}
+                onMoveEnd={() => {}}
+                onEdit={() => viewerRef.current?.edit(globalScriptItem)}
+              />
+            </Grid>
+          )}
           {enhanceItems.map((item) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={item.file}>
               <ProfileMore
