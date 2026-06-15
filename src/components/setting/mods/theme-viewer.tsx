@@ -100,16 +100,6 @@ export const ThemeViewer = forwardRef<DialogRef>((props, ref) => {
         {renderItem("Success Color", "success_color")}
 
         <Item>
-          <ListItemText primary="Font Family" />
-          <TextField
-            {...textProps}
-            value={theme.font_family ?? ""}
-            onChange={handleChange("font_family")}
-            onKeyDown={(e) => e.key === "Enter" && onSave()}
-          />
-        </Item>
-
-        <Item>
           <ListItemText primary="CSS Injection" />
           <TextField
             {...textProps}

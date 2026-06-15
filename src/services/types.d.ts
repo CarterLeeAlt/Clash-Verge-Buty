@@ -237,7 +237,6 @@ interface IVergeConfig {
     error_color?: string;
     warning_color?: string;
     success_color?: string;
-    font_family?: string;
     css_injection?: string;
   };
   auto_close_connection?: boolean;
