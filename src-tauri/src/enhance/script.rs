@@ -136,10 +136,15 @@ rules:
         let cases = [
             "function test(config) { return config; }",
             "function main(config) { return config",
+            "function main(config) { throw new Error('test'); }",
             "function main(config) { return 'bad'; }",
+            "function main(config) { return 123; }",
             "function main(config) { return [config]; }",
             "function main(config) { return null; }",
             "function main(config) { return {}; }",
+            "function main(config) { config.rules = 'bad'; return config; }",
+            "function main(config) { config.proxies = 'bad'; return config; }",
+            "function main(config) { config['proxy-groups'] = 'bad'; return config; }",
         ];
 
         for script in cases {
