@@ -2,7 +2,15 @@ import useSWR, { mutate } from "swr";
 import { useMemo, useRef, useState } from "react";
 import { useLockFn } from "ahooks";
 import { useSetRecoilState } from "recoil";
-import { Box, Button, Grid, IconButton, Stack, TextField } from "@mui/material";
+import {
+  Box,
+  Button,
+  Divider,
+  Grid,
+  IconButton,
+  Stack,
+  TextField,
+} from "@mui/material";
 import {
   DndContext,
   closestCenter,
@@ -356,12 +364,14 @@ const ProfilePage = () => {
         </Box>
       </DndContext>
 
-      {(globalScriptItem || enhanceItems.length > 0) && (
-        <Grid container spacing={{ xs: 2, lg: 2 }}>
-          {globalScriptItem && (
+      {globalScriptItem && (
+        <>
+          <Divider sx={{ mb: 2 }} />
+          <Grid container spacing={{ xs: 1, lg: 1 }} sx={{ mb: 2 }}>
             <Grid item xs={12} sm={6} md={4} lg={3} key={globalScriptItem.file}>
               <ProfileMore
                 fixed
+                fixedColor="#6942d4"
                 selected
                 itemData={globalScriptItem}
                 enableNum={chain.length || 0}
@@ -374,7 +384,12 @@ const ProfilePage = () => {
                 onEdit={() => viewerRef.current?.edit(globalScriptItem)}
               />
             </Grid>
-          )}
+          </Grid>
+        </>
+      )}
+
+      {enhanceItems.length > 0 && (
+        <Grid container spacing={{ xs: 2, lg: 2 }}>
           {enhanceItems.map((item) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={item.file}>
               <ProfileMore

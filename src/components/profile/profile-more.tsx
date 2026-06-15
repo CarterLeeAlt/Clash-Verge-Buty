@@ -10,6 +10,7 @@ import {
   MenuItem,
   Menu,
   IconButton,
+  LinearProgress,
 } from "@mui/material";
 import { FeaturedPlayListRounded } from "@mui/icons-material";
 import { viewProfile } from "@/services/cmds";
@@ -30,6 +31,7 @@ interface Props {
   onDelete: () => void;
   onEdit: () => void;
   fixed?: boolean;
+  fixedColor?: string;
 }
 
 // profile enhanced item
@@ -46,9 +48,11 @@ export const ProfileMore = (props: Props) => {
     onDelete,
     onEdit,
     fixed = false,
+    fixedColor,
   } = props;
 
   const { uid, type } = itemData;
+  const displayName = fixed ? "Global Overwrite Script" : itemData.name;
   const { t, i18n } = useTranslation();
   const [anchorEl, setAnchorEl] = useState<any>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
@@ -84,7 +88,6 @@ export const ProfileMore = (props: Props) => {
 
   const fixedMenu = [
     { label: "Edit File", handler: onEditFile },
-    { label: "Open File", handler: onOpenFile },
   ];
 
   const enableMenu = [
@@ -117,6 +120,15 @@ export const ProfileMore = (props: Props) => {
     <>
       <ProfileBox
         aria-selected={selected}
+        sx={
+          fixed && fixedColor
+            ? {
+                borderLeft: `3px solid ${fixedColor}`,
+                width: "calc(100% + 3px)",
+                marginLeft: "-3px",
+              }
+            : undefined
+        }
         onDoubleClick={onEditFile}
         // onClick={() => onSelect(false)}
         onContextMenu={(event) => {
@@ -137,9 +149,9 @@ export const ProfileMore = (props: Props) => {
             variant="h6"
             component="h2"
             noWrap
-            title={itemData.name}
+            title={displayName}
           >
-            {itemData.name}
+            {displayName}
           </Typography>
 
           <Chip
@@ -197,6 +209,25 @@ export const ProfileMore = (props: Props) => {
               : ""}
           </Typography>
         </Box>
+
+        {fixed && (
+          <>
+            <Box
+              sx={{
+                ...boxStyle,
+                fontSize: 14,
+                justifyContent: "flex-end",
+              }}
+            >
+              <span title="Updated Time">{parseExpire(itemData.updated)}</span>
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={0}
+              sx={{ visibility: "hidden" }}
+            />
+          </>
+        )}
       </ProfileBox>
 
       <Menu
