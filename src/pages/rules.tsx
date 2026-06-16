@@ -1,7 +1,7 @@
 import useSWR from "swr";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Virtuoso } from "react-virtuoso";
+import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { Box, TextField } from "@mui/material";
 import { getRules } from "@/services/api";
 import { BaseEmpty, BasePage } from "@/components/base";
@@ -13,10 +13,21 @@ const RulesPage = () => {
   const { data = [] } = useSWR("getRules", getRules);
 
   const [filterText, setFilterText] = useState("");
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   const rules = useMemo(() => {
     return data.filter((each) => each.payload.includes(filterText));
   }, [data, filterText]);
+
+  useEffect(() => {
+    if (rules.length > 0) {
+      virtuosoRef.current?.scrollToIndex({
+        index: 0,
+        align: "start",
+        behavior: "auto",
+      });
+    }
+  }, [rules, filterText]);
 
   return (
     <BasePage
@@ -56,11 +67,11 @@ const RulesPage = () => {
       <Box height="calc(100% - 50px)">
         {rules.length > 0 ? (
           <Virtuoso
+            ref={virtuosoRef}
             data={rules}
             itemContent={(index, item) => (
               <RuleItem index={index + 1} value={item} />
             )}
-            followOutput={"smooth"}
           />
         ) : (
           <BaseEmpty text="No Rules" />
