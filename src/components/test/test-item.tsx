@@ -204,8 +204,6 @@ export const TestItem = (props: Props) => {
             >
               {name}
             </Typography>
-              {name}
-            </Typography>
           </Box>
         </Box>
         <Divider sx={{ marginTop: "8px" }} />
