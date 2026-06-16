@@ -1,15 +1,11 @@
-import { Button, ButtonGroup } from "@mui/material";
+import { Box, Button, ButtonGroup } from "@mui/material";
 import { appWindow } from "@tauri-apps/api/window";
 import {
   CloseRounded,
   CropSquareRounded,
   FilterNoneRounded,
   HorizontalRuleRounded,
-  PushPinOutlined,
-  PushPinRounded,
 } from "@mui/icons-material";
-import LockRounded from "@mui/icons-material/LockRounded";
-import LockOpenRounded from "@mui/icons-material/LockOpenRounded";
 import { useEffect, useState } from "react";
 import { Notice } from "@/components/base";
 import { setWindowSizeLocked } from "@/services/cmds";
@@ -18,6 +14,95 @@ import { useVerge } from "@/hooks/use-verge";
 interface LayoutControlProps {
   nativeDecorations?: boolean;
 }
+
+type ControlGlyphProps = {
+  type: "lock" | "unlock" | "pin" | "pinOutlined";
+};
+
+const ControlGlyph = ({ type }: ControlGlyphProps) => {
+  const isLock = type === "lock" || type === "unlock";
+  const isFilled = type === "pin";
+
+  if (isLock) {
+    return (
+      <Box
+        component="span"
+        sx={{
+          position: "relative",
+          display: "block",
+          width: 16,
+          height: 16,
+          color: "currentColor",
+          boxSizing: "border-box",
+          "&::before": {
+            content: '""',
+            position: "absolute",
+            left: type === "unlock" ? 7 : 4,
+            top: type === "unlock" ? 0 : 1,
+            width: 8,
+            height: 7,
+            border: "2px solid currentColor",
+            borderBottom: 0,
+            borderRadius: "8px 8px 0 0",
+            boxSizing: "border-box",
+            transform: type === "unlock" ? "rotate(-35deg)" : "none",
+            transformOrigin: "left bottom",
+          },
+          "&::after": {
+            content: '""',
+            position: "absolute",
+            left: 3,
+            bottom: 2,
+            width: 10,
+            height: 8,
+            border: "2px solid currentColor",
+            borderRadius: "2px",
+            boxSizing: "border-box",
+            backgroundColor: "transparent",
+          },
+        }}
+      />
+    );
+  }
+
+  return (
+    <Box
+      component="span"
+      sx={{
+        position: "relative",
+        display: "block",
+        width: 16,
+        height: 16,
+        color: "currentColor",
+        transform: "rotate(35deg)",
+        boxSizing: "border-box",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          left: 5,
+          top: 1,
+          width: 6,
+          height: 8,
+          border: "2px solid currentColor",
+          borderRadius: "2px 2px 1px 1px",
+          backgroundColor: isFilled ? "currentColor" : "transparent",
+          boxSizing: "border-box",
+        },
+        "&::after": {
+          content: '""',
+          position: "absolute",
+          left: 7,
+          top: 8,
+          width: 2,
+          height: 7,
+          borderRadius: "999px",
+          backgroundColor: "currentColor",
+          boxSizing: "border-box",
+        },
+      }}
+    />
+  );
+};
 
 export const LayoutControl = ({
   nativeDecorations = false,
@@ -30,6 +115,7 @@ export const LayoutControl = ({
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    color: "text.secondary",
     svg: { transform: "scale(0.9)" },
   };
 
@@ -89,18 +175,15 @@ export const LayoutControl = ({
         },
       }}
     >
-      <Button size="small" sx={controlButtonSx} onClick={onToggleSizeLocked}>
-        {isSizeLocked ? (
-          <LockRounded
-            fontSize="small"
-            sx={{ color: "error.main", display: "block" }}
-          />
-        ) : (
-          <LockOpenRounded
-            fontSize="small"
-            sx={{ color: "text.secondary", display: "block" }}
-          />
-        )}
+      <Button
+        size="small"
+        sx={{
+          ...controlButtonSx,
+          color: isSizeLocked ? "error.main" : "text.secondary",
+        }}
+        onClick={onToggleSizeLocked}
+      >
+        <ControlGlyph type={isSizeLocked ? "lock" : "unlock"} />
       </Button>
 
       <Button
@@ -111,11 +194,7 @@ export const LayoutControl = ({
           setIsPined((isPined) => !isPined);
         }}
       >
-        {isPined ? (
-          <PushPinRounded fontSize="small" />
-        ) : (
-          <PushPinOutlined fontSize="small" />
-        )}
+        <ControlGlyph type={isPined ? "pin" : "pinOutlined"} />
       </Button>
 
       <Button
