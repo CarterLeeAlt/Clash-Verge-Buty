@@ -191,7 +191,11 @@ export const ProfileMore = (props: Props) => {
                 component="h2"
                 noWrap
                 title={displayName}
-                sx={{ fontSize: PROFILE_CARD_TITLE_FONT_SIZE, fontWeight: 600 }}
+                sx={{
+                  color: "#000000",
+                  fontSize: PROFILE_CARD_TITLE_FONT_SIZE,
+                  fontWeight: 600,
+                }}
               >
                 {displayName}
               </Typography>
@@ -217,7 +221,11 @@ export const ProfileMore = (props: Props) => {
               <Typography
                 noWrap
                 title={displayDesc}
-                sx={leftInfoStyle}
+                sx={{
+                  ...leftInfoStyle,
+                  color: fixedColor,
+                  fontWeight: 400,
+                }}
               >
                 {displayDesc}
               </Typography>
@@ -251,7 +259,11 @@ export const ProfileMore = (props: Props) => {
                 component="h2"
                 noWrap
                 title={displayName}
-                sx={{ fontSize: PROFILE_CARD_TITLE_FONT_SIZE, fontWeight: 600 }}
+                sx={{
+                  color: "#000000",
+                  fontSize: PROFILE_CARD_TITLE_FONT_SIZE,
+                  fontWeight: 600,
+                }}
               >
                 {displayName}
               </Typography>
