@@ -5,11 +5,11 @@ import {
   CropSquareRounded,
   FilterNoneRounded,
   HorizontalRuleRounded,
-  LockOpenRounded,
-  LockRounded,
-  RestartAltRounded,
 } from "@mui/icons-material";
 import { useEffect, useState } from "react";
+import LockIcon from "@/assets/icons/lock.svg?react";
+import LockOpenIcon from "@/assets/icons/lock_open.svg?react";
+import RestartIcon from "@/assets/icons/restart.svg?react";
 import { Notice } from "@/components/base";
 import { restartSidecar, setWindowSizeLocked } from "@/services/cmds";
 import { useVerge } from "@/hooks/use-verge";
@@ -31,9 +31,12 @@ export const LayoutControl = ({
     justifyContent: "center",
     color: "text.secondary",
     svg: {
-      transform: "scale(0.9)",
+      width: 20,
+      height: 20,
       display: "block",
-      bgcolor: "transparent",
+      transform: "scale(0.9)",
+    },
+    "svg path": {
       fill: "currentColor",
     },
   };
@@ -110,15 +113,11 @@ export const LayoutControl = ({
         }}
         onClick={onToggleSizeLocked}
       >
-        {isSizeLocked ? (
-          <LockRounded fontSize="small" />
-        ) : (
-          <LockOpenRounded fontSize="small" />
-        )}
+        {isSizeLocked ? <LockIcon /> : <LockOpenIcon />}
       </Button>
 
       <Button size="small" sx={controlButtonSx} onClick={onRestartSidecar}>
-        <RestartAltRounded fontSize="small" />
+        <RestartIcon />
       </Button>
 
       <Button
@@ -151,7 +150,7 @@ export const LayoutControl = ({
         size="small"
         sx={{
           ...controlButtonSx,
-          svg: { transform: "scale(1.05)" },
+          svg: { ...controlButtonSx.svg, transform: "scale(1.05)" },
           ":hover": { bgcolor: "#ff000090" },
         }}
         onClick={() => appWindow.hide().catch(() => undefined)}
