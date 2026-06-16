@@ -2,9 +2,9 @@ import useSWR from "swr";
 import { useEffect, useMemo } from "react";
 import { useLockFn } from "ahooks";
 import { useTranslation } from "react-i18next";
-import { RestartAlt } from "@mui/icons-material";
-import LockRounded from "@mui/icons-material/LockRounded";
-import LockOpenRounded from "@mui/icons-material/LockOpenRounded";
+import lockIconUrl from "@/assets/icons/lock.svg";
+import lockOpenRightIconUrl from "@/assets/icons/lock_open_right.svg";
+import syncIconUrl from "@/assets/icons/sync.svg";
 import { Box, Button, ButtonGroup, IconButton, Tooltip } from "@mui/material";
 import {
   closeAllConnections,
@@ -20,6 +20,24 @@ import { useVerge } from "@/hooks/use-verge";
 import { BasePage, Notice } from "@/components/base";
 import { ProxyGroups } from "@/components/proxy/proxy-groups";
 import { ProviderButton } from "@/components/proxy/provider-button";
+
+function LocalMaskIcon(props: { src: string; size?: number }) {
+  const { src, size = 22 } = props;
+
+  return (
+    <span
+      aria-hidden
+      style={{
+        display: "inline-block",
+        width: size,
+        height: size,
+        backgroundColor: "currentColor",
+        mask: `url(${src}) center / contain no-repeat`,
+        WebkitMask: `url(${src}) center / contain no-repeat`,
+      }}
+    />
+  );
+}
 
 const ProxyPage = () => {
   const { t } = useTranslation();
@@ -96,23 +114,20 @@ const ProxyPage = () => {
                 color="inherit"
                 onClick={onToggleSizeLocked}
               >
-                {isSizeLocked ? (
-                  <LockRounded
-                    fontSize="small"
-                    sx={{ color: "error.main", display: "block" }}
-                  />
-                ) : (
-                  <LockOpenRounded
-                    fontSize="small"
-                    sx={{ color: "text.secondary", display: "block" }}
-                  />
-                )}
+                <LocalMaskIcon
+                  src={isSizeLocked ? lockIconUrl : lockOpenRightIconUrl}
+                />
               </IconButton>
             </Tooltip>
 
             <Tooltip title={t("Restart")}>
-              <IconButton size="small" color="inherit" onClick={onRestartCore} sx={{ mr: 1.1 }}>
-                <RestartAlt fontSize="small" />
+              <IconButton
+                size="small"
+                color="inherit"
+                onClick={onRestartCore}
+                sx={{ mr: 1.1 }}
+              >
+                <LocalMaskIcon src={syncIconUrl} />
               </IconButton>
             </Tooltip>
 
