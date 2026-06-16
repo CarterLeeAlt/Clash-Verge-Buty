@@ -1070,6 +1070,63 @@ fn schedule_create_window_show_fallback(
     });
 }
 
+#[cfg(target_os = "windows")]
+fn env_flag_enabled(name: &str) -> bool {
+    std::env::var(name)
+        .map(|value| {
+            matches!(
+                value.to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn valid_window_size_position(size_pos: &[f64]) -> bool {
+    size_pos.len() == 4
+        && size_pos.iter().all(|value| value.is_finite())
+        && size_pos[0] >= 600.0
+        && size_pos[1] >= 520.0
+        && size_pos[0] <= 20_000.0
+        && size_pos[1] <= 20_000.0
+        && size_pos[2].abs() <= 100_000.0
+        && size_pos[3].abs() <= 100_000.0
+}
+
+#[cfg(target_os = "windows")]
+fn windows_webview2_args(reliable_mode: bool, fallback_mode: bool) -> Option<String> {
+    let mut args = Vec::new();
+
+    if !reliable_mode {
+        args.push("--enable-features=msWebView2EnableDraggableRegions".to_string());
+    }
+
+    if fallback_mode || env_flag_enabled("CLASH_VERGE_WEBVIEW2_DISABLE_GPU") {
+        args.push("--disable-gpu".to_string());
+    }
+
+    if fallback_mode || env_flag_enabled("CLASH_VERGE_WEBVIEW2_DISABLE_HW_ACCELERATION") {
+        args.push("--disable-software-rasterizer".to_string());
+        args.push("--disable-accelerated-2d-canvas".to_string());
+        args.push("--disable-accelerated-video-decode".to_string());
+    }
+
+    if let Ok(extra_args) = std::env::var("CLASH_VERGE_WEBVIEW2_ARGS") {
+        args.extend(
+            extra_args
+                .split_whitespace()
+                .filter(|arg| !arg.trim().is_empty())
+                .map(|arg| arg.to_string()),
+        );
+    }
+
+    if args.is_empty() {
+        None
+    } else {
+        Some(args.join(" "))
+    }
+}
+
 /// create main window
 pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
     if show_when_ready {
@@ -1131,38 +1188,67 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
     FRONTEND_READY_HANDLED.store(false, Ordering::SeqCst);
     log::trace!("create_window reset frontend ready handled for new main window");
 
-    let mut builder = tauri::window::WindowBuilder::new(
-        app_handle,
-        "main".to_string(),
-        tauri::WindowUrl::App("index.html".into()),
-    )
-    .title("Clash-Verge-Buty")
-    .visible(false)
-    .fullscreen(false)
-    .min_inner_size(600.0, 520.0);
-
     let window_size_locked = Config::verge().latest().window_size_locked.unwrap_or(false);
-    builder = builder
+    let configured_size_pos = Config::verge().latest().window_size_position.clone();
+    let size_pos_is_valid = configured_size_pos
+        .as_ref()
+        .map(|size_pos| valid_window_size_position(size_pos))
+        .unwrap_or(false);
+    if let Some(size_pos) = configured_size_pos.as_ref() {
+        if !size_pos_is_valid {
+            log::warn!(
+                target: "app",
+                "create_window ignoring abnormal window_size_position={:?}; safe centered defaults will be used and saved value will be cleared",
+                size_pos
+            );
+            Config::verge().data().patch_config(IVerge {
+                window_size_position: None,
+                ..IVerge::default()
+            });
+            match Config::verge().data().save_file() {
+                Ok(_) => log::info!(
+                    target: "app",
+                    "create_window cleared abnormal saved window_size_position"
+                ),
+                Err(err) => log::warn!(
+                    target: "app",
+                    "create_window failed to clear abnormal saved window_size_position: {err}"
+                ),
+            }
+        } else {
+            log::info!(
+                target: "app",
+                "create_window using saved window_size_position={:?}",
+                size_pos
+            );
+        }
+    } else {
+        log::info!(target: "app", "create_window no saved window_size_position");
+    }
+
+    let build_window = |fallback_mode: bool, use_saved_size_pos: bool| {
+        let mut builder = tauri::window::WindowBuilder::new(
+            app_handle,
+            "main".to_string(),
+            tauri::WindowUrl::App("index.html".into()),
+        )
+        .title("Clash-Verge-Buty")
+        .visible(false)
+        .fullscreen(false)
+        .min_inner_size(600.0, 520.0)
         .resizable(!window_size_locked)
         .maximizable(!window_size_locked);
 
-    match Config::verge().latest().window_size_position.clone() {
-        Some(size_pos) if size_pos.len() == 4 => {
-            let size = (size_pos[0], size_pos[1]);
-            let pos = (size_pos[2], size_pos[3]);
-            let w = size.0.clamp(600.0, f64::INFINITY);
-            let h = size.1.clamp(520.0, f64::INFINITY);
-            builder = builder.inner_size(w, h).position(pos.0, pos.1);
-        }
-        _ => {
+        if use_saved_size_pos {
+            if let Some(size_pos) = configured_size_pos.as_ref() {
+                let w = size_pos[0].clamp(600.0, 20_000.0);
+                let h = size_pos[1].clamp(520.0, 20_000.0);
+                builder = builder.inner_size(w, h).position(size_pos[2], size_pos[3]);
+            }
+        } else {
             #[cfg(target_os = "windows")]
             {
                 builder = builder.inner_size(800.0, 636.0).center();
-                if !reliable_mode {
-                    builder = builder.additional_browser_args(
-                        "--enable-features=msWebView2EnableDraggableRegions",
-                    );
-                }
             }
 
             #[cfg(target_os = "macos")]
@@ -1175,52 +1261,107 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
                 builder = builder.inner_size(800.0, 642.0).center();
             }
         }
-    };
-    #[cfg(target_os = "windows")]
-    if !reliable_mode && Config::verge().latest().window_size_position.is_some() {
-        builder =
-            builder.additional_browser_args("--enable-features=msWebView2EnableDraggableRegions");
-    }
 
+        #[cfg(target_os = "windows")]
+        if let Some(args) = windows_webview2_args(reliable_mode, fallback_mode) {
+            log::info!(
+                target: "app",
+                "create_window applying WebView2 additional_browser_args='{}', fallback_mode={}",
+                args,
+                fallback_mode
+            );
+            builder = builder.additional_browser_args(&args);
+        }
+
+        #[cfg(target_os = "windows")]
+        let window = if reliable_mode || fallback_mode {
+            builder
+                .decorations(true)
+                .transparent(false)
+                .visible(false)
+                .build()
+        } else {
+            builder
+                .decorations(false)
+                .transparent(true)
+                .visible(false)
+                .build()
+        };
+        #[cfg(target_os = "macos")]
+        let window = builder
+            .decorations(true)
+            .hidden_title(true)
+            .title_bar_style(tauri::TitleBarStyle::Overlay)
+            .build();
+        #[cfg(target_os = "linux")]
+        let window = builder.decorations(true).transparent(false).build();
+
+        window
+    };
+
+    let use_saved_size_pos = size_pos_is_valid;
     let build_start = Instant::now();
     log::info!(
         target: "app",
-        "create_window before WindowBuilder::build, show_when_ready={}, show_request_id={}",
+        "create_window primary build start before WindowBuilder::build, show_when_ready={}, show_request_id={}, reliable_mode={}, saved_size_pos={}, fallback_mode=false, window_size_locked={}",
         show_when_ready,
-        MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst)
+        MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst),
+        reliable_mode,
+        use_saved_size_pos,
+        window_size_locked
     );
-
-    #[cfg(target_os = "windows")]
-    let window = if reliable_mode {
-        builder
-            .decorations(true)
-            .transparent(false)
-            .visible(false)
-            .build()
-    } else {
-        builder
-            .decorations(false)
-            .transparent(true)
-            .visible(false)
-            .build()
-    };
-    #[cfg(target_os = "macos")]
-    let window = builder
-        .decorations(true)
-        .hidden_title(true)
-        .title_bar_style(tauri::TitleBarStyle::Overlay)
-        .build();
-    #[cfg(target_os = "linux")]
-    let window = builder.decorations(true).transparent(false).build();
+    let mut window = build_window(false, use_saved_size_pos);
+    let mut used_window_fallback = false;
 
     log::info!(
         target: "app",
-        "create_window after WindowBuilder::build, result={}, elapsed_ms={}, show_when_ready={}, show_request_id={}",
+        "create_window primary build finished after WindowBuilder::build, result={}, elapsed_ms={}, show_when_ready={}, show_request_id={}, fallback_mode=false",
         if window.is_ok() { "ok" } else { "err" },
         build_start.elapsed().as_millis(),
         show_when_ready,
         MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst)
     );
+
+    #[cfg(target_os = "windows")]
+    if let Err(err) = &window {
+        let retry_start = Instant::now();
+        log::error!(
+            target: "app",
+            "create_window primary build Err: {err}; retrying with reliable decorated WebView2 fallback, disabled GPU/hardware acceleration, and centered safe size"
+        );
+        if configured_size_pos.is_some() && size_pos_is_valid {
+            Config::verge().data().patch_config(IVerge {
+                window_size_position: None,
+                ..IVerge::default()
+            });
+            match Config::verge().data().save_file() {
+                Ok(_) => log::info!(
+                    target: "app",
+                    "create_window cleared saved window_size_position before fallback retry"
+                ),
+                Err(err) => log::warn!(
+                    target: "app",
+                    "create_window failed to clear saved window_size_position before fallback retry: {err}"
+                ),
+            }
+        }
+        log::info!(
+            target: "app",
+            "create_window fallback build start before WindowBuilder::build, show_when_ready={}, show_request_id={}, reliable_mode=true, saved_size_pos=false, fallback_mode=true",
+            show_when_ready,
+            MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst)
+        );
+        window = build_window(true, false);
+        used_window_fallback = window.is_ok();
+        log::info!(
+            target: "app",
+            "create_window fallback build finished after WindowBuilder::build, result={}, elapsed_ms={}, show_when_ready={}, show_request_id={}, fallback_mode=true",
+            if window.is_ok() { "ok" } else { "err" },
+            retry_start.elapsed().as_millis(),
+            show_when_ready,
+            MAIN_WINDOW_SHOW_REQUEST_ID.load(Ordering::SeqCst)
+        );
+    }
 
     match window {
         Ok(win) => {
@@ -1256,8 +1397,13 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
                 trace_err!(win.center(), "set win center");
             }
 
-            if reliable_mode {
-                log::info!(target: "app", "create_window set_shadow skipped, reliable_mode=true");
+            if reliable_mode || used_window_fallback {
+                log::info!(
+                    target: "app",
+                    "create_window set_shadow skipped, reliable_mode={}, fallback_mode={}",
+                    reliable_mode,
+                    used_window_fallback
+                );
             } else {
                 log::debug!(target: "app", "create_window before set_shadow");
                 trace_err!(set_shadow(&win, true), "set win shadow");
