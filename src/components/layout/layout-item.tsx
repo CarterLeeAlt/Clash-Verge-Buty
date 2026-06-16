@@ -33,7 +33,7 @@ export const LayoutItem = (props: Props) => {
             "& .MuiListItemText-primary": {
               color: "text.primary",
               fontSize: "1.05rem",
-              fontWeight: "700",
+              fontWeight: 600,
             },
           },
           ({ palette: { mode, primary } }) => {
