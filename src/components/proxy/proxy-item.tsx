@@ -113,7 +113,7 @@ export const ProxyItem = (props: Props) => {
                   marginRight: "8px",
                   fontSize: "13px",
                   color: "text.primary",
-                  fontWeight: "700",
+                  fontWeight: 600,
                 }}
               >
                 {proxy.name}
