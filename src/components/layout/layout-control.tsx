@@ -18,19 +18,21 @@ interface LayoutControlProps {
   nativeDecorations?: boolean;
 }
 
-function LocalMaskIcon(props: { src: string; size?: number }) {
+function LocalSvgIcon(props: { src: string; size?: number }) {
   const { src, size = 20 } = props;
 
   return (
-    <span
+    <img
       aria-hidden
+      src={src}
+      draggable={false}
       style={{
-        display: "inline-block",
+        display: "block",
         width: size,
         height: size,
-        backgroundColor: "currentColor",
-        mask: `url(${src}) center / contain no-repeat`,
-        WebkitMask: `url(${src}) center / contain no-repeat`,
+        objectFit: "contain",
+        pointerEvents: "none",
+        userSelect: "none",
       }}
     />
   );
@@ -118,15 +120,15 @@ export const LayoutControl = ({
         size="small"
         sx={{
           ...controlButtonSx,
-          color: isSizeLocked ? "error.main" : "text.secondary",
+          opacity: isSizeLocked ? 1 : 0.72,
         }}
         onClick={onToggleSizeLocked}
       >
-        <LocalMaskIcon src={isSizeLocked ? lockIconUrl : lockOpenIconUrl} />
+        <LocalSvgIcon src={isSizeLocked ? lockIconUrl : lockOpenIconUrl} />
       </Button>
 
       <Button size="small" sx={controlButtonSx} onClick={onRestartSidecar}>
-        <LocalMaskIcon src={restartIconUrl} />
+        <LocalSvgIcon src={restartIconUrl} />
       </Button>
 
       <Button
