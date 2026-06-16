@@ -261,7 +261,11 @@ export const ProfileItem = (props: Props) => {
               component="h2"
               noWrap
               title={displayName}
-              sx={{ fontSize: PROFILE_CARD_TITLE_FONT_SIZE, fontWeight: 600 }}
+              sx={{
+                color: "#000000",
+                fontSize: PROFILE_CARD_TITLE_FONT_SIZE,
+                fontWeight: 600,
+              }}
             >
               {displayName}
             </Typography>
@@ -295,7 +299,9 @@ export const ProfileItem = (props: Props) => {
             <>
               <Typography noWrap title="Used / Total" sx={leftInfoStyle}>
                 {hasExtra
-                  ? `${parseTraffic(upload + download)} / ${parseTraffic(total)}`
+                  ? `${parseTraffic(upload + download)} / ${parseTraffic(
+                      total
+                    )}`
                   : ""}
               </Typography>
 
@@ -319,7 +325,13 @@ export const ProfileItem = (props: Props) => {
           <Typography
             noWrap
             title={hasUrl ? `From: ${from}` : itemData.desc}
-            sx={leftInfoStyle}
+            sx={[
+              leftInfoStyle,
+              ({ palette }) => ({
+                color: palette.primary.main,
+                fontWeight: 400,
+              }),
+            ]}
           >
             {hasUrl ? from : itemData.desc}
           </Typography>
