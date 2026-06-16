@@ -16,12 +16,7 @@ export const ProfileBox = styled(Box)(
       "dark-false": alpha(text.secondary, 0.65),
     }[key]!;
 
-    const h2color = {
-      "light-true": primary.main,
-      "light-false": text.primary,
-      "dark-true": primary.main,
-      "dark-false": text.primary,
-    }[key]!;
+    const h2color = "#000000";
 
     const borderSelect = {
       "light-true": {
