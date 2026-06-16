@@ -16,6 +16,7 @@ import { editor } from "monaco-editor/esm/vs/editor/editor.api";
 import "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js";
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution.js";
 import "monaco-editor/esm/vs/editor/contrib/folding/browser/folding.js";
+import "monaco-editor/esm/vs/editor/contrib/find/browser/findController.js";
 
 export const ConfigViewer = forwardRef<DialogRef>((props, ref) => {
   const { t } = useTranslation();
@@ -52,6 +53,8 @@ export const ConfigViewer = forwardRef<DialogRef>((props, ref) => {
           fontFamily: `"Ubuntu Sans Mono", "Noto Sans SC", "twemoji mozilla", monospace`,
           readOnly: true,
         });
+
+        instanceRef.current.focus();
       });
     },
     close: () => setOpen(false),
