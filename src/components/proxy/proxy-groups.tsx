@@ -71,8 +71,9 @@ export const ProxyGroups = (props: Props) => {
 
       if (verge?.auto_close_connection) {
         getConnections().then(({ connections }) => {
+          const connectionList = Array.isArray(connections) ? connections : [];
           Promise.allSettled(
-            connections
+            connectionList
               .filter((conn) => conn.chains.includes(now!))
               .map((conn) => deleteConnection(conn.id))
           ).finally(() => {
