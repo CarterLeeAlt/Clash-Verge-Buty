@@ -7,15 +7,33 @@ import {
   HorizontalRuleRounded,
 } from "@mui/icons-material";
 import { useEffect, useState } from "react";
-import LockIcon from "@/assets/icons/lock.svg?react";
-import LockOpenIcon from "@/assets/icons/lock_open.svg?react";
-import RestartIcon from "@/assets/icons/restart.svg?react";
+import lockIconUrl from "@/assets/icons/lock.svg";
+import lockOpenIconUrl from "@/assets/icons/lock_open.svg";
+import restartIconUrl from "@/assets/icons/restart.svg";
 import { Notice } from "@/components/base";
 import { restartSidecar, setWindowSizeLocked } from "@/services/cmds";
 import { useVerge } from "@/hooks/use-verge";
 
 interface LayoutControlProps {
   nativeDecorations?: boolean;
+}
+
+function LocalMaskIcon(props: { src: string; size?: number }) {
+  const { src, size = 20 } = props;
+
+  return (
+    <span
+      aria-hidden
+      style={{
+        display: "inline-block",
+        width: size,
+        height: size,
+        backgroundColor: "currentColor",
+        mask: `url(${src}) center / contain no-repeat`,
+        WebkitMask: `url(${src}) center / contain no-repeat`,
+      }}
+    />
+  );
 }
 
 export const LayoutControl = ({
@@ -30,15 +48,6 @@ export const LayoutControl = ({
     alignItems: "center",
     justifyContent: "center",
     color: "text.secondary",
-    svg: {
-      width: 20,
-      height: 20,
-      display: "block",
-      transform: "scale(0.9)",
-    },
-    "svg path": {
-      fill: "currentColor",
-    },
   };
 
   const { verge, mutateVerge } = useVerge();
@@ -113,11 +122,11 @@ export const LayoutControl = ({
         }}
         onClick={onToggleSizeLocked}
       >
-        {isSizeLocked ? <LockIcon /> : <LockOpenIcon />}
+        <LocalMaskIcon src={isSizeLocked ? lockIconUrl : lockOpenIconUrl} />
       </Button>
 
       <Button size="small" sx={controlButtonSx} onClick={onRestartSidecar}>
-        <RestartIcon />
+        <LocalMaskIcon src={restartIconUrl} />
       </Button>
 
       <Button
@@ -150,7 +159,7 @@ export const LayoutControl = ({
         size="small"
         sx={{
           ...controlButtonSx,
-          svg: { ...controlButtonSx.svg, transform: "scale(1.05)" },
+          svg: { transform: "scale(1.05)" },
           ":hover": { bgcolor: "#ff000090" },
         }}
         onClick={() => appWindow.hide().catch(() => undefined)}
