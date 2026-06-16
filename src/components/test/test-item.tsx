@@ -195,7 +195,15 @@ export const TestItem = (props: Props) => {
           )}
 
           <Box sx={{ display: "flex", justifyContent: "center" }}>
-            <Typography variant="h6" component="h2" noWrap title={name}>
+            <Typography
+              variant="h6"
+              component="h2"
+              noWrap
+              title={name}
+              sx={{ fontSize: 16 }}
+            >
+              {name}
+            </Typography>
               {name}
             </Typography>
           </Box>
