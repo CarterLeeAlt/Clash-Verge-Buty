@@ -21,19 +21,21 @@ import { BasePage, Notice } from "@/components/base";
 import { ProxyGroups } from "@/components/proxy/proxy-groups";
 import { ProviderButton } from "@/components/proxy/provider-button";
 
-function LocalMaskIcon(props: { src: string; size?: number }) {
+function LocalSvgIcon(props: { src: string; size?: number }) {
   const { src, size = 22 } = props;
 
   return (
-    <span
+    <img
       aria-hidden
+      src={src}
+      draggable={false}
       style={{
-        display: "inline-block",
+        display: "block",
         width: size,
         height: size,
-        backgroundColor: "currentColor",
-        mask: `url(${src}) center / contain no-repeat`,
-        WebkitMask: `url(${src}) center / contain no-repeat`,
+        objectFit: "contain",
+        pointerEvents: "none",
+        userSelect: "none",
       }}
     />
   );
@@ -114,7 +116,7 @@ const ProxyPage = () => {
                 color="inherit"
                 onClick={onToggleSizeLocked}
               >
-                <LocalMaskIcon
+                <LocalSvgIcon
                   src={isSizeLocked ? lockIconUrl : lockOpenIconUrl}
                 />
               </IconButton>
@@ -127,7 +129,7 @@ const ProxyPage = () => {
                 onClick={onRestartCore}
                 sx={{ mr: 1.1 }}
               >
-                <LocalMaskIcon src={restartIconUrl} />
+                <LocalSvgIcon src={restartIconUrl} />
               </IconButton>
             </Tooltip>
 
