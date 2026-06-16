@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup } from "@mui/material";
+import { Button, ButtonGroup, SvgIcon } from "@mui/material";
 import { appWindow } from "@tauri-apps/api/window";
 import {
   CloseRounded,
@@ -15,93 +15,37 @@ interface LayoutControlProps {
   nativeDecorations?: boolean;
 }
 
-type ControlGlyphProps = {
+type ControlIconProps = {
   type: "lock" | "unlock" | "pin" | "pinOutlined";
 };
 
-const ControlGlyph = ({ type }: ControlGlyphProps) => {
-  const isLock = type === "lock" || type === "unlock";
-  const isFilled = type === "pin";
-
-  if (isLock) {
-    return (
-      <Box
-        component="span"
-        sx={{
-          position: "relative",
-          display: "block",
-          width: 16,
-          height: 16,
-          color: "currentColor",
-          boxSizing: "border-box",
-          "&::before": {
-            content: '""',
-            position: "absolute",
-            left: type === "unlock" ? 7 : 4,
-            top: type === "unlock" ? 0 : 1,
-            width: 8,
-            height: 7,
-            border: "2px solid currentColor",
-            borderBottom: 0,
-            borderRadius: "8px 8px 0 0",
-            boxSizing: "border-box",
-            transform: type === "unlock" ? "rotate(-35deg)" : "none",
-            transformOrigin: "left bottom",
-          },
-          "&::after": {
-            content: '""',
-            position: "absolute",
-            left: 3,
-            bottom: 2,
-            width: 10,
-            height: 8,
-            border: "2px solid currentColor",
-            borderRadius: "2px",
-            boxSizing: "border-box",
-            backgroundColor: "transparent",
-          },
-        }}
-      />
-    );
+const ControlIcon = ({ type }: ControlIconProps) => {
+  switch (type) {
+    case "lock":
+      return (
+        <SvgIcon fontSize="small" viewBox="0 0 24 24">
+          <path d="M17 8h-1V6c0-2.76-2.24-5-5-5S6 3.24 6 6v2H5c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2ZM8 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H8V6Zm9 14H5V10h12v10Z" />
+        </SvgIcon>
+      );
+    case "unlock":
+      return (
+        <SvgIcon fontSize="small" viewBox="0 0 24 24">
+          <path d="M17 8H9V6c0-1.66 1.34-3 3-3 1.12 0 2.09.61 2.61 1.52.28.48.89.64 1.37.36.48-.28.64-.89.36-1.37C15.47 1.99 13.85 1 12 1 9.24 1 7 3.24 7 6v2H5c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2Zm0 12H5V10h12v10Z" />
+        </SvgIcon>
+      );
+    case "pin":
+      return (
+        <SvgIcon fontSize="small" viewBox="0 0 24 24">
+          <path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3Z" />
+        </SvgIcon>
+      );
+    case "pinOutlined":
+      return (
+        <SvgIcon fontSize="small" viewBox="0 0 24 24">
+          <path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3Zm-8.17 3C9.17 11.01 10 9.43 10 7.7V4h4v3.7c0 1.73.83 3.31 2.17 4.3H7.83Z" />
+        </SvgIcon>
+      );
   }
-
-  return (
-    <Box
-      component="span"
-      sx={{
-        position: "relative",
-        display: "block",
-        width: 16,
-        height: 16,
-        color: "currentColor",
-        transform: "rotate(35deg)",
-        boxSizing: "border-box",
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          left: 5,
-          top: 1,
-          width: 6,
-          height: 8,
-          border: "2px solid currentColor",
-          borderRadius: "2px 2px 1px 1px",
-          backgroundColor: isFilled ? "currentColor" : "transparent",
-          boxSizing: "border-box",
-        },
-        "&::after": {
-          content: '""',
-          position: "absolute",
-          left: 7,
-          top: 8,
-          width: 2,
-          height: 7,
-          borderRadius: "999px",
-          backgroundColor: "currentColor",
-          boxSizing: "border-box",
-        },
-      }}
-    />
-  );
 };
 
 export const LayoutControl = ({
@@ -183,7 +127,7 @@ export const LayoutControl = ({
         }}
         onClick={onToggleSizeLocked}
       >
-        <ControlGlyph type={isSizeLocked ? "lock" : "unlock"} />
+        <ControlIcon type={isSizeLocked ? "lock" : "unlock"} />
       </Button>
 
       <Button
@@ -194,7 +138,7 @@ export const LayoutControl = ({
           setIsPined((isPined) => !isPined);
         }}
       >
-        <ControlGlyph type={isPined ? "pin" : "pinOutlined"} />
+        <ControlIcon type={isPined ? "pin" : "pinOutlined"} />
       </Button>
 
       <Button
