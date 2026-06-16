@@ -10,13 +10,14 @@ import { ProviderButton } from "@/components/rule/provider-button";
 
 const RulesPage = () => {
   const { t } = useTranslation();
-  const { data = [] } = useSWR("getRules", getRules);
+  const { data } = useSWR("getRules", getRules);
 
   const [filterText, setFilterText] = useState("");
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   const rules = useMemo(() => {
-    return data.filter((each) => each.payload.includes(filterText));
+    const ruleList = Array.isArray(data) ? data : [];
+    return ruleList.filter((each) => each.payload.includes(filterText));
   }, [data, filterText]);
 
   useEffect(() => {

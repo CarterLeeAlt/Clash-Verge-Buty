@@ -62,7 +62,8 @@ function filterProxies(
   groupName: string,
   filterText: string
 ) {
-  if (!filterText) return proxies;
+  const proxyList = Array.isArray(proxies) ? proxies : [];
+  if (!filterText) return proxyList;
 
   const res1 = regex1.exec(filterText);
   if (res1) {
@@ -71,7 +72,7 @@ function filterProxies(
     const value =
       symbol2 === "error" ? 1e5 : symbol2 === "timeout" ? 3000 : +symbol2;
 
-    return proxies.filter((p) => {
+    return proxyList.filter((p) => {
       const delay = delayManager.getDelayFix(p, groupName);
 
       if (delay < 0) return false;
@@ -88,10 +89,10 @@ function filterProxies(
   const res2 = regex2.exec(filterText);
   if (res2) {
     const type = res2[1].toLowerCase();
-    return proxies.filter((p) => p.type.toLowerCase().includes(type));
+    return proxyList.filter((p) => p.type.toLowerCase().includes(type));
   }
 
-  return proxies.filter((p) => p.name.includes(filterText.trim()));
+  return proxyList.filter((p) => p.name.includes(filterText.trim()));
 }
 
 /**
