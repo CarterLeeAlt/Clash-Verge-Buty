@@ -3,8 +3,8 @@ import { useEffect, useMemo } from "react";
 import { useLockFn } from "ahooks";
 import { useTranslation } from "react-i18next";
 import lockIconUrl from "@/assets/icons/lock.svg";
-import lockOpenRightIconUrl from "@/assets/icons/lock_open_right.svg";
-import syncIconUrl from "@/assets/icons/sync.svg";
+import lockOpenIconUrl from "@/assets/icons/lock_open.svg";
+import restartIconUrl from "@/assets/icons/restart.svg";
 import { Box, Button, ButtonGroup, IconButton, Tooltip } from "@mui/material";
 import {
   closeAllConnections,
@@ -115,7 +115,7 @@ const ProxyPage = () => {
                 onClick={onToggleSizeLocked}
               >
                 <LocalMaskIcon
-                  src={isSizeLocked ? lockIconUrl : lockOpenRightIconUrl}
+                  src={isSizeLocked ? lockIconUrl : lockOpenIconUrl}
                 />
               </IconButton>
             </Tooltip>
@@ -127,7 +127,7 @@ const ProxyPage = () => {
                 onClick={onRestartCore}
                 sx={{ mr: 1.1 }}
               >
-                <LocalMaskIcon src={syncIconUrl} />
+                <LocalMaskIcon src={restartIconUrl} />
               </IconButton>
             </Tooltip>
 
