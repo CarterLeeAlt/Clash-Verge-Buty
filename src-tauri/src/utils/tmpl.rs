@@ -44,14 +44,38 @@ function main(params) {
 ";
 
 /// fixed global overwrite script template
-pub const ITEM_GLOBAL_SCRIPT: &str = r#"// Add custom rules before subscription rules.
+pub const ITEM_GLOBAL_SCRIPT: &str = r#"// Global Overwrite Script
+//
+// This script runs for every subscription profile after the subscription
+// config is loaded, and before normal profile merge/script items.
+// You can modify the generated mihomo/Clash config here.
+//
+// Parameters:
+// - config: the current subscription config object.
+// - profileName: the current subscription name. It may be an empty string.
+//
+// Common fields you may edit:
+// - config.rules
+// - config.proxies
+// - config["proxy-groups"]
+// - config.dns
+//
+// Requirements:
+// - Keep the main function.
+// - Always return the config object.
+// - Invalid JavaScript, missing main(), non-object returns, or broken basic
+//   config structure will be rejected when saving.
+//
+// Tip:
+// Start with small changes, such as adding custom rules before subscription
+// rules. If you do not need custom rules, keep customRules empty.
 
 function main(config, profileName) {
-  const testRules = [
+  const customRules = [
     "DOMAIN-SUFFIX,baidu.com,DIRECT",
   ];
 
-  config.rules = testRules.concat(config.rules || []);
+  config.rules = customRules.concat(config.rules || []);
 
   return config;
 }
