@@ -85,7 +85,7 @@ export const getProxyDelay = async (
   const { url, timeout = 10000, signal } = options;
   const params = {
     timeout,
-    url: url || "https://cp.cloudflare.com/generate_204",
+    url: url || "http://cp.cloudflare.com/generate_204",
   };
   const instance = await getAxios();
   const result = await instance.get(
