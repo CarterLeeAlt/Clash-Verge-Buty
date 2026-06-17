@@ -11,7 +11,7 @@ import {
   TextField,
 } from "@mui/material";
 import { useClash } from "@/hooks/use-clash";
-import { BaseDialog, DialogRef, Notice, Switch } from "@/components/base";
+import { BaseDialog, DialogRef, formatNoticeMessage, Notice, Switch } from "@/components/base";
 import { StackModeSwitch } from "./stack-mode-switch";
 
 export const TunViewer = forwardRef<DialogRef>((props, ref) => {
@@ -70,7 +70,7 @@ export const TunViewer = forwardRef<DialogRef>((props, ref) => {
       );
       setOpen(false);
     } catch (err: any) {
-      Notice.error(err.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 

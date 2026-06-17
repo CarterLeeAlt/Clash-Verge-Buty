@@ -1,6 +1,6 @@
 import { mutate } from "swr";
 import { forwardRef, useImperativeHandle, useState } from "react";
-import { BaseDialog, DialogRef, Notice } from "@/components/base";
+import { BaseDialog, DialogRef, formatNoticeMessage, Notice } from "@/components/base";
 import { useTranslation } from "react-i18next";
 import { useVerge } from "@/hooks/use-verge";
 import { useLockFn } from "ahooks";
@@ -52,9 +52,9 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
         mutate("getClashConfig");
         mutate("getVersion");
       }, 100);
-      Notice.success(`Successfully switch to ${core}`, 1000);
+      Notice.success(`Switched to ${core}.`, 1000);
     } catch (err: any) {
-      Notice.error(err?.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 
@@ -63,18 +63,18 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
       await grantPermission(core);
       // 自动重启
       if (core === clash_core) await restartSidecar();
-      Notice.success(`Successfully grant permission to ${core}`, 1000);
+      Notice.success(`Permission granted for ${core}.`, 1000);
     } catch (err: any) {
-      Notice.error(err?.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 
   const onRestart = useLockFn(async () => {
     try {
       await restartSidecar();
-      Notice.success(`Successfully restart core`, 1000);
+      Notice.success(`Clash core restarted.`, 1000);
     } catch (err: any) {
-      Notice.error(err?.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 
@@ -83,10 +83,10 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
       setUpgrading(true);
       await upgradeCore();
       setUpgrading(false);
-      Notice.success(`Successfully upgrade core`, 1000);
+      Notice.success(`Clash core upgraded.`, 1000);
     } catch (err: any) {
       setUpgrading(false);
-      Notice.error(err?.response.data.message || err.toString());
+      Notice.error(formatNoticeMessage(err?.response?.data?.message || err));
     }
   });
 

@@ -3,7 +3,7 @@ import { useLockFn } from "ahooks";
 import { useTranslation } from "react-i18next";
 import { List, ListItem, ListItemText, TextField } from "@mui/material";
 import { useClashInfo } from "@/hooks/use-clash";
-import { BaseDialog, DialogRef, Notice } from "@/components/base";
+import { BaseDialog, DialogRef, formatNoticeMessage, Notice } from "@/components/base";
 
 export const ControllerViewer = forwardRef<DialogRef>((props, ref) => {
   const { t } = useTranslation();
@@ -26,10 +26,10 @@ export const ControllerViewer = forwardRef<DialogRef>((props, ref) => {
   const onSave = useLockFn(async () => {
     try {
       await patchInfo({ "external-controller": controller, secret });
-      Notice.success("Change Clash Config successfully!", 1000);
+      Notice.success("Clash config updated.", 1000);
       setOpen(false);
     } catch (err: any) {
-      Notice.error(err.message || err.toString(), 4000);
+      Notice.error(formatNoticeMessage(err), 4000);
     }
   });
 

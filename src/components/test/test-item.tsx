@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import { BaseLoading } from "@/components/base";
 import { LanguageTwoTone } from "@mui/icons-material";
-import { Notice } from "@/components/base";
+import { formatNoticeMessage, Notice } from "@/components/base";
 import { TestBox } from "./test-box";
 import delayManager from "@/services/delay";
 import { cmdTestDelay } from "@/services/cmds";
@@ -74,7 +74,7 @@ export const TestItem = (props: Props) => {
     try {
       onDeleteItem(uid);
     } catch (err: any) {
-      Notice.error(err?.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 
