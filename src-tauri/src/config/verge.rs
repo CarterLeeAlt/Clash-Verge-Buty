@@ -204,7 +204,7 @@ impl IVerge {
             auto_close_connection: Some(true),
             enable_builtin_enhanced: Some(true),
             auto_log_clean: Some(1),
-            default_latency_test: Some("https://cp.cloudflare.com/generate_204".into()),
+            default_latency_test: Some("http://cp.cloudflare.com/generate_204".into()),
             ..Self::default()
         }
     }
