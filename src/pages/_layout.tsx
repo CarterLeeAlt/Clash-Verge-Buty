@@ -16,7 +16,7 @@ import LogoSvg from "@/assets/image/logo.svg?react";
 import LogoSvg_dark from "@/assets/image/logo_dark.svg?react";
 import { atomThemeMode } from "@/services/states";
 import { useRecoilState } from "recoil";
-import { BaseErrorBoundary, Notice, NoticeManager } from "@/components/base";
+import { BaseErrorBoundary, formatNoticeMessage, Notice, NoticeManager } from "@/components/base";
 import { LayoutItem } from "@/components/layout/layout-item";
 import { LayoutControl } from "@/components/layout/layout-control";
 import { LayoutTraffic } from "@/components/layout/layout-traffic";
@@ -95,10 +95,10 @@ const Layout = () => {
         const [status, msg] = payload as [string, string];
         switch (status) {
           case "set_config::ok":
-            Notice.success("Refresh clash config");
+            Notice.success("Clash config refreshed.");
             break;
           case "set_config::error":
-            Notice.error(msg);
+            Notice.error(formatNoticeMessage(msg));
             break;
           default:
             break;

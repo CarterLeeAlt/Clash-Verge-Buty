@@ -23,7 +23,7 @@ const SWITCH_OPERATION_IN_PROGRESS =
 const isSwitchOperationInProgressError = (err: unknown) =>
   err instanceof Error && err.message === SWITCH_OPERATION_IN_PROGRESS;
 const SYS_PROXY_WRITE_FAILED_TIP =
-  "系统代理写入失败，已回滚设置。请稍后重试，或检查是否有其他代理软件、安全软件、系统代理设置正在占用。";
+  "System proxy update failed. Check other proxy or security software.";
 
 const SettingSystem = ({ onError }: Props) => {
   const { t } = useTranslation();
@@ -133,13 +133,13 @@ const SettingSystem = ({ onError }: Props) => {
                 if (isWIN && e) {
                   const latestServiceStatus = await mutateServiceStatus();
                   if (!latestServiceStatus?.installed) {
-                    throw new Error("Please install and enable Service Mode first.");
+                    throw new Error("Install and enable service mode first.");
                   }
                   if (!enable_service_mode) {
-                    throw new Error("Please enable Service Mode first.");
+                    throw new Error("Enable service mode first.");
                   }
                   if (!serviceReady) {
-                    Notice.info("Checking service readiness...");
+                    Notice.info("Checking service readiness.");
                   }
                 }
                 await patchVerge({ enable_tun_mode: e });
@@ -190,11 +190,11 @@ const SettingSystem = ({ onError }: Props) => {
                   const latestServiceStatus = await mutateServiceStatus();
                   if (enable_tun_mode) {
                     throw new Error(
-                      "Tun Mode is enabled. Please disable Tun Mode before changing Service Mode."
+                      "Disable TUN mode before changing service mode."
                     );
                   }
                   if (e && !latestServiceStatus?.installed) {
-                    throw new Error("Please install Service first from the shield button.");
+                    throw new Error("Install the service from the shield button first.");
                   }
                 }
                 await patchVerge({ enable_service_mode: e });

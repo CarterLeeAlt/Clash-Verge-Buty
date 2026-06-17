@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import { useVerge } from "@/hooks/use-verge";
 import { getSystemProxy } from "@/services/cmds";
-import { BaseDialog, DialogRef, Notice, Switch } from "@/components/base";
+import { BaseDialog, DialogRef, formatNoticeMessage, Notice, Switch } from "@/components/base";
 
 export const SysproxyViewer = forwardRef<DialogRef>((props, ref) => {
   const { t } = useTranslation();
@@ -53,7 +53,7 @@ export const SysproxyViewer = forwardRef<DialogRef>((props, ref) => {
 
   const onSave = useLockFn(async () => {
     if (value.duration < 1) {
-      Notice.error("Proxy guard duration at least 1 seconds");
+      Notice.error("Proxy guard duration must be at least 1 second.");
       return;
     }
 
@@ -73,7 +73,7 @@ export const SysproxyViewer = forwardRef<DialogRef>((props, ref) => {
       await patchVerge(patch);
       setOpen(false);
     } catch (err: any) {
-      Notice.error(err.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 

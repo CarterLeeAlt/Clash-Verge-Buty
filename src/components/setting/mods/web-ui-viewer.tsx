@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Button, Box, Typography } from "@mui/material";
 import { useVerge } from "@/hooks/use-verge";
 import { openWebUrl } from "@/services/cmds";
-import { BaseDialog, BaseEmpty, DialogRef, Notice } from "@/components/base";
+import { BaseDialog, BaseEmpty, DialogRef, formatNoticeMessage, Notice } from "@/components/base";
 import { useClashInfo } from "@/hooks/use-clash";
 import { WebUIItem } from "./web-ui-item";
 
@@ -53,9 +53,9 @@ export const WebUIViewer = forwardRef<DialogRef>((props, ref) => {
       let url = value.trim().replaceAll("%host", "127.0.0.1");
 
       if (url.includes("%port") || url.includes("%secret")) {
-        if (!clashInfo) throw new Error("failed to get clash info");
+        if (!clashInfo) throw new Error("Failed to get Clash info.");
         if (!clashInfo.server?.includes(":")) {
-          throw new Error(`failed to parse the server "${clashInfo.server}"`);
+          throw new Error(`Failed to parse server "${clashInfo.server}".`);
         }
 
         const port = clashInfo.server
@@ -71,7 +71,7 @@ export const WebUIViewer = forwardRef<DialogRef>((props, ref) => {
 
       await openWebUrl(url);
     } catch (e: any) {
-      Notice.error(e.message || e.toString());
+      Notice.error(formatNoticeMessage(e));
     }
   });
 

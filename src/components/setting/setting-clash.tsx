@@ -10,7 +10,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { ArrowForward, Settings, Shuffle } from "@mui/icons-material";
-import { DialogRef, Notice, Switch } from "@/components/base";
+import { DialogRef, formatNoticeMessage, Notice, Switch } from "@/components/base";
 import { useClash } from "@/hooks/use-clash";
 import { GuardState } from "./mods/guard-state";
 import { ClashPortViewer } from "./mods/clash-port-viewer";
@@ -52,9 +52,9 @@ const SettingClash = ({ onError }: Props) => {
   const onUpdateGeo = useLockFn(async () => {
     try {
       await updateGeoData();
-      Notice.success("Start update geodata");
+      Notice.success("GeoData update started.");
     } catch (err: any) {
-      Notice.error(err?.response.data.message || err.toString());
+      Notice.error(formatNoticeMessage(err?.response?.data?.message || err));
     }
   });
 
@@ -117,7 +117,7 @@ const SettingClash = ({ onError }: Props) => {
               color={enable_random_port ? "primary" : "inherit"}
               size="small"
               onClick={() => {
-                Notice.success(t("After restart to take effect"), 1000);
+                Notice.success("Restart required to apply changes.");
                 onChangeVerge({ enable_random_port: !enable_random_port });
                 patchVerge({ enable_random_port: !enable_random_port });
               }}

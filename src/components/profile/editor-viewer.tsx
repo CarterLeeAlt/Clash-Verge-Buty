@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 import { atomThemeMode } from "@/services/states";
 import { readProfileFile, saveProfileFile } from "@/services/cmds";
-import { Notice } from "@/components/base";
+import { formatNoticeMessage, Notice } from "@/components/base";
 
 import "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js";
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution.js";
@@ -73,7 +73,7 @@ export const EditorViewer = (props: Props) => {
       onChange?.();
       onClose();
     } catch (err: any) {
-      Notice.error(err.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 
