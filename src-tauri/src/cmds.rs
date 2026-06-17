@@ -368,7 +368,13 @@ pub async fn clash_api_get_proxy_delay(
     url: Option<String>,
     timeout: i32,
 ) -> CmdResult<clash_api::DelayRes> {
-    match clash_api::get_proxy_delay(name, url, timeout).await {
+    let result = if name == "DIRECT" {
+        clash_api::get_direct_tcp_delay(url, timeout).await
+    } else {
+        clash_api::get_proxy_delay(name, url, timeout).await
+    };
+
+    match result {
         Ok(res) => Ok(res),
         Err(err) => Err(err.to_string()),
     }
