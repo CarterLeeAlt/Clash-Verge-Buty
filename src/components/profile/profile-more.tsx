@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import { DragIndicator, FeaturedPlayListRounded } from "@mui/icons-material";
 import { viewProfile } from "@/services/cmds";
-import { Notice } from "@/components/base";
+import { formatNoticeMessage, Notice } from "@/components/base";
 import { EditorViewer } from "./editor-viewer";
 import { PROFILE_CARD_TITLE_FONT_SIZE, ProfileBox } from "./profile-box";
 import { LogViewer } from "./log-viewer";
@@ -93,7 +93,7 @@ export const ProfileMore = (props: Props) => {
     try {
       await viewProfile(itemData.uid);
     } catch (err: any) {
-      Notice.error(err?.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 

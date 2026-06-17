@@ -19,7 +19,7 @@ import {
 import { RefreshRounded, DragIndicator } from "@mui/icons-material";
 import { atomLoadingCache } from "@/services/states";
 import { updateProfile, deleteProfile, viewProfile } from "@/services/cmds";
-import { Notice } from "@/components/base";
+import { formatNoticeMessage, Notice } from "@/components/base";
 import { EditorViewer } from "./editor-viewer";
 import { PROFILE_CARD_TITLE_FONT_SIZE, ProfileBox } from "./profile-box";
 import parseTraffic from "@/utils/parse-traffic";
@@ -111,7 +111,7 @@ export const ProfileItem = (props: Props) => {
     try {
       await viewProfile(itemData.uid);
     } catch (err: any) {
-      Notice.error(err?.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 
@@ -143,10 +143,11 @@ export const ProfileItem = (props: Props) => {
       await updateProfile(itemData.uid, option);
       mutate("getProfiles");
     } catch (err: any) {
-      const errmsg = err?.message || err.toString();
-      Notice.error(
-        errmsg.replace(/error sending request for url (\S+?): /, "")
+      const errmsg = formatNoticeMessage(err).replace(
+        /error sending request for url (\S+?): /,
+        ""
       );
+      Notice.error(formatNoticeMessage(errmsg));
     } finally {
       setLoadingCache((cache) => ({ ...cache, [itemData.uid]: false }));
     }
@@ -158,7 +159,7 @@ export const ProfileItem = (props: Props) => {
       await deleteProfile(itemData.uid);
       mutate("getProfiles");
     } catch (err: any) {
-      Notice.error(err?.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 

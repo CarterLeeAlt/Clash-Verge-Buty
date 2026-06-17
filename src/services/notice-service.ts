@@ -37,6 +37,22 @@ let nextNoticeId = 0;
 let notices: NoticeItem[] = [];
 const subscribers = new Set<NoticeSubscriber>();
 
+export function formatNoticeMessage(message: unknown): string {
+  const raw =
+    message instanceof Error
+      ? message.message
+      : typeof message === "string"
+        ? message
+        : String(message ?? "");
+
+  const normalized = raw.trim().replace(/\s+/g, " ");
+  const fallback = normalized || "Unknown error.";
+  const truncated =
+    fallback.length > 180 ? `${fallback.slice(0, 177)}...` : fallback;
+
+  return /[.!?]$/.test(truncated) ? truncated : `${truncated}.`;
+}
+
 const notifySubscribers = () => {
   subscribers.forEach((subscriber) => subscriber());
 };

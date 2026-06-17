@@ -476,7 +476,7 @@ pub mod service {
         };
         if tun_mode_enabled {
             return Err(
-                "Tun Mode is enabled. Please disable Tun Mode before uninstalling the service."
+                "Disable TUN mode before uninstalling the service."
                     .to_string(),
             );
         }

@@ -217,7 +217,7 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
         };
 
         if current_tun_enabled && service_mode.is_some() {
-            bail!("Tun Mode is enabled. Please disable Tun Mode before changing Service Mode.");
+            bail!("Disable TUN mode before changing service mode.");
         }
 
         if let Some(true) = service_mode {

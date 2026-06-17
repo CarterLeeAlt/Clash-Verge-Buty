@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { List, Button } from "@mui/material";
 import { useVerge } from "@/hooks/use-verge";
-import { BaseDialog, DialogRef, Notice, Switch } from "@/components/base";
+import { BaseDialog, DialogRef, formatNoticeMessage, Notice, Switch } from "@/components/base";
 import { SettingItem } from "./setting-comp";
 import { GuardState } from "./guard-state";
 import { open as openDialog } from "@tauri-apps/api/dialog";
@@ -41,7 +41,7 @@ export const LayoutViewer = forwardRef<DialogRef>((props, ref) => {
 
   const onSwitchFormat = (_e: any, value: boolean) => value;
   const onError = (err: any) => {
-    Notice.error(err.message || err.toString());
+    Notice.error(formatNoticeMessage(err));
   };
   const onChangeData = (patch: Partial<IVergeConfig>) => {
     mutateVerge({ ...verge, ...patch }, false);

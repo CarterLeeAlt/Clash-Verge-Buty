@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useForm, Controller } from "react-hook-form";
 import { TextField } from "@mui/material";
 import { useVerge } from "@/hooks/use-verge";
-import { BaseDialog, Notice } from "@/components/base";
+import { BaseDialog, formatNoticeMessage, Notice } from "@/components/base";
 import { nanoid } from "nanoid";
 
 interface Props {
@@ -72,8 +72,8 @@ export const TestViewer = forwardRef<TestViewerRef, Props>((props, ref) => {
     formIns.handleSubmit(async (form) => {
       setLoading(true);
       try {
-        if (!form.name) throw new Error("`Name` should not be null");
-        if (!form.url) throw new Error("`Url` should not be null");
+        if (!form.name) throw new Error("Name is required.");
+        if (!form.url) throw new Error("URL is required.");
         let newList: IVergeTestItem[];
         let uid: string;
 
@@ -84,12 +84,12 @@ export const TestViewer = forwardRef<TestViewerRef, Props>((props, ref) => {
           await patchVerge({ test_list: newList });
           props.onChange(uid);
         } else {
-          if (!form.uid) throw new Error("UID not found");
+          if (!form.uid) throw new Error("UID not found.");
           uid = form.uid;
 
           const target = testList.find((x) => x.uid === uid);
           if (target?.builtIn || form.builtIn) {
-            throw new Error("Built-in test items cannot be edited");
+            throw new Error("Built-in test items cannot be edited.");
           }
 
           const patch = { ...form, builtIn: false };
@@ -100,7 +100,7 @@ export const TestViewer = forwardRef<TestViewerRef, Props>((props, ref) => {
         setLoading(false);
         setTimeout(() => formIns.reset(), 500);
       } catch (err: any) {
-        Notice.error(err.message || err.toString());
+        Notice.error(formatNoticeMessage(err));
         setLoading(false);
       }
     })

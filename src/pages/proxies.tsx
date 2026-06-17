@@ -17,7 +17,7 @@ import {
   setWindowSizeLocked,
 } from "@/services/cmds";
 import { useVerge } from "@/hooks/use-verge";
-import { BasePage, Notice } from "@/components/base";
+import { BasePage, formatNoticeMessage, Notice } from "@/components/base";
 import { ProxyGroups } from "@/components/proxy/proxy-groups";
 import { ProviderButton } from "@/components/proxy/provider-button";
 
@@ -75,9 +75,9 @@ const ProxyPage = () => {
   const onRestartCore = useLockFn(async () => {
     try {
       await restartSidecar();
-      Notice.success(`Successfully restart core`, 1000);
+      Notice.success(`Clash core restarted.`, 1000);
     } catch (err: any) {
-      Notice.error(err?.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 
@@ -86,7 +86,7 @@ const ProxyPage = () => {
       await setWindowSizeLocked(!isSizeLocked);
       await mutateVerge();
     } catch (err: any) {
-      Notice.error(err?.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 

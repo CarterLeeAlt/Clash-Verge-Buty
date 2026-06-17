@@ -19,7 +19,7 @@ import {
   TextField,
 } from "@mui/material";
 import { createProfile, patchProfile } from "@/services/cmds";
-import { BaseDialog, Notice, Switch } from "@/components/base";
+import { BaseDialog, formatNoticeMessage, Notice, Switch } from "@/components/base";
 import { version } from "@root/package.json";
 import { FileInput } from "./file-input";
 
@@ -97,9 +97,9 @@ export const ProfileViewer = forwardRef<ProfileViewerRef, Props>(
       formIns.handleSubmit(async (form) => {
         setLoading(true);
         try {
-          if (!form.type) throw new Error("`Type` should not be null");
+          if (!form.type) throw new Error("Type is required.");
           if (form.type === "remote" && !form.url) {
-            throw new Error("The URL should not be null");
+            throw new Error("URL is required.");
           }
           if (form.type !== "remote" && form.type !== "local") {
             delete form.option;
@@ -116,7 +116,7 @@ export const ProfileViewer = forwardRef<ProfileViewerRef, Props>(
           }
           // 编辑
           else {
-            if (!form.uid) throw new Error("UID not found");
+            if (!form.uid) throw new Error("UID not found.");
             await patchProfile(form.uid, item);
           }
           setOpen(false);
@@ -125,7 +125,7 @@ export const ProfileViewer = forwardRef<ProfileViewerRef, Props>(
           fileDataRef.current = null;
           props.onChange();
         } catch (err: any) {
-          Notice.error(err.message || err.toString());
+          Notice.error(formatNoticeMessage(err));
           setLoading(false);
         }
       })
