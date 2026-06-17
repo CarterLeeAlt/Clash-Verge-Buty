@@ -16,15 +16,10 @@ export interface NoticeItem {
 export interface ShowNoticeOptions {
   type: NoticeType;
   message: ReactNode;
-  duration?: number;
 }
 
 type NoticeSubscriber = () => void;
-type NoticeShortcut = (
-  message: ReactNode,
-  duration?: number,
-  isDark?: boolean
-) => number;
+type NoticeShortcut = (message: ReactNode) => number;
 
 export interface NoticeInstance {
   (options: ShowNoticeOptions): number;

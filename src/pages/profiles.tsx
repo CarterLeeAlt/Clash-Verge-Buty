@@ -157,9 +157,9 @@ const ProfilePage = () => {
       mutateLogs();
       closeAllConnections();
       setTimeout(() => activateSelected(), 2000);
-      Notice.success("Clash config refreshed.", 1000);
+      Notice.success("Clash config refreshed.");
     } catch (err: any) {
-      Notice.error(formatNoticeMessage(err), 4000);
+      Notice.error(formatNoticeMessage(err));
     } finally {
       clearTimeout(reset);
       setActivating("");
@@ -170,9 +170,9 @@ const ProfilePage = () => {
     try {
       await enhanceProfiles();
       mutateLogs();
-      Notice.success("Clash config refreshed.", 1000);
+      Notice.success("Clash config refreshed.");
     } catch (err: any) {
-      Notice.error(formatNoticeMessage(err), 3000);
+      Notice.error(formatNoticeMessage(err));
     }
   });
 

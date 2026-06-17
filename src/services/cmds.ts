@@ -149,19 +149,19 @@ export async function getAppDir() {
 
 export async function openAppDir() {
   return invoke<void>("open_app_dir").catch((err) =>
-    Notice.error(formatNoticeMessage(err), 1500)
+    Notice.error(formatNoticeMessage(err))
   );
 }
 
 export async function openCoreDir() {
   return invoke<void>("open_core_dir").catch((err) =>
-    Notice.error(formatNoticeMessage(err), 1500)
+    Notice.error(formatNoticeMessage(err))
   );
 }
 
 export async function openLogsDir() {
   return invoke<void>("open_logs_dir").catch((err) =>
-    Notice.error(formatNoticeMessage(err), 1500)
+    Notice.error(formatNoticeMessage(err))
   );
 }
 
@@ -219,7 +219,7 @@ export async function uninstallService() {
 
 export async function invoke_uwp_tool() {
   return invoke<void>("invoke_uwp_tool").catch((err) =>
-    Notice.error(formatNoticeMessage(err), 1500)
+    Notice.error(formatNoticeMessage(err))
   );
 }
 
