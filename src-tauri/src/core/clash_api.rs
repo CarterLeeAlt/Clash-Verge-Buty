@@ -5,6 +5,9 @@ use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Mapping;
 use std::collections::HashMap;
+use std::time::Instant;
+use tokio::net::TcpStream;
+use tokio::time::{timeout as tokio_timeout, Duration};
 
 /// PUT /configs
 /// path 是绝对路径
@@ -92,7 +95,64 @@ pub struct ConnectionsRes {
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
 pub struct DelayRes {
-    delay: u64,
+    pub delay: u64,
+}
+
+/// Native TCP probe for the built-in DIRECT outbound.
+///
+/// This intentionally bypasses Clash's `/proxies/DIRECT/delay` path so the
+/// result reflects the host system's direct TCP connect latency to the test URL.
+pub async fn get_direct_tcp_delay(test_url: Option<String>, timeout: i32) -> Result<DelayRes> {
+    let default_url = "http://captive.apple.com/hotspot-detect.html";
+    let test_url = test_url
+        .map(|s| {
+            let trimmed = s.trim();
+            if trimmed.is_empty() {
+                default_url.into()
+            } else {
+                trimmed.into()
+            }
+        })
+        .unwrap_or(default_url.into());
+
+    let timeout = if timeout <= 0 {
+        10000
+    } else if timeout > 60000 {
+        60000
+    } else {
+        timeout
+    };
+
+    let parsed = reqwest::Url::parse(&test_url)
+        .map_err(|err| anyhow::anyhow!("failed to parse DIRECT delay URL '{test_url}': {err}"))?;
+
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| anyhow::anyhow!("DIRECT delay URL has no host: {test_url}"))?;
+
+    let port = parsed
+        .port_or_known_default()
+        .ok_or_else(|| anyhow::anyhow!("DIRECT delay URL has no known port: {test_url}"))?;
+
+    log::debug!(
+        "requesting DIRECT TCP delay: url={test_url}, target={host}:{port}, timeout={timeout}"
+    );
+
+    let start = Instant::now();
+
+    tokio_timeout(
+        Duration::from_millis(timeout as u64),
+        TcpStream::connect((host, port)),
+    )
+    .await
+    .map_err(|_| anyhow::anyhow!("DIRECT TCP delay timed out for {host}:{port}"))?
+    .map_err(|err| anyhow::anyhow!("DIRECT TCP delay failed for {host}:{port}: {err}"))?;
+
+    let delay = start.elapsed().as_millis() as u64;
+
+    log::debug!("DIRECT TCP delay response: target={host}:{port}, delay={delay}ms");
+
+    Ok(DelayRes { delay })
 }
 
 /// GET /proxies/{name}/delay
