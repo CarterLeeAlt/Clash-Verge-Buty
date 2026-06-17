@@ -126,28 +126,47 @@ pub async fn get_proxy_delay(
         timeout
     };
 
-    log::debug!(
-        "requesting Clash proxy delay: proxy={name}, path=/proxies/{encoded_name}/delay, timeout={timeout}, url={test_url}"
-    );
-
+    let timeout_param = format!("{timeout}");
     let client = reqwest::ClientBuilder::new().no_proxy().build()?;
-    let response = client
+    let request = client
         .get(&url)
         .headers(headers)
-        .query(&[("timeout", &format!("{timeout}")), ("url", &test_url)])
-        .send()
-        .await
+        .query(&[("timeout", &timeout_param), ("url", &test_url)])
+        .build()
         .map_err(|err| {
-            anyhow::anyhow!("failed to request Clash proxy delay for '{name}' via {url}: {err}")
+            anyhow::anyhow!(
+                "failed to build Clash proxy delay request for '{name}' via {url}: {err}"
+            )
         })?;
+    let request_url = request.url().clone();
+    let request_path_and_query = request_url
+        .query()
+        .map(|query| format!("{}?{query}", request_url.path()))
+        .unwrap_or_else(|| request_url.path().to_string());
+
+    log::debug!("requesting Clash proxy delay: proxy={name}, request={request_path_and_query}");
+
+    let response = client.execute(request).await.map_err(|err| {
+        anyhow::anyhow!(
+            "failed to request Clash proxy delay for '{name}' via {request_path_and_query}: {err}"
+        )
+    })?;
 
     let status = response.status();
     let body = response.text().await.map_err(|err| {
-        anyhow::anyhow!("failed to read Clash proxy delay response for '{name}' from {url}: {err}")
+        anyhow::anyhow!(
+            "failed to read Clash proxy delay response for '{name}' from {request_path_and_query}: {err}"
+        )
     })?;
 
+    log::debug!(
+        "Clash proxy delay response: proxy={name}, request={request_path_and_query}, status={status}, body={body}"
+    );
+
     if !status.is_success() {
-        bail!("Clash proxy delay request failed for '{name}' with status {status}: {body}");
+        bail!(
+            "Clash proxy delay request failed for '{name}' via {request_path_and_query} with status {status}: {body}"
+        );
     }
 
     serde_json::from_str::<DelayRes>(&body).map_err(|err| {
