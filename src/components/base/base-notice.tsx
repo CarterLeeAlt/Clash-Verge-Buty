@@ -10,6 +10,7 @@ import {
 
 export {
   DEFAULT_NOTICE_DURATION,
+  formatNoticeMessage,
   hideNotice,
   Notice,
 } from "@/services/notice-service";

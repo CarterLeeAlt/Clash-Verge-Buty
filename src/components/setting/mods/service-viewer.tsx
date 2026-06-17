@@ -9,7 +9,7 @@ import {
   uninstallService,
   patchVergeConfig,
 } from "@/services/cmds";
-import { BaseDialog, DialogRef, Notice } from "@/components/base";
+import { BaseDialog, DialogRef, formatNoticeMessage, Notice } from "@/components/base";
 
 interface Props {
   enable: boolean;
@@ -83,10 +83,10 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
           });
         })
         .catch((err) => console.warn("service status refresh failed:", err));
-      Notice.success("Service installed successfully. You can now enable Service Mode.");
+      Notice.success("Service installed. You can enable service mode now.");
     } catch (err: any) {
       mutateCheck();
-      Notice.error(err.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     } finally {
       setOperation(null);
     }
@@ -97,7 +97,7 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
     try {
       if (enableTun) {
         throw new Error(
-          "Tun Mode is enabled. Please disable Tun Mode before uninstalling the service."
+          "Disable TUN mode before uninstalling the service."
         );
       }
       if (enable || enableTun) {
@@ -118,10 +118,10 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
           });
         })
         .catch((err) => console.warn("service status refresh failed:", err));
-      Notice.success("Service uninstalled successfully");
+      Notice.success("Service uninstalled.");
     } catch (err: any) {
       mutateCheck();
-      Notice.error(err.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     } finally {
       setOperation(null);
     }
@@ -139,7 +139,7 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
       setOpen(false);
     } catch (err: any) {
       mutateCheck();
-      Notice.error(err.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 

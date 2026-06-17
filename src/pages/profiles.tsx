@@ -44,7 +44,7 @@ import {
 } from "@/services/cmds";
 import { atomLoadingCache } from "@/services/states";
 import { closeAllConnections } from "@/services/api";
-import { BasePage, DialogRef, Notice } from "@/components/base";
+import { BasePage, DialogRef, formatNoticeMessage, Notice } from "@/components/base";
 import {
   ProfileViewer,
   ProfileViewerRef,
@@ -114,7 +114,7 @@ const ProfilePage = () => {
 
     try {
       await importProfile(url);
-      Notice.success("Successfully import profile.");
+      Notice.success("Profile imported.");
       setUrl("");
       setLoading(false);
 
@@ -130,7 +130,7 @@ const ProfilePage = () => {
         }
       });
     } catch (err: any) {
-      Notice.error(err.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
       setLoading(false);
     } finally {
       setDisabled(false);
@@ -157,9 +157,9 @@ const ProfilePage = () => {
       mutateLogs();
       closeAllConnections();
       setTimeout(() => activateSelected(), 2000);
-      Notice.success("Refresh clash config", 1000);
+      Notice.success("Clash config refreshed.");
     } catch (err: any) {
-      Notice.error(err?.message || err.toString(), 4000);
+      Notice.error(formatNoticeMessage(err));
     } finally {
       clearTimeout(reset);
       setActivating("");
@@ -170,9 +170,9 @@ const ProfilePage = () => {
     try {
       await enhanceProfiles();
       mutateLogs();
-      Notice.success("Refresh clash config", 1000);
+      Notice.success("Clash config refreshed.");
     } catch (err: any) {
-      Notice.error(err.message || err.toString(), 3000);
+      Notice.error(formatNoticeMessage(err));
     }
   });
 
@@ -197,7 +197,7 @@ const ProfilePage = () => {
       mutateProfiles();
       mutateLogs();
     } catch (err: any) {
-      Notice.error(err?.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 

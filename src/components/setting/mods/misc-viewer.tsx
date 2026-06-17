@@ -10,7 +10,7 @@ import {
   TextField,
 } from "@mui/material";
 import { useVerge } from "@/hooks/use-verge";
-import { BaseDialog, DialogRef, Notice, Switch } from "@/components/base";
+import { BaseDialog, DialogRef, formatNoticeMessage, Notice, Switch } from "@/components/base";
 
 export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
   const { t } = useTranslation();
@@ -50,7 +50,7 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
       const timeout = Number(values.defaultLatencyTimeout);
 
       if (!Number.isInteger(timeout) || timeout <= 0) {
-        Notice.error("测试超时时间必须是正整数");
+        Notice.error("Latency timeout must be a positive integer.");
         return;
       }
 
@@ -65,7 +65,7 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
       });
       setOpen(false);
     } catch (err: any) {
-      Notice.error(err.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   });
 

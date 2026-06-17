@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import lockIconUrl from "@/assets/icons/lock.svg";
 import lockOpenIconUrl from "@/assets/icons/lock_open.svg";
 import restartIconUrl from "@/assets/icons/restart.svg";
-import { Notice } from "@/components/base";
+import { formatNoticeMessage, Notice } from "@/components/base";
 import { restartSidecar, setWindowSizeLocked } from "@/services/cmds";
 import { useVerge } from "@/hooks/use-verge";
 
@@ -78,16 +78,16 @@ export const LayoutControl = ({
       if (nextLocked) setIsMaximized(false);
       await mutateVerge();
     } catch (err: any) {
-      Notice.error(err?.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   };
 
   const onRestartSidecar = async () => {
     try {
       await restartSidecar();
-      Notice.success("Restart clash core successfully");
+      Notice.success("Clash core restarted.");
     } catch (err: any) {
-      Notice.error(err?.message || err.toString());
+      Notice.error(formatNoticeMessage(err));
     }
   };
 
