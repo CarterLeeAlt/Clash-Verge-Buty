@@ -104,16 +104,16 @@ pub struct DelayRes {
 /// result reflects the host system's direct TCP connect latency to the test URL.
 pub async fn get_direct_tcp_delay(test_url: Option<String>, timeout: i32) -> Result<DelayRes> {
     let default_url = "http://captive.apple.com/hotspot-detect.html";
-    let test_url = test_url
+    let test_url: String = test_url
         .map(|s| {
             let trimmed = s.trim();
             if trimmed.is_empty() {
-                default_url.into()
+                default_url.to_string()
             } else {
-                trimmed.into()
+                trimmed.to_string()
             }
         })
-        .unwrap_or(default_url.into());
+        .unwrap_or_else(|| default_url.to_string());
 
     let timeout = if timeout <= 0 {
         10000
@@ -167,16 +167,16 @@ pub async fn get_proxy_delay(
     let url = format!("{base_url}/proxies/{encoded_name}/delay");
 
     let default_url = "http://captive.apple.com/hotspot-detect.html";
-    let test_url = test_url
+    let test_url: String = test_url
         .map(|s| {
             let trimmed = s.trim();
             if trimmed.is_empty() {
-                default_url.into()
+                default_url.to_string()
             } else {
-                trimmed.into()
+                trimmed.to_string()
             }
         })
-        .unwrap_or(default_url.into());
+        .unwrap_or_else(|| default_url.to_string());
 
     let timeout = if timeout <= 0 {
         10000
