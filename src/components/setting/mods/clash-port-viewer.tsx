@@ -50,9 +50,9 @@ export const ClashPortViewer = forwardRef<DialogRef>((props, ref) => {
       await patchVerge({ verge_socks_port: socksPort });
       await patchVerge({ verge_port: port });
       setOpen(false);
-      Notice.success("Clash ports updated.", 1000);
+      Notice.success("Clash ports updated.");
     } catch (err: any) {
-      Notice.error(formatNoticeMessage(err), 4000);
+      Notice.error(formatNoticeMessage(err));
     }
   });
 

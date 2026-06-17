@@ -117,7 +117,7 @@ const SettingClash = ({ onError }: Props) => {
               color={enable_random_port ? "primary" : "inherit"}
               size="small"
               onClick={() => {
-                Notice.success("Restart required to apply changes.", 1000);
+                Notice.success("Restart required to apply changes.");
                 onChangeVerge({ enable_random_port: !enable_random_port });
                 patchVerge({ enable_random_port: !enable_random_port });
               }}

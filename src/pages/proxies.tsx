@@ -75,7 +75,7 @@ const ProxyPage = () => {
   const onRestartCore = useLockFn(async () => {
     try {
       await restartSidecar();
-      Notice.success(`Clash core restarted.`, 1000);
+      Notice.success(`Clash core restarted.`);
     } catch (err: any) {
       Notice.error(formatNoticeMessage(err));
     }

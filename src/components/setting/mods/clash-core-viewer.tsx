@@ -52,7 +52,7 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
         mutate("getClashConfig");
         mutate("getVersion");
       }, 100);
-      Notice.success(`Switched to ${core}.`, 1000);
+      Notice.success(`Switched to ${core}.`);
     } catch (err: any) {
       Notice.error(formatNoticeMessage(err));
     }
@@ -63,7 +63,7 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
       await grantPermission(core);
       // 自动重启
       if (core === clash_core) await restartSidecar();
-      Notice.success(`Permission granted for ${core}.`, 1000);
+      Notice.success(`Permission granted for ${core}.`);
     } catch (err: any) {
       Notice.error(formatNoticeMessage(err));
     }
@@ -72,7 +72,7 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
   const onRestart = useLockFn(async () => {
     try {
       await restartSidecar();
-      Notice.success(`Clash core restarted.`, 1000);
+      Notice.success(`Clash core restarted.`);
     } catch (err: any) {
       Notice.error(formatNoticeMessage(err));
     }
@@ -83,7 +83,7 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
       setUpgrading(true);
       await upgradeCore();
       setUpgrading(false);
-      Notice.success(`Clash core upgraded.`, 1000);
+      Notice.success(`Clash core upgraded.`);
     } catch (err: any) {
       setUpgrading(false);
       Notice.error(formatNoticeMessage(err?.response?.data?.message || err));

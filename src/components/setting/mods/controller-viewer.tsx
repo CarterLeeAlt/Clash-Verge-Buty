@@ -26,10 +26,10 @@ export const ControllerViewer = forwardRef<DialogRef>((props, ref) => {
   const onSave = useLockFn(async () => {
     try {
       await patchInfo({ "external-controller": controller, secret });
-      Notice.success("Clash config updated.", 1000);
+      Notice.success("Clash config updated.");
       setOpen(false);
     } catch (err: any) {
-      Notice.error(formatNoticeMessage(err), 4000);
+      Notice.error(formatNoticeMessage(err));
     }
   });
 
