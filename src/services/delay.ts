@@ -1,6 +1,4 @@
-import axios from "axios";
 import { cmdGetProxyDelay } from "./cmds";
-import { getProxyDelay } from "./api";
 
 const hashKey = (name: string, group: string) => `${group ?? ""}::${name}`;
 
@@ -156,14 +154,8 @@ class DelayManager {
     return -1;
   }
 
-  private isAbortError(err: any, signal?: AbortSignal) {
-    return (
-      signal?.aborted ||
-      axios.isCancel(err) ||
-      err?.name === "AbortError" ||
-      err?.name === "CanceledError" ||
-      err?.code === "ERR_CANCELED"
-    );
+  private isAbortError(_err: any, signal?: AbortSignal) {
+    return signal?.aborted ?? false;
   }
 
   private requestDelay(
@@ -188,10 +180,10 @@ class DelayManager {
     let delay = -1;
 
     try {
+      if (signal?.aborted) return null;
       const url = this.getUrl(group);
-      const result = signal
-        ? await getProxyDelay(name, { url, timeout, signal })
-        : await cmdGetProxyDelay(name, timeout, url);
+      const result = await cmdGetProxyDelay(name, timeout, url);
+      if (signal?.aborted) return null;
       delay = result.delay;
     } catch (err) {
       if (this.isAbortError(err, signal)) return null;
