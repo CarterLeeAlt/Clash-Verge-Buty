@@ -1,5 +1,6 @@
 use crate::config::Config;
 use anyhow::{bail, Result};
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Mapping;
@@ -101,12 +102,20 @@ pub async fn get_proxy_delay(
     test_url: Option<String>,
     timeout: i32,
 ) -> Result<DelayRes> {
-    let (url, headers) = clash_client_info()?;
-    let url = format!("{url}/proxies/{name}/delay");
+    let (base_url, headers) = clash_client_info()?;
+    let encoded_name = utf8_percent_encode(&name, NON_ALPHANUMERIC).to_string();
+    let url = format!("{base_url}/proxies/{encoded_name}/delay");
 
-    let default_url = "http://cp.cloudflare.com/generate_204";
+    let default_url = "http://captive.apple.com/hotspot-detect.html";
     let test_url = test_url
-        .map(|s| if s.is_empty() { default_url.into() } else { s })
+        .map(|s| {
+            let trimmed = s.trim();
+            if trimmed.is_empty() {
+                default_url.into()
+            } else {
+                trimmed.into()
+            }
+        })
         .unwrap_or(default_url.into());
 
     let timeout = if timeout <= 0 {
@@ -117,14 +126,54 @@ pub async fn get_proxy_delay(
         timeout
     };
 
+    let timeout_param = format!("{timeout}");
     let client = reqwest::ClientBuilder::new().no_proxy().build()?;
-    let builder = client
+    let request = client
         .get(&url)
         .headers(headers)
-        .query(&[("timeout", &format!("{timeout}")), ("url", &test_url)]);
-    let response = builder.send().await?;
+        .query(&[("timeout", &timeout_param), ("url", &test_url)])
+        .build()
+        .map_err(|err| {
+            anyhow::anyhow!(
+                "failed to build Clash proxy delay request for '{name}' via {url}: {err}"
+            )
+        })?;
+    let request_url = request.url().clone();
+    let request_path_and_query = request_url
+        .query()
+        .map(|query| format!("{}?{query}", request_url.path()))
+        .unwrap_or_else(|| request_url.path().to_string());
 
-    Ok(response.json::<DelayRes>().await?)
+    log::debug!("requesting Clash proxy delay: proxy={name}, request={request_path_and_query}");
+
+    let response = client.execute(request).await.map_err(|err| {
+        anyhow::anyhow!(
+            "failed to request Clash proxy delay for '{name}' via {request_path_and_query}: {err}"
+        )
+    })?;
+
+    let status = response.status();
+    let body = response.text().await.map_err(|err| {
+        anyhow::anyhow!(
+            "failed to read Clash proxy delay response for '{name}' from {request_path_and_query}: {err}"
+        )
+    })?;
+
+    log::debug!(
+        "Clash proxy delay response: proxy={name}, request={request_path_and_query}, status={status}, body={body}"
+    );
+
+    if !status.is_success() {
+        bail!(
+            "Clash proxy delay request failed for '{name}' via {request_path_and_query} with status {status}: {body}"
+        );
+    }
+
+    serde_json::from_str::<DelayRes>(&body).map_err(|err| {
+        anyhow::anyhow!(
+            "failed to parse Clash proxy delay response for '{name}' as JSON: {err}; body: {body}"
+        )
+    })
 }
 
 /// GET /proxies

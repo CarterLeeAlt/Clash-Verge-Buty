@@ -85,7 +85,7 @@ export const getProxyDelay = async (
   const { url, timeout = 10000, signal } = options;
   const params = {
     timeout,
-    url: url || "http://cp.cloudflare.com/generate_204",
+    url: url || "http://captive.apple.com/hotspot-detect.html",
   };
   const instance = await getAxios();
   const result = await instance.get(
