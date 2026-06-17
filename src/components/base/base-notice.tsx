@@ -39,7 +39,7 @@ export const NoticeManager = () => {
         display: "flex",
         flexDirection: "column",
         gap: "10px",
-        width: "360px",
+        width: "288px",
         maxWidth: "calc(100vw - 40px)",
         pointerEvents: "none",
       }}
