@@ -48,20 +48,6 @@ pub const ITEM_GLOBAL_SCRIPT: &str = r#"// Global Overwrite Script
 // Runs after subscription config is loaded.
 // Keep main() and return the config object.
 
-// Parameters:
-// - config: the current subscription config object.
-// - profileName: the current subscription name. It may be an empty string.
-
-// Common fields you may edit:
-// - config.rules
-// - config.proxies
-// - config["proxy-groups"]
-// - config.dns
-
-// Tip:
-// Start with small changes, such as adding custom rules before subscription
-// rules. If you do not need custom rules, keep customRules empty.
-
 function main(config, profileName) {
   const customRules = [
     //"DOMAIN-SUFFIX,baidu.com,DIRECT",
