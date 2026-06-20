@@ -49,7 +49,7 @@ export const EditorViewer = (props: Props) => {
         language: mode,
         theme: themeMode === "light" ? "vs" : "vs-dark",
         minimap: { enabled: false },
-        fontFamily: `"Ubuntu Sans Mono", "Noto Sans SC", "twemoji mozilla", monospace`,
+        fontFamily: `"Noto Sans Mono", "Noto Sans SC", "twemoji mozilla", monospace`,
       });
 
       instanceRef.current.focus();
