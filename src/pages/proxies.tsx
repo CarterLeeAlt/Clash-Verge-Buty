@@ -128,7 +128,7 @@ const ProxyPage = () => {
                 size="small"
                 color="inherit"
                 onClick={onRestartCore}
-                sx={{ mr: 1.2 }}
+                sx={{ mr: 1.8 }}
               >
                 <LocalSvgIcon src={restartIconUrl} />
               </IconButton>
