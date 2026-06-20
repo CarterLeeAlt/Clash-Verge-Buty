@@ -105,7 +105,7 @@ const ProxyPage = () => {
         <Box display="flex" alignItems="center" gap={1}>
           <ProviderButton />
 
-          <Box display="flex" alignItems="center" gap={1}>
+          <Box display="flex" alignItems="center">
             <Tooltip
               title={
                 isSizeLocked ? t("Unlock Window Size") : t("Lock Window Size")
@@ -115,6 +115,7 @@ const ProxyPage = () => {
                 size="small"
                 color="inherit"
                 onClick={onToggleSizeLocked}
+                sx={{ mr: 1 }}
               >
                 <LocalSvgIcon
                   src={isSizeLocked ? lockIconUrl : lockOpenIconUrl}
@@ -127,7 +128,7 @@ const ProxyPage = () => {
                 size="small"
                 color="inherit"
                 onClick={onRestartCore}
-                sx={{ mr: 1.1 }}
+                sx={{ mr: 1.2 }}
               >
                 <LocalSvgIcon src={restartIconUrl} />
               </IconButton>
