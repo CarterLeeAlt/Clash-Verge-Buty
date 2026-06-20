@@ -50,7 +50,7 @@ export const ConfigViewer = forwardRef<DialogRef>((props, ref) => {
           language: "yaml",
           theme: themeMode === "light" ? "vs" : "vs-dark",
           minimap: { enabled: false },
-          fontFamily: `"Ubuntu Sans Mono", "Noto Sans SC", "twemoji mozilla", monospace`,
+          fontFamily: `"Noto Sans Mono", "Noto Sans SC", "twemoji mozilla", monospace`,
           readOnly: true,
         });
 
