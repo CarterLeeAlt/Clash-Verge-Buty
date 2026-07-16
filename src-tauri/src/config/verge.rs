@@ -382,31 +382,23 @@ mod tests {
     }
 
     #[test]
-    fn normalize_default_latency_test_migrates_apple_legacy_default() {
-        let mut config = IVerge {
-            default_latency_test: Some("http://captive.apple.com/hotspot-detect.html".into()),
-            ..IVerge::default()
-        };
+    fn normalize_default_latency_test_migrates_all_legacy_defaults() {
+        for legacy_url in LEGACY_DEFAULT_LATENCY_TEST_URLS {
+            let mut config = IVerge {
+                default_latency_test: Some((*legacy_url).to_string()),
+                ..IVerge::default()
+            };
 
-        assert!(config.normalize_default_latency_test());
-        assert_eq!(
-            config.default_latency_test.as_deref(),
-            Some(DEFAULT_LATENCY_TEST_URL)
-        );
-    }
-
-    #[test]
-    fn normalize_default_latency_test_migrates_google_legacy_default() {
-        let mut config = IVerge {
-            default_latency_test: Some("https://www.google.com/generate_204".into()),
-            ..IVerge::default()
-        };
-
-        assert!(config.normalize_default_latency_test());
-        assert_eq!(
-            config.default_latency_test.as_deref(),
-            Some(DEFAULT_LATENCY_TEST_URL)
-        );
+            assert!(
+                config.normalize_default_latency_test(),
+                "legacy URL was not migrated: {legacy_url}"
+            );
+            assert_eq!(
+                config.default_latency_test.as_deref(),
+                Some(DEFAULT_LATENCY_TEST_URL),
+                "legacy URL did not migrate to the current default: {legacy_url}"
+            );
+        }
     }
 
     #[test]
