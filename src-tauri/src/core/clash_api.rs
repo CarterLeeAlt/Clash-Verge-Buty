@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, DEFAULT_LATENCY_TEST_URL};
 use anyhow::{bail, Result};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqwest::header::HeaderMap;
@@ -102,18 +102,21 @@ pub struct DelayRes {
 ///
 /// This intentionally bypasses Clash's `/proxies/DIRECT/delay` path so the
 /// result reflects the host system's direct TCP connect latency to the test URL.
-pub async fn get_direct_tcp_delay(test_url: Option<String>, timeout: i32) -> Result<DelayRes> {
-    let default_url = "http://captive.apple.com/hotspot-detect.html";
-    let test_url: String = test_url
-        .map(|s| {
-            let trimmed = s.trim();
+fn resolve_latency_test_url(test_url: Option<String>) -> String {
+    test_url
+        .and_then(|url| {
+            let trimmed = url.trim().to_string();
             if trimmed.is_empty() {
-                default_url.to_string()
+                None
             } else {
-                trimmed.to_string()
+                Some(trimmed)
             }
         })
-        .unwrap_or_else(|| default_url.to_string());
+        .unwrap_or_else(|| DEFAULT_LATENCY_TEST_URL.to_string())
+}
+
+pub async fn get_direct_tcp_delay(test_url: Option<String>, timeout: i32) -> Result<DelayRes> {
+    let test_url = resolve_latency_test_url(test_url);
 
     let timeout = if timeout <= 0 {
         10000
@@ -166,17 +169,7 @@ pub async fn get_proxy_delay(
     let encoded_name = utf8_percent_encode(&name, NON_ALPHANUMERIC).to_string();
     let url = format!("{base_url}/proxies/{encoded_name}/delay");
 
-    let default_url = "http://captive.apple.com/hotspot-detect.html";
-    let test_url: String = test_url
-        .map(|s| {
-            let trimmed = s.trim();
-            if trimmed.is_empty() {
-                default_url.to_string()
-            } else {
-                trimmed.to_string()
-            }
-        })
-        .unwrap_or_else(|| default_url.to_string());
+    let test_url = resolve_latency_test_url(test_url);
 
     let timeout = if timeout <= 0 {
         10000
@@ -333,4 +326,30 @@ fn test_parse_check_output() {
     println!("res3: {res3}");
 
     assert_eq!(res1, res3);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_latency_test_url_uses_default_for_none() {
+        assert_eq!(resolve_latency_test_url(None), DEFAULT_LATENCY_TEST_URL);
+    }
+
+    #[test]
+    fn resolve_latency_test_url_uses_default_for_blank() {
+        assert_eq!(
+            resolve_latency_test_url(Some("  	  ".into())),
+            DEFAULT_LATENCY_TEST_URL
+        );
+    }
+
+    #[test]
+    fn resolve_latency_test_url_trims_and_preserves_custom_url() {
+        assert_eq!(
+            resolve_latency_test_url(Some("  https://example.com/generate_204  ".into())),
+            "https://example.com/generate_204"
+        );
+    }
 }
