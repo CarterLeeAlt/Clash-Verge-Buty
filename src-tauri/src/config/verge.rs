@@ -1,3 +1,4 @@
+use crate::config::{DEFAULT_LATENCY_TEST_URL, LEGACY_DEFAULT_LATENCY_TEST_URLS};
 use crate::utils::{dirs, help};
 use anyhow::Result;
 use log::LevelFilter;
@@ -164,7 +165,10 @@ impl IVerge {
     pub fn new() -> Self {
         match dirs::verge_path().and_then(|path| help::read_yaml::<IVerge>(&path)) {
             Ok(mut config) => {
-                if config.normalize_auto_log_clean() {
+                let mut changed = config.normalize_auto_log_clean();
+                changed |= config.normalize_default_latency_test();
+
+                if changed {
                     let _ = config.save_file();
                 }
                 config
@@ -204,7 +208,7 @@ impl IVerge {
             auto_close_connection: Some(true),
             enable_builtin_enhanced: Some(true),
             auto_log_clean: Some(1),
-            default_latency_test: Some("http://captive.apple.com/hotspot-detect.html".into()),
+            default_latency_test: Some(DEFAULT_LATENCY_TEST_URL.into()),
             ..Self::default()
         }
     }
@@ -217,6 +221,24 @@ impl IVerge {
 
         if self.auto_log_clean != normalized {
             self.auto_log_clean = normalized;
+            return true;
+        }
+
+        false
+    }
+
+    pub fn normalize_default_latency_test(&mut self) -> bool {
+        let normalized = match self.default_latency_test.as_deref() {
+            Some(url) if url.trim().is_empty() => Some(DEFAULT_LATENCY_TEST_URL.to_string()),
+            Some(url) if LEGACY_DEFAULT_LATENCY_TEST_URLS.contains(&url) => {
+                Some(DEFAULT_LATENCY_TEST_URL.to_string())
+            }
+            Some(_) => self.default_latency_test.clone(),
+            None => Some(DEFAULT_LATENCY_TEST_URL.to_string()),
+        };
+
+        if self.default_latency_test != normalized {
+            self.default_latency_test = normalized;
             return true;
         }
 
@@ -316,5 +338,100 @@ impl IVerge {
         } else {
             LevelFilter::Info
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn template_uses_default_latency_test_url() {
+        assert_eq!(
+            IVerge::template().default_latency_test.as_deref(),
+            Some(DEFAULT_LATENCY_TEST_URL)
+        );
+    }
+
+    #[test]
+    fn normalize_default_latency_test_migrates_none() {
+        let mut config = IVerge {
+            default_latency_test: None,
+            ..IVerge::default()
+        };
+
+        assert!(config.normalize_default_latency_test());
+        assert_eq!(
+            config.default_latency_test.as_deref(),
+            Some(DEFAULT_LATENCY_TEST_URL)
+        );
+    }
+
+    #[test]
+    fn normalize_default_latency_test_migrates_empty_string() {
+        let mut config = IVerge {
+            default_latency_test: Some("   ".into()),
+            ..IVerge::default()
+        };
+
+        assert!(config.normalize_default_latency_test());
+        assert_eq!(
+            config.default_latency_test.as_deref(),
+            Some(DEFAULT_LATENCY_TEST_URL)
+        );
+    }
+
+    #[test]
+    fn normalize_default_latency_test_migrates_apple_legacy_default() {
+        let mut config = IVerge {
+            default_latency_test: Some("http://captive.apple.com/hotspot-detect.html".into()),
+            ..IVerge::default()
+        };
+
+        assert!(config.normalize_default_latency_test());
+        assert_eq!(
+            config.default_latency_test.as_deref(),
+            Some(DEFAULT_LATENCY_TEST_URL)
+        );
+    }
+
+    #[test]
+    fn normalize_default_latency_test_migrates_google_legacy_default() {
+        let mut config = IVerge {
+            default_latency_test: Some("https://www.google.com/generate_204".into()),
+            ..IVerge::default()
+        };
+
+        assert!(config.normalize_default_latency_test());
+        assert_eq!(
+            config.default_latency_test.as_deref(),
+            Some(DEFAULT_LATENCY_TEST_URL)
+        );
+    }
+
+    #[test]
+    fn normalize_default_latency_test_preserves_custom_url() {
+        let custom_url = "https://example.com/healthz";
+        let mut config = IVerge {
+            default_latency_test: Some(custom_url.into()),
+            ..IVerge::default()
+        };
+
+        assert!(!config.normalize_default_latency_test());
+        assert_eq!(config.default_latency_test.as_deref(), Some(custom_url));
+    }
+
+    #[test]
+    fn normalize_default_latency_test_keeps_current_default_without_changes() {
+        let mut config = IVerge {
+            default_latency_test: Some(DEFAULT_LATENCY_TEST_URL.into()),
+            ..IVerge::default()
+        };
+
+        assert!(!config.normalize_default_latency_test());
+        assert_eq!(
+            config.default_latency_test.as_deref(),
+            Some(DEFAULT_LATENCY_TEST_URL)
+        );
     }
 }

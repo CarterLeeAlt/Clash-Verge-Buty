@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from "axios";
-import { getClashInfo } from "./cmds";
+import { getClashInfo, getVergeConfig } from "./cmds";
 import { normalizeControllerHost } from "@/utils/controller";
 
 let axiosIns: AxiosInstance = null!;
@@ -83,9 +83,11 @@ export const getProxyDelay = async (
   options: GetProxyDelayOptions = {}
 ) => {
   const { url, timeout = 10000, signal } = options;
+  const configuredUrl =
+    url?.trim() || (await getVergeConfig()).default_latency_test?.trim();
   const params = {
     timeout,
-    url: url || "http://captive.apple.com/hotspot-detect.html",
+    url: configuredUrl,
   };
   const instance = await getAxios();
   const result = await instance.get(
