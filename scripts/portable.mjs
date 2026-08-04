@@ -51,15 +51,8 @@ async function resolvePortable() {
   const releaseExeFiles = (await fs.readdir(releaseDir))
     .filter((name) => name.toLowerCase().endsWith(".exe"))
     .sort();
-  const nsisDir = path.join(releaseDir, "bundle", "nsis");
-  const nsisExeFiles = (await fs.pathExists(nsisDir))
-    ? (await fs.readdir(nsisDir))
-        .filter((name) => name.toLowerCase().endsWith(".exe"))
-        .sort()
-    : [];
 
   console.log("[INFO]: target/release exe files:", releaseExeFiles);
-  console.log("[INFO]: target/release/bundle/nsis exe files:", nsisExeFiles);
 
   const preferredNames = [
     "Clash_Verge_Buty.exe",
