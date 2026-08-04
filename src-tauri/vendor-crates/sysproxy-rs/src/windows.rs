@@ -1,6 +1,7 @@
 use crate::{Error, Result, Sysproxy};
 use std::ffi::c_void;
 use std::mem::{size_of, ManuallyDrop};
+use std::time::{SystemTime, UNIX_EPOCH};
 use windows::core::PWSTR;
 use windows::Win32::Networking::WinInet::{
     InternetSetOptionW, INTERNET_OPTION_PER_CONNECTION_OPTION,
@@ -23,6 +24,7 @@ const RECOVERY_ORIGINAL_KEY: &str = "SOFTWARE\\Clash-Verge-Buty\\ProxyRecovery\\
 const RECOVERY_OWNED_KEY: &str = "SOFTWARE\\Clash-Verge-Buty\\ProxyRecovery\\Owned";
 const RECOVERY_PHASE_PREPARED: u32 = 1;
 const RECOVERY_PHASE_OWNED: u32 = 2;
+const RECOVERY_JOURNAL_VERSION: u32 = 1;
 const SNAPSHOT_PROXY_ENABLE: u32 = 1 << 0;
 const SNAPSHOT_PROXY_SERVER: u32 = 1 << 1;
 const SNAPSHOT_PROXY_OVERRIDE: u32 = 1 << 2;
@@ -139,6 +141,21 @@ struct WindowsProxyRecovery {
     original: WindowsProxySnapshot,
     owned: Option<WindowsProxySnapshot>,
     target: Sysproxy,
+}
+
+fn write_recovery_metadata(key: &RegKey) {
+    let _ = key.set_value("JournalVersion", &RECOVERY_JOURNAL_VERSION);
+    let updated = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0);
+    let _ = key.set_value("UpdatedUnixSeconds", &updated);
+    if let Ok(executable) = std::env::current_exe() {
+        let _ = key.set_value(
+            "OwnerExecutable",
+            &executable.to_string_lossy().into_owned(),
+        );
+    }
 }
 
 fn read_raw_value(key: Option<&RegKey>, name: &str) -> Result<Option<RawRegistryValue>> {
@@ -429,6 +446,7 @@ impl WindowsProxySnapshot {
         let (original, _) =
             hkcu.create_subkey_transacted(RECOVERY_ORIGINAL_KEY, &transaction)?;
         write_snapshot(&original, self)?;
+        write_recovery_metadata(&recovery);
         recovery.set_value("Phase", &RECOVERY_PHASE_PREPARED)?;
         recovery.set_value("TargetEnable", &(if target.enable { 1u32 } else { 0u32 }))?;
         recovery.set_value("TargetHost", &target.host)?;
@@ -450,6 +468,7 @@ impl WindowsProxySnapshot {
         )?;
         let (owned, _) = hkcu.create_subkey_transacted(RECOVERY_OWNED_KEY, &transaction)?;
         write_snapshot(&owned, self)?;
+        write_recovery_metadata(&recovery);
         recovery.set_value("TargetEnable", &(if target.enable { 1u32 } else { 0u32 }))?;
         recovery.set_value("TargetHost", &target.host)?;
         recovery.set_value("TargetPort", &(target.port as u32))?;

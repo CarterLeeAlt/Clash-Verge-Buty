@@ -10,6 +10,7 @@ pub const API_HEALTH: &str = "/health";
 pub const API_GET_CLASH: &str = "/get_clash";
 pub const API_START_CLASH: &str = "/start_clash";
 pub const API_STOP_CLASH: &str = "/stop_clash";
+pub const API_STOP_SERVICE: &str = "/stop_service";
 
 pub const API_TOKEN_DIR: &str = "service-data";
 pub const API_TOKEN_FILE: &str = "service-api-token";
