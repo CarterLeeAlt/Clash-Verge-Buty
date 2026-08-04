@@ -50,13 +50,6 @@ impl Handle {
         }
     }
 
-    #[allow(unused)]
-    pub fn refresh_profiles() {
-        if let Some(window) = Self::global().get_window() {
-            log_err!(window.emit("verge://refresh-profiles-config", "yes"));
-        }
-    }
-
     pub fn notice_message<S: Into<String>, M: Into<String>>(status: S, msg: M) {
         if let Some(window) = Self::global().get_window() {
             log_err!(window.emit("verge://notice-message", (status.into(), msg.into())));

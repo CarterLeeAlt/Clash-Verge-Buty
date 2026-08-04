@@ -223,10 +223,6 @@ export async function invoke_uwp_tool() {
   );
 }
 
-export async function getPortableFlag() {
-  return invoke<boolean>("get_portable_flag");
-}
-
 export async function exitApp() {
   return invoke("exit_app");
 }

@@ -1,4 +1,4 @@
-use crate::{config::Config, log_err};
+use crate::{config::Config, core::CoreManager, log_err};
 use anyhow::{anyhow, Context, Result};
 use auto_launch::{AutoLaunch, AutoLaunchBuilder};
 use once_cell::sync::OnceCell;
@@ -69,30 +69,30 @@ fn wait_for_local_proxy(port: u16) -> Result<()> {
 
     let address = SocketAddr::from(([127, 0, 0, 1], port));
     let deadline = Instant::now() + READY_TIMEOUT;
-    let mut last_err = None;
 
     loop {
-        match TcpStream::connect_timeout(&address, CONNECT_TIMEOUT) {
+        if !CoreManager::global().is_core_ready() {
+            return Err(anyhow!(
+                "Clash core is not ready; refuse to use an unrelated listener on 127.0.0.1:{port}"
+            ));
+        }
+
+        let last_err = match TcpStream::connect_timeout(&address, CONNECT_TIMEOUT) {
             Ok(stream) => {
                 drop(stream);
                 return Ok(());
             }
-            Err(err) => last_err = Some(err),
-        }
+            Err(err) => err,
+        };
 
         if Instant::now() >= deadline {
-            break;
+            return Err(anyhow!(
+                "local proxy listener 127.0.0.1:{port} was not ready within {}s: {last_err}",
+                READY_TIMEOUT.as_secs()
+            ));
         }
         thread::sleep(RETRY_DELAY);
     }
-
-    let detail = last_err
-        .map(|err| err.to_string())
-        .unwrap_or_else(|| "unknown connection error".into());
-    Err(anyhow!(
-        "local proxy listener 127.0.0.1:{port} was not ready within {}s: {detail}",
-        READY_TIMEOUT.as_secs()
-    ))
 }
 
 fn set_system_proxy_once(
@@ -106,9 +106,9 @@ fn set_system_proxy_once(
             #[cfg(target_os = "windows")]
             if allow_registry_fallback {
                 log::warn!(target: "app", "{action}: WinINet failed; use reversible registry fallback: {primary_err}");
-                return target
-                    .set_system_proxy_registry()
-                    .with_context(|| format!("{action}: registry fallback failed after WinINet error: {primary_err}"));
+                return target.set_system_proxy_registry().with_context(|| {
+                    format!("{action}: registry fallback failed after WinINet error: {primary_err}")
+                });
             }
 
             #[cfg(not(target_os = "windows"))]
@@ -224,7 +224,9 @@ impl Sysopt {
     pub fn init_sysproxy(&self) -> Result<()> {
         let _operation = self.proxy_operation.lock();
         #[cfg(target_os = "windows")]
-        if WindowsProxySnapshot::recover_pending().context("recover pending Windows proxy session")? {
+        if WindowsProxySnapshot::recover_pending()
+            .context("recover pending Windows proxy session")?
+        {
             log::info!(target: "app", "recovered pending Windows proxy session from a previous unclean shutdown");
         }
 
@@ -407,9 +409,11 @@ impl Sysopt {
                 );
                 #[cfg(not(target_os = "windows"))]
                 if let Some(before) = before.as_ref() {
-                    if let Err(rollback_err) =
-                        set_system_proxy_with_retry(before, "restore system proxy after failed enable", false)
-                    {
+                    if let Err(rollback_err) = set_system_proxy_with_retry(
+                        before,
+                        "restore system proxy after failed enable",
+                        false,
+                    ) {
                         log::error!(target: "app", "enable system proxy rollback failed: {rollback_err}");
                     }
                 }
@@ -812,9 +816,7 @@ impl Sysopt {
                     continue;
                 }
 
-                let guard_result = sysproxy
-                    .set_system_proxy()
-                    .context("guard system proxy");
+                let guard_result = sysproxy.set_system_proxy().context("guard system proxy");
 
                 #[cfg(target_os = "windows")]
                 if guard_result.is_ok() {

@@ -1,4 +1,4 @@
-use crate::config::{Config, DEFAULT_LATENCY_TEST_URL};
+use crate::config::{ClashInfo, Config, DEFAULT_LATENCY_TEST_URL};
 use anyhow::{bail, Result};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqwest::header::HeaderMap;
@@ -251,16 +251,49 @@ pub async fn get_connections() -> Result<ConnectionsRes> {
     Ok(response.json::<ConnectionsRes>().await?)
 }
 
+/// Wait until the controller described by the latest config draft responds.
+/// This is used while restarting the core, before the draft is committed.
+pub async fn wait_for_core_ready(ready_timeout: Duration) -> Result<()> {
+    let client_info = { Config::clash().latest().get_client_info() };
+    let (url, headers) = build_clash_client_info(client_info)?;
+    let url = format!("{url}/configs");
+    let client = reqwest::ClientBuilder::new()
+        .no_proxy()
+        .timeout(Duration::from_millis(1200))
+        .build()?;
+    let started = Instant::now();
+
+    loop {
+        let last_error = match client.get(&url).headers(headers.clone()).send().await {
+            Ok(response) if response.status().is_success() => return Ok(()),
+            Ok(response) => format!("controller returned HTTP {}", response.status()),
+            Err(err) => err.to_string(),
+        };
+
+        if started.elapsed() >= ready_timeout {
+            bail!(
+                "Clash controller was not ready within {}s: {last_error}",
+                ready_timeout.as_secs()
+            );
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+}
+
 /// 根据clash info获取clash服务地址和请求头
 fn clash_client_info() -> Result<(String, HeaderMap)> {
     let client = { Config::clash().data().get_client_info() };
 
+    build_clash_client_info(client)
+}
+
+fn build_clash_client_info(client: ClashInfo) -> Result<(String, HeaderMap)> {
     let server = format!("http://{}", client.server);
 
     let mut headers = HeaderMap::new();
     headers.insert("Content-Type", "application/json".parse()?);
 
-    if let Some(secret) = client.secret {
+    if let Some(secret) = client.secret.filter(|secret| !secret.trim().is_empty()) {
         let secret = format!("Bearer {}", secret).parse()?;
         headers.insert("Authorization", secret);
     }

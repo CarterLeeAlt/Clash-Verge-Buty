@@ -1,74 +1,59 @@
-use super::{IClashTemp, IProfiles, IRuntime, IVerge};
+#[cfg(test)]
+use super::IVerge;
 use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
-pub struct Draft<T: Clone + ToOwned> {
+pub struct Draft<T: Clone> {
     inner: Arc<Mutex<(T, Option<T>)>>,
 }
 
-macro_rules! draft_define {
-    ($id: ident) => {
-        impl Draft<$id> {
-            #[allow(unused)]
-            pub fn data(&self) -> MappedMutexGuard<$id> {
-                MutexGuard::map(self.inner.lock(), |guard| &mut guard.0)
+impl<T: Clone> Draft<T> {
+    pub fn data(&self) -> MappedMutexGuard<'_, T> {
+        MutexGuard::map(self.inner.lock(), |guard| &mut guard.0)
+    }
+
+    pub fn latest(&self) -> MappedMutexGuard<'_, T> {
+        MutexGuard::map(self.inner.lock(), |inner| {
+            if inner.1.is_none() {
+                &mut inner.0
+            } else {
+                inner.1.as_mut().unwrap()
+            }
+        })
+    }
+
+    pub fn draft(&self) -> MappedMutexGuard<'_, T> {
+        MutexGuard::map(self.inner.lock(), |inner| {
+            if inner.1.is_none() {
+                inner.1 = Some(inner.0.clone());
             }
 
-            pub fn latest(&self) -> MappedMutexGuard<$id> {
-                MutexGuard::map(self.inner.lock(), |inner| {
-                    if inner.1.is_none() {
-                        &mut inner.0
-                    } else {
-                        inner.1.as_mut().unwrap()
-                    }
-                })
-            }
+            inner.1.as_mut().unwrap()
+        })
+    }
 
-            pub fn draft(&self) -> MappedMutexGuard<$id> {
-                MutexGuard::map(self.inner.lock(), |inner| {
-                    if inner.1.is_none() {
-                        inner.1 = Some(inner.0.clone());
-                    }
+    pub fn apply(&self) -> Option<T> {
+        let mut inner = self.inner.lock();
+        inner
+            .1
+            .take()
+            .map(|draft| std::mem::replace(&mut inner.0, draft))
+    }
 
-                    inner.1.as_mut().unwrap()
-                })
-            }
-
-            pub fn apply(&self) -> Option<$id> {
-                let mut inner = self.inner.lock();
-
-                match inner.1.take() {
-                    Some(draft) => {
-                        let old_value = inner.0.to_owned();
-                        inner.0 = draft.to_owned();
-                        Some(old_value)
-                    }
-                    None => None,
-                }
-            }
-
-            pub fn discard(&self) -> Option<$id> {
-                let mut inner = self.inner.lock();
-                inner.1.take()
-            }
-        }
-
-        impl From<$id> for Draft<$id> {
-            fn from(data: $id) -> Self {
-                Draft {
-                    inner: Arc::new(Mutex::new((data, None))),
-                }
-            }
-        }
-    };
+    pub fn discard(&self) -> Option<T> {
+        let mut inner = self.inner.lock();
+        inner.1.take()
+    }
 }
 
-// draft_define!(IClash);
-draft_define!(IClashTemp);
-draft_define!(IProfiles);
-draft_define!(IRuntime);
-draft_define!(IVerge);
+impl<T: Clone> From<T> for Draft<T> {
+    fn from(data: T) -> Self {
+        Draft {
+            inner: Arc::new(Mutex::new((data, None))),
+        }
+    }
+}
 
 #[test]
 fn test_draft() {

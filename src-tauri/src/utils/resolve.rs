@@ -2,6 +2,7 @@ use crate::config::{IVerge, PrfOption};
 use crate::{
     config::{Config, PrfItem},
     core::*,
+    utils::dirs,
     utils::init,
     utils::server,
 };
@@ -523,7 +524,6 @@ pub fn resolve_setup(app: &mut App) {
     create_window(&app.app_handle(), show_when_ready);
 
     log_err!(sysopt::Sysopt::global().init_launch());
-    log_err!(sysopt::Sysopt::global().init_sysproxy());
 
     log_err!(handle::Handle::update_systray_part());
     log_err!(hotkey::Hotkey::global().init(app.app_handle()));
@@ -1189,6 +1189,18 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
     FRONTEND_READY_HANDLED.store(false, Ordering::SeqCst);
     log::trace!("create_window reset frontend ready handled for new main window");
 
+    let webview_data_dir = match dirs::webview_data_dir() {
+        Ok(path) => path,
+        Err(err) => {
+            log::error!(target: "app", "failed to resolve portable WebView data directory: {err}");
+            return;
+        }
+    };
+    if let Err(err) = std::fs::create_dir_all(&webview_data_dir) {
+        log::error!(target: "app", "failed to create portable WebView data directory {}: {err}", webview_data_dir.display());
+        return;
+    }
+
     let window_size_locked = Config::verge().latest().window_size_locked.unwrap_or(false);
     let configured_size_pos = Config::verge().latest().window_size_position.clone();
     let size_pos_is_valid = configured_size_pos
@@ -1234,6 +1246,7 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
             tauri::WindowUrl::App("index.html".into()),
         )
         .title("Clash-Verge-Buty")
+        .data_directory(webview_data_dir.clone())
         .visible(false)
         .fullscreen(false)
         .min_inner_size(600.0, 520.0)

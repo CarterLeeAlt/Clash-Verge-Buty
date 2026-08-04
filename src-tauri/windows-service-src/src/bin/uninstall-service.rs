@@ -1,5 +1,7 @@
 use anyhow::Result;
-use clash_verge_windows_service_src::SERVICE_NAME;
+use clash_verge_windows_service_src::{
+    api_token_path, remove_token_file_and_empty_parent, SERVICE_NAME,
+};
 use windows_service::service::{ServiceAccess, ServiceState};
 use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
 
@@ -26,5 +28,8 @@ fn remove_one(manager: &ServiceManager, name: &str) -> Result<()> {
 fn main() -> Result<()> {
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
     remove_one(&manager, SERVICE_NAME)?;
+    if let Some(path) = api_token_path() {
+        remove_token_file_and_empty_parent(&path)?;
+    }
     Ok(())
 }

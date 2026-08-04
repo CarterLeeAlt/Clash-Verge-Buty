@@ -1,6 +1,6 @@
 use crate::config::*;
 use crate::utils::{dirs, help, redact::redact_log_text};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::{Duration, Local};
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
@@ -245,43 +245,39 @@ pub fn delete_log() -> Result<()> {
 /// Initialize all the config files
 /// before tauri setup
 pub fn init_config() -> Result<()> {
-    let _ = dirs::init_portable_flag();
-    let _ = init_log();
+    let app_dir = dirs::app_home_dir()?;
+    fs::create_dir_all(&app_dir).with_context(|| {
+        format!(
+            "failed to create portable application directory {}",
+            app_dir.display()
+        )
+    })?;
+    let profiles_dir = dirs::app_profiles_dir()?;
+    fs::create_dir_all(&profiles_dir).with_context(|| {
+        format!(
+            "failed to create portable profiles directory {}",
+            profiles_dir.display()
+        )
+    })?;
+
+    init_log()?;
     init_panic_hook();
     let _ = delete_log();
 
-    crate::log_err!(dirs::app_home_dir().map(|app_dir| {
-        if !app_dir.exists() {
-            let _ = fs::create_dir_all(&app_dir);
-        }
-    }));
+    let path = dirs::clash_path()?;
+    if !path.exists() {
+        help::save_yaml(&path, &IClashTemp::template().0, Some("# Clash-Verge-Buty"))?;
+    }
 
-    crate::log_err!(dirs::app_profiles_dir().map(|profiles_dir| {
-        if !profiles_dir.exists() {
-            let _ = fs::create_dir_all(&profiles_dir);
-        }
-    }));
+    let path = dirs::verge_path()?;
+    if !path.exists() {
+        help::save_yaml(&path, &IVerge::template(), Some("# Clash-Verge-Buty"))?;
+    }
 
-    crate::log_err!(dirs::clash_path().map(|path| {
-        if !path.exists() {
-            help::save_yaml(&path, &IClashTemp::template().0, Some("# Clash-Verge-Buty"))?;
-        }
-        <Result<()>>::Ok(())
-    }));
-
-    crate::log_err!(dirs::verge_path().map(|path| {
-        if !path.exists() {
-            help::save_yaml(&path, &IVerge::template(), Some("# Clash-Verge-Buty"))?;
-        }
-        <Result<()>>::Ok(())
-    }));
-
-    crate::log_err!(dirs::profiles_path().map(|path| {
-        if !path.exists() {
-            help::save_yaml(&path, &IProfiles::template(), Some("# Clash-Verge-Buty"))?;
-        }
-        <Result<()>>::Ok(())
-    }));
+    let path = dirs::profiles_path()?;
+    if !path.exists() {
+        help::save_yaml(&path, &IProfiles::template(), Some("# Clash-Verge-Buty"))?;
+    }
 
     Ok(())
 }
@@ -295,8 +291,11 @@ pub fn init_resources() -> Result<()> {
     if !app_dir.exists() {
         let _ = fs::create_dir_all(&app_dir);
     }
-    if !res_dir.exists() {
-        let _ = fs::create_dir_all(&res_dir);
+    if !res_dir.is_dir() {
+        anyhow::bail!(
+            "application resources directory not found: {}",
+            res_dir.display()
+        );
     }
 
     #[cfg(target_os = "windows")]
