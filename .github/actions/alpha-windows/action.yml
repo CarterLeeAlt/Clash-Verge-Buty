@@ -151,8 +151,8 @@ runs:
 
         $files = @(
           "src-tauri/target/${{ inputs.target }}/release/Clash_Verge_Buty.exe",
-          "src-tauri/target/${{ inputs.target }}/release/clash-meta.exe",
-          "src-tauri/target/${{ inputs.target }}/release/clash-meta-alpha.exe"
+          "src-tauri/target/${{ inputs.target }}/release/mihomo.exe",
+          "src-tauri/target/${{ inputs.target }}/release/mihomo-alpha.exe"
         )
         $files += Get-ChildItem "src-tauri/target/${{ inputs.target }}/release/bundle" -Recurse -File -Include *.exe,*.msi | ForEach-Object { $_.FullName }
         $files = $files | Where-Object { Test-Path $_ } | Select-Object -Unique
@@ -187,8 +187,8 @@ runs:
 
         $files = @(
           "src-tauri/target/${{ inputs.target }}/release/Clash_Verge_Buty.exe",
-          "src-tauri/target/${{ inputs.target }}/release/clash-meta.exe",
-          "src-tauri/target/${{ inputs.target }}/release/clash-meta-alpha.exe"
+          "src-tauri/target/${{ inputs.target }}/release/mihomo.exe",
+          "src-tauri/target/${{ inputs.target }}/release/mihomo-alpha.exe"
         )
         $files += Get-ChildItem "src-tauri/target/${{ inputs.target }}/release/bundle" -Recurse -File -Include *.exe,*.msi | ForEach-Object { $_.FullName }
         $files = $files | Where-Object { Test-Path $_ } | Select-Object -Unique

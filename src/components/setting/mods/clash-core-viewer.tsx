@@ -20,8 +20,8 @@ import { grantPermission } from "@/services/cmds";
 import getSystem from "@/utils/get-system";
 
 const VALID_CORE = [
-  { name: "Clash Meta", core: "clash-meta" },
-  { name: "Clash Meta Alpha", core: "clash-meta-alpha" },
+  { name: "Mihomo", core: "mihomo" },
+  { name: "Mihomo Alpha", core: "mihomo-alpha" },
 ];
 
 const OS = getSystem();
@@ -39,7 +39,7 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
     close: () => setOpen(false),
   }));
 
-  const { clash_core = "clash-meta" } = verge ?? {};
+  const { clash_core = "mihomo" } = verge ?? {};
 
   const onCoreChange = useLockFn(async (core: string) => {
     if (core === clash_core) return;
@@ -72,7 +72,7 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
   const onRestart = useLockFn(async () => {
     try {
       await restartSidecar();
-      Notice.success(`Clash core restarted.`);
+      Notice.success(`Mihomo core restarted.`);
     } catch (err: any) {
       Notice.error(formatNoticeMessage(err));
     }
@@ -83,7 +83,7 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
       setUpgrading(true);
       await upgradeCore();
       setUpgrading(false);
-      Notice.success(`Clash core upgraded.`);
+      Notice.success(`Mihomo core upgraded.`);
     } catch (err: any) {
       setUpgrading(false);
       Notice.error(formatNoticeMessage(err?.response?.data?.message || err));
@@ -95,9 +95,9 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
       open={open}
       title={
         <Box display="flex" justifyContent="space-between">
-          {t("Clash Core")}
+          {t("Mihomo Core")}
           <Box>
-            {clash_core !== "clash-meta" && (
+            {clash_core !== "mihomo" && (
               <LoadingButton
                 variant="contained"
                 size="small"

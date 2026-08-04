@@ -85,7 +85,7 @@ export const LayoutControl = ({
   const onRestartSidecar = async () => {
     try {
       await restartSidecar();
-      Notice.success("Clash core restarted.");
+      Notice.success("Mihomo core restarted.");
     } catch (err: any) {
       Notice.error(formatNoticeMessage(err));
     }

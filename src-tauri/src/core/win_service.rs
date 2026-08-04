@@ -1,7 +1,7 @@
 #![cfg(target_os = "windows")]
 
 use super::clash_api;
-use crate::config::Config;
+use crate::config::{Config, MIHOMO_CORE};
 use crate::utils::dirs;
 use anyhow::{bail, Context, Result};
 use deelevate::{PrivilegeLevel, Token};
@@ -439,7 +439,7 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
         .latest()
         .clash_core
         .clone()
-        .unwrap_or("clash".into());
+        .unwrap_or_else(|| MIHOMO_CORE.into());
     let clash_bin = format!("{clash_core}.exe");
     let bin_path_buf = current_exe()?.with_file_name(clash_bin);
     let config_dir_buf = dirs::app_home_dir()?;
@@ -485,15 +485,15 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
         sleep(Duration::from_millis(300)).await;
     }
     if core_pid.is_none() {
-        bail!("service did not start clash core; /get_clash has no pid");
+        bail!("service did not start Mihomo core; /get_clash has no pid");
     }
 
-    log::info!(target: "app", "waiting for configured Clash controller readiness");
+    log::info!(target: "app", "waiting for configured Mihomo controller readiness");
     clash_api::wait_for_core_ready(Duration::from_secs(12))
         .await
         .with_context(|| {
             format!(
-                "service started clash core (pid {core_pid:?}) but its configured controller is not ready"
+                "service started Mihomo core (pid {core_pid:?}) but its configured controller is not ready"
             )
         })
 }

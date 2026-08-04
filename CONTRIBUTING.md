@@ -25,9 +25,9 @@ After installing Rust and Node.js, install the necessary Node.js packages:
 pnpm i
 ```
 
-### Download the Clash Binary
+### Download the Mihomo Binary
 
-You have two options for downloading the clash binary:
+You have two options for downloading the Mihomo binary:
 
 - Automatically download it via the provided script:
   ```shell
@@ -35,7 +35,7 @@ You have two options for downloading the clash binary:
   # Use '--force' to force update to the latest version
   # pnpm run check --force
   ```
-- Manually download it from the [Clash Meta release](https://github.com/MetaCubeX/Clash.Meta/releases). After downloading, rename the binary according to the [Tauri configuration](https://tauri.app/v1/api/config#bundleconfig.externalbin).
+- Manually download it from the [Mihomo releases](https://github.com/MetaCubeX/mihomo/releases). After downloading, rename the binary according to the [Tauri configuration](https://tauri.app/v1/api/config#bundleconfig.externalbin).
 
 ### Run the Development Server
 

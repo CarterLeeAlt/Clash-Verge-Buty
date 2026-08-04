@@ -91,7 +91,7 @@ impl CoreManager {
         let config_path = dirs::path_to_str(&config_path)?;
 
         let clash_core = { Config::verge().latest().clash_core.clone() };
-        let clash_core = clash_core.unwrap_or("clash".into());
+        let clash_core = clash_core.unwrap_or_else(|| MIHOMO_CORE.into());
 
         let app_dir = dirs::app_home_dir()?;
         let app_dir = dirs::path_to_str(&app_dir)?;
@@ -203,13 +203,13 @@ impl CoreManager {
                             .ok();
                         self.core_ready.store(false, Ordering::SeqCst);
                         log_err!(win_service::stop_core_by_service().await);
-                        log::error!(target: "app", "Service Mode failed; service could not start clash core. {err}");
+                        log::error!(target: "app", "Service Mode failed; service could not start Mihomo core. {err}");
                         if tun_enabled {
                             bail!(
                                 "Tun mode requires a working clash-verge-service on Windows: {err}"
                             );
                         }
-                        bail!("Service Mode failed; service could not start clash core. {err}");
+                        bail!("Service Mode failed; service could not start Mihomo core. {err}");
                     }
                 }
             }
@@ -219,16 +219,11 @@ impl CoreManager {
         let app_dir = dirs::path_to_str(&app_dir)?;
 
         let clash_core = { Config::verge().latest().clash_core.clone() };
-        let clash_core = clash_core.unwrap_or("clash".into());
-        let is_clash = clash_core == "clash";
+        let clash_core = clash_core.unwrap_or_else(|| MIHOMO_CORE.into());
 
         let config_path = dirs::path_to_str(&config_path)?;
 
-        let args = match clash_core.as_str() {
-            "clash-meta" => vec!["-d", app_dir, "-f", config_path],
-            "clash-meta-alpha" => vec!["-d", app_dir, "-f", config_path],
-            _ => vec!["-d", app_dir, "-f", config_path],
-        };
+        let args = vec!["-d", app_dir, "-f", config_path];
 
         let spawn_result = (|| -> Result<_> {
             let cmd = Command::new_sidecar(clash_core)?;
@@ -264,25 +259,19 @@ impl CoreManager {
             while let Some(event) = rx.recv().await {
                 match event {
                     CommandEvent::Stdout(line) => {
-                        if is_clash {
-                            let stdout = clash_api::parse_log(line.clone());
-                            log::info!(target: "app", "[clash]: {stdout}");
-                        } else {
-                            log::info!(target: "app", "[clash]: {line}");
-                        };
+                        log::info!(target: "app", "[mihomo]: {line}");
                         Logger::global().set_log(line);
                     }
                     CommandEvent::Stderr(err) => {
-                        // let stdout = clash_api::parse_log(err.clone());
-                        log::error!(target: "app", "[clash]: {err}");
+                        log::error!(target: "app", "[mihomo]: {err}");
                         Logger::global().set_log(err);
                     }
                     CommandEvent::Error(err) => {
-                        log::error!(target: "app", "[clash]: {err}");
+                        log::error!(target: "app", "[mihomo]: {err}");
                         Logger::global().set_log(err);
                     }
                     CommandEvent::Terminated(_) => {
-                        log::info!(target: "app", "clash core terminated");
+                        log::info!(target: "app", "Mihomo core terminated");
                         CoreManager::global().handle_core_terminated(generation);
                         break;
                     }
@@ -302,11 +291,11 @@ impl CoreManager {
                 }
             }
             self.core_ready.store(false, Ordering::SeqCst);
-            return Err(err).context("wait for Clash core readiness");
+            return Err(err).context("wait for Mihomo core readiness");
         }
 
         if self.active_generation.load(Ordering::SeqCst) != generation {
-            bail!("Clash core terminated while readiness was being confirmed");
+            bail!("Mihomo core terminated while readiness was being confirmed");
         }
         self.core_ready.store(true, Ordering::SeqCst);
 
@@ -425,7 +414,7 @@ impl CoreManager {
                     Ok(true) => break,
                     Ok(false) => break,
                     Err(err) => {
-                        log::error!(target: "app", "failed to recover Clash core: {err}");
+                        log::error!(target: "app", "failed to recover Mihomo core: {err}");
                         retry_delay = (retry_delay * 2).min(Duration::from_secs(30));
                     }
                 }
@@ -469,7 +458,7 @@ impl CoreManager {
                     .compare_exchange(generation, 0, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
-                    log::error!(target: "app", "service-managed Clash core stopped; scheduling recovery");
+                    log::error!(target: "app", "service-managed Mihomo core stopped; scheduling recovery");
                     self.core_ready.store(false, Ordering::SeqCst);
                     self.schedule_core_recovery();
                 }
@@ -505,11 +494,9 @@ impl CoreManager {
 
     /// 切换核心
     pub async fn change_core(&self, clash_core: Option<String>) -> Result<()> {
-        let clash_core = clash_core.ok_or(anyhow::anyhow!("clash core is null"))?;
-        const CLASH_CORES: [&str; 2] = ["clash-meta", "clash-meta-alpha"];
-
-        if !CLASH_CORES.contains(&clash_core.as_str()) {
-            bail!("invalid clash core name \"{clash_core}\"");
+        let clash_core = clash_core.ok_or(anyhow::anyhow!("Mihomo core is null"))?;
+        if !VALID_MIHOMO_CORES.contains(&clash_core.as_str()) {
+            bail!("invalid Mihomo core name \"{clash_core}\"");
         }
 
         log::debug!(target: "app", "change core to `{clash_core}`");

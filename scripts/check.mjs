@@ -135,14 +135,14 @@ const DOWNLOAD_SOURCES = {
     "https://github.com/Kuingsmile/uwp-tool/releases/download/latest/enableLoopback.exe",
 };
 
-/* ======= clash meta alpha======= */
+/* ======= mihomo alpha ======= */
 const META_ALPHA_VERSION_URL = DOWNLOAD_SOURCES.mihomoAlphaVersion;
 const META_ALPHA_URL_PREFIX = DOWNLOAD_SOURCES.mihomoAlphaPrefix;
 // Dynamic upstream asset; checksum cannot be fixed unless version is pinned.
 let META_ALPHA_VERSION;
 
 const META_ALPHA_MAP = {
-  "win32-x64": "mihomo-windows-amd64-compatible",
+  "win32-x64": "mihomo-windows-amd64-v2",
 };
 
 // Fetch the latest alpha release version from the version.txt file
@@ -156,7 +156,7 @@ async function getLatestAlphaVersion() {
       method: "GET",
     },
     {
-      name: "clash-meta-alpha-version",
+      name: "mihomo-alpha-version",
     }
   );
   let v = await response.text();
@@ -164,14 +164,14 @@ async function getLatestAlphaVersion() {
   console.log(`Latest alpha version: ${META_ALPHA_VERSION}`);
 }
 
-/* ======= clash meta stable ======= */
+/* ======= mihomo stable ======= */
 const META_VERSION_URL = DOWNLOAD_SOURCES.mihomoStableVersion;
 const META_URL_PREFIX = DOWNLOAD_SOURCES.mihomoStablePrefix;
 // Dynamic upstream asset; checksum cannot be fixed unless version is pinned.
 let META_VERSION;
 
 const META_MAP = {
-  "win32-x64": "mihomo-windows-amd64-compatible",
+  "win32-x64": "mihomo-windows-amd64-v2",
 };
 
 // Fetch the latest release version from the version.txt file
@@ -185,7 +185,7 @@ async function getLatestReleaseVersion() {
       method: "GET",
     },
     {
-      name: "clash-meta-version",
+      name: "mihomo-version",
     }
   );
   let v = await response.text();
@@ -198,20 +198,20 @@ async function getLatestReleaseVersion() {
  */
 if (!META_MAP[`${platform}-${arch}`]) {
   throw new Error(
-    `clash meta alpha unsupported platform "${platform}-${arch}"`
+    `mihomo unsupported platform "${platform}-${arch}"`
   );
 }
 
 if (!META_ALPHA_MAP[`${platform}-${arch}`]) {
   throw new Error(
-    `clash meta alpha unsupported platform "${platform}-${arch}"`
+    `mihomo alpha unsupported platform "${platform}-${arch}"`
   );
 }
 
 /**
  * core info
  */
-function clashMetaAlpha() {
+function mihomoAlpha() {
   const name = META_ALPHA_MAP[`${platform}-${arch}`];
   const isWin = platform === "win32";
   const urlExt = isWin ? "zip" : "gz";
@@ -220,15 +220,15 @@ function clashMetaAlpha() {
   const zipFile = `${name}-${META_ALPHA_VERSION}.${urlExt}`;
 
   return {
-    name: "clash-meta-alpha",
-    targetFile: `clash-meta-alpha-${SIDECAR_HOST}${isWin ? ".exe" : ""}`,
+    name: "mihomo-alpha",
+    targetFile: `mihomo-alpha-${SIDECAR_HOST}${isWin ? ".exe" : ""}`,
     exeFile,
     zipFile,
     downloadURL,
   };
 }
 
-function clashMeta() {
+function mihomoStable() {
   const name = META_MAP[`${platform}-${arch}`];
   const isWin = platform === "win32";
   const urlExt = isWin ? "zip" : "gz";
@@ -237,8 +237,8 @@ function clashMeta() {
   const zipFile = `${name}-${META_VERSION}.${urlExt}`;
 
   return {
-    name: "clash-meta",
-    targetFile: `clash-meta-${SIDECAR_HOST}${isWin ? ".exe" : ""}`,
+    name: "mihomo",
+    targetFile: `mihomo-${SIDECAR_HOST}${isWin ? ".exe" : ""}`,
     exeFile,
     zipFile,
     downloadURL,
@@ -599,15 +599,15 @@ const resolveEnableLoopback = () =>
 const tasks = [
   // { name: "clash", func: resolveClash, retry: 5 },
   {
-    name: "clash-meta-alpha",
+    name: "mihomo-alpha",
     func: () =>
-      getLatestAlphaVersion().then(() => resolveSidecar(clashMetaAlpha())),
+      getLatestAlphaVersion().then(() => resolveSidecar(mihomoAlpha())),
     retry: 5,
   },
   {
-    name: "clash-meta",
+    name: "mihomo",
     func: () =>
-      getLatestReleaseVersion().then(() => resolveSidecar(clashMeta())),
+      getLatestReleaseVersion().then(() => resolveSidecar(mihomoStable())),
     retry: 5,
   },
   { name: "plugin", func: resolvePlugin, retry: 5, winOnly: true },

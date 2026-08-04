@@ -6,7 +6,7 @@
 </h1>
 
 <h3 align="center">
-A Clash Meta GUI based on Tauri (Just a Modified Version)</a>.
+A Mihomo GUI based on Tauri (Just a Modified Version)</a>.
 </h3>
 
 
@@ -14,7 +14,7 @@ A Clash Meta GUI based on Tauri (Just a Modified Version)</a>.
 
 Clash-Verge-Buty was based on or inspired by these projects and so on:
 
-- [clash-verge-rev/clash-verge-rev](https://github.com/clash-verge-rev/clash-verge-rev): A Clash Meta GUI based on Tauri.
+- [clash-verge-rev/clash-verge-rev](https://github.com/clash-verge-rev/clash-verge-rev): A Mihomo GUI based on Tauri.
 - [zzzgydi/clash-verge](https://github.com/zzzgydi/clash-verge): A Clash GUI based on tauri. Supports Windows, macOS and Linux.
 - [tauri-apps/tauri](https://github.com/tauri-apps/tauri): Build smaller, faster, and more secure desktop applications with a web frontend.
 - [Dreamacro/clash](https://github.com/Dreamacro/clash): A rule-based tunnel in Go.

@@ -20,11 +20,11 @@
         "icons/icon.ico"
       ],
       "resources": ["resources"],
-      "externalBin": ["sidecar/clash-meta", "sidecar/clash-meta-alpha"],
+      "externalBin": ["sidecar/mihomo", "sidecar/mihomo-alpha"],
       "copyright": "© 2022 zzzgydi All Rights Reserved",
       "category": "DeveloperTool",
-      "shortDescription": "A Clash Meta GUI based on Tauri.",
-      "longDescription": "A Clash Meta GUI based on Tauri."
+      "shortDescription": "A Mihomo GUI based on Tauri.",
+      "longDescription": "A Mihomo GUI based on Tauri."
     },
 
     "updater": {

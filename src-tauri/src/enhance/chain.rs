@@ -20,8 +20,8 @@ pub enum ChainType {
 #[derive(Debug, Clone)]
 pub enum ChainSupport {
     Clash,
-    ClashMeta,
-    ClashMetaAlpha,
+    Mihomo,
+    MihomoAlpha,
     All,
 }
 
@@ -70,10 +70,10 @@ impl ChainItem {
             ChainItem::to_script("verge_hy_alpn", include_str!("./builtin/meta_hy_alpn.js"));
 
         vec![
-            (ChainSupport::ClashMeta, hy_alpn),
-            (ChainSupport::ClashMeta, meta_guard),
-            (ChainSupport::ClashMetaAlpha, hy_alpn_alpha),
-            (ChainSupport::ClashMetaAlpha, meta_guard_alpha),
+            (ChainSupport::Mihomo, hy_alpn),
+            (ChainSupport::Mihomo, meta_guard),
+            (ChainSupport::MihomoAlpha, hy_alpn_alpha),
+            (ChainSupport::MihomoAlpha, meta_guard_alpha),
         ]
     }
 
@@ -91,8 +91,8 @@ impl ChainSupport {
             Some(core) => match (self, core.as_str()) {
                 (ChainSupport::All, _) => true,
                 (ChainSupport::Clash, "clash") => true,
-                (ChainSupport::ClashMeta, "clash-meta") => true,
-                (ChainSupport::ClashMetaAlpha, "clash-meta-alpha") => true,
+                (ChainSupport::Mihomo, "mihomo") => true,
+                (ChainSupport::MihomoAlpha, "mihomo-alpha") => true,
                 _ => false,
             },
             None => true,
