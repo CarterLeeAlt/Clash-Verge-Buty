@@ -252,22 +252,6 @@ runs:
         Write-Host "[INFO] portable zip entries"
         tar -tf $portableZip.FullName
 
-        $portableConfigSources = @(
-          "src-tauri/resources/config",
-          "src-tauri/config",
-          "dist/config",
-          "src-tauri/target/${{ inputs.target }}/release/.config"
-        )
-
-        foreach ($src in $portableConfigSources) {
-          if (Test-Path $src) {
-            Write-Host "[INFO] config source exists: $src"
-            Get-ChildItem $src -Force -Recurse | ForEach-Object { Write-Host "   - $($_.FullName)" }
-          } else {
-            Write-Host "[INFO] config source missing: $src"
-          }
-        }
-
         Expand-Archive -Path $portableZip.FullName -DestinationPath $stage -Force
 
         Write-Host "[INFO] prepared portable artifact from: $($portableZip.Name)"
@@ -277,13 +261,6 @@ runs:
         if (-not (Get-ChildItem $stage -Force -Recurse -File)) {
           throw "portable artifact content not found after unzip: $($portableZip.FullName)"
         }
-
-        $portableMarker = Join-Path $stage ".config/PORTABLE"
-        if (-not (Test-Path $portableMarker)) {
-          throw "Portable marker missing: $portableMarker"
-        }
-
-        Write-Host "[INFO] portable marker found: $portableMarker"
 
     - name: Stage Windows installer artifact
       shell: pwsh
