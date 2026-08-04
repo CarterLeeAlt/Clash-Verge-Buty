@@ -16,7 +16,12 @@ import LogoSvg from "@/assets/image/logo.svg?react";
 import LogoSvg_dark from "@/assets/image/logo_dark.svg?react";
 import { atomThemeMode } from "@/services/states";
 import { useRecoilState } from "recoil";
-import { BaseErrorBoundary, formatNoticeMessage, Notice, NoticeManager } from "@/components/base";
+import {
+  BaseErrorBoundary,
+  formatNoticeMessage,
+  Notice,
+  NoticeManager,
+} from "@/components/base";
 import { LayoutItem } from "@/components/layout/layout-item";
 import { LayoutControl } from "@/components/layout/layout-control";
 import { LayoutTraffic } from "@/components/layout/layout-traffic";
@@ -27,12 +32,10 @@ import "dayjs/locale/ru";
 import "dayjs/locale/zh-cn";
 import {
   frontendHeartbeat,
-  getPortableFlag,
   getWindowStyleConfig,
   reportFrontendError,
 } from "@/services/cmds";
 import { useNavigate } from "react-router-dom";
-export let portableFlag = false;
 
 dayjs.extend(relativeTime);
 
@@ -128,12 +131,6 @@ const Layout = () => {
     };
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onUnhandledRejection);
-
-    getPortableFlag()
-      .then((value) => {
-        portableFlag = value;
-      })
-      .catch(() => undefined);
 
     getWindowStyleConfig()
       .then(setWindowStyle)

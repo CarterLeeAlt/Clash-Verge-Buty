@@ -21,10 +21,9 @@ fn main() -> std::io::Result<()> {
         return Ok(());
     }
 
-    crate::log_err!(init::init_config());
+    init::init_config().map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
 
-    #[allow(unused_mut)]
-    let mut builder = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .system_tray(SystemTray::new())
         .setup(|app| {
             resolve::resolve_setup(app);
@@ -38,8 +37,6 @@ fn main() -> std::io::Result<()> {
             cmds::open_logs_dir,
             cmds::open_web_url,
             cmds::open_core_dir,
-            cmds::get_portable_flag,
-            // cmds::kill_sidecar,
             cmds::restart_sidecar,
             cmds::grant_permission,
             // clash
@@ -63,7 +60,6 @@ fn main() -> std::io::Result<()> {
             cmds::report_frontend_error,
             cmds::get_window_style_config,
             cmds::set_window_size_locked,
-            // cmds::update_hotkeys,
             // profile
             cmds::get_profiles,
             cmds::enhance_profiles,
@@ -86,10 +82,10 @@ fn main() -> std::io::Result<()> {
         ]);
 
     #[cfg(target_os = "macos")]
-    {
+    let builder = {
         use tauri::{Menu, MenuItem, Submenu};
 
-        builder = builder.menu(
+        builder.menu(
             Menu::new().add_submenu(Submenu::new(
                 "Edit",
                 Menu::new()
@@ -102,8 +98,8 @@ fn main() -> std::io::Result<()> {
                     .add_native_item(MenuItem::CloseWindow)
                     .add_native_item(MenuItem::Quit),
             )),
-        );
-    }
+        )
+    };
 
     let app = builder
         .build(tauri::generate_context!())

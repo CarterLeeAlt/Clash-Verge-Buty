@@ -3,7 +3,37 @@ use crate::utils::{dirs, help, tmpl};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Mapping;
-use std::fs;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, Ordering},
+};
+
+static PROFILES_WRITE_BLOCKED: AtomicBool = AtomicBool::new(false);
+
+fn backup_invalid_profiles(path: &Path) -> Result<PathBuf> {
+    let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("profiles.yaml");
+    let backup = path.with_file_name(format!(
+        "{file_name}.invalid-{timestamp}-{}.bak",
+        std::process::id()
+    ));
+    let copied = fs::copy(path, &backup).with_context(|| {
+        format!(
+            "failed to preserve invalid profiles file '{}' as '{}'",
+            path.display(),
+            backup.display()
+        )
+    })?;
+    let original_len = fs::metadata(path)?.len();
+    if copied != original_len || fs::metadata(&backup)?.len() != original_len {
+        bail!("invalid profiles backup size verification failed");
+    }
+    Ok(backup)
+}
 
 /// Define the `profiles.yaml` schema
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -28,7 +58,15 @@ macro_rules! patch {
 
 impl IProfiles {
     pub fn new() -> Self {
-        match dirs::profiles_path().and_then(|path| help::read_yaml::<Self>(&path)) {
+        let profiles_path = match dirs::profiles_path() {
+            Ok(path) => path,
+            Err(err) => {
+                log::error!(target: "app", "{err}");
+                return Self::template();
+            }
+        };
+
+        match help::read_yaml::<Self>(&profiles_path) {
             Ok(mut profiles) => {
                 if profiles.items.is_none() {
                     profiles.items = Some(vec![]);
@@ -63,6 +101,20 @@ impl IProfiles {
             Err(err) => {
                 log::error!(target: "app", "{err}");
                 let mut profiles = Self::template();
+                if profiles_path.exists() {
+                    match backup_invalid_profiles(&profiles_path) {
+                        Ok(backup) => log::error!(
+                            target: "app",
+                            "invalid profiles config was preserved at {} before reset",
+                            backup.display()
+                        ),
+                        Err(backup_err) => {
+                            PROFILES_WRITE_BLOCKED.store(true, Ordering::SeqCst);
+                            log::error!(target: "app", "refuse to overwrite invalid profiles config because backup failed: {backup_err}");
+                            return profiles;
+                        }
+                    }
+                }
                 if let Err(err) = profiles.ensure_global_script() {
                     log::error!(target: "app", "{err}");
                 }
@@ -156,6 +208,11 @@ impl IProfiles {
     }
 
     pub fn save_file(&self) -> Result<()> {
+        if PROFILES_WRITE_BLOCKED.load(Ordering::SeqCst) {
+            bail!(
+                "profiles.yaml writes are blocked because the invalid original could not be backed up; preserve or repair the file and restart the app"
+            );
+        }
         help::save_yaml(
             &dirs::profiles_path()?,
             self,

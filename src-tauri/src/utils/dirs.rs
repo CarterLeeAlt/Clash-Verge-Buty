@@ -1,56 +1,42 @@
 use crate::core::handle;
 use anyhow::Result;
-use once_cell::sync::OnceCell;
 use std::path::PathBuf;
-use tauri::{
-    api::path::{data_dir, resource_dir},
-    Env,
-};
+use tauri::{api::path::resource_dir, Env};
 
 #[cfg(not(feature = "verge-dev"))]
 pub static APP_ID: &str = "io.github.clash-verge-buty.data";
 #[cfg(feature = "verge-dev")]
 pub static APP_ID: &str = "io.github.clash-verge-buty.data.dev";
 
-pub static PORTABLE_FLAG: OnceCell<bool> = OnceCell::new();
-
 static CLASH_CONFIG: &str = "config.yaml";
 static VERGE_CONFIG: &str = "verge.yaml";
 static PROFILE_YAML: &str = "profiles.yaml";
 
-/// init portable flag
-pub fn init_portable_flag() -> Result<()> {
+/// Directory that contains the running executable. All application-created
+/// files must stay in this directory or one of its descendants.
+pub fn executable_dir() -> Result<PathBuf> {
     use tauri::utils::platform::current_exe;
 
-    let app_exe = current_exe()?;
-    if let Some(dir) = app_exe.parent() {
-        let dir = PathBuf::from(dir).join(".config/PORTABLE");
-
-        if dir.exists() {
-            PORTABLE_FLAG.get_or_init(|| true);
-        }
-    }
-    PORTABLE_FLAG.get_or_init(|| false);
-    Ok(())
+    let app_exe = dunce::canonicalize(current_exe()?)?;
+    app_exe
+        .parent()
+        .map(PathBuf::from)
+        .ok_or(anyhow::anyhow!("failed to get the executable directory"))
 }
 
 /// get the verge app home dir
 pub fn app_home_dir() -> Result<PathBuf> {
-    use tauri::utils::platform::current_exe;
+    Ok(executable_dir()?.join(".config").join(APP_ID))
+}
 
-    let flag = PORTABLE_FLAG.get().unwrap_or(&false);
-    if *flag {
-        let app_exe = current_exe()?;
-        let app_exe = dunce::canonicalize(app_exe)?;
-        let app_dir = app_exe
-            .parent()
-            .ok_or(anyhow::anyhow!("failed to get the portable app dir"))?;
-        return Ok(PathBuf::from(app_dir).join(".config").join(APP_ID));
-    }
+/// WebView cache, cookies, LocalStorage and IndexedDB.
+pub fn webview_data_dir() -> Result<PathBuf> {
+    Ok(app_home_dir()?.join("webview"))
+}
 
-    Ok(data_dir()
-        .ok_or(anyhow::anyhow!("failed to get app home dir"))?
-        .join(APP_ID))
+/// Temporary files owned by this application.
+pub fn app_temp_dir() -> Result<PathBuf> {
+    Ok(app_home_dir()?.join("temp"))
 }
 
 /// get the resources dir
@@ -111,6 +97,13 @@ pub fn service_path() -> Result<PathBuf> {
     // Windows service binary keeps the historical filename clash-verge-service.exe
     // because local-binaries and CI provide it under this name.
     Ok(app_resources_dir()?.join("clash-verge-service.exe"))
+}
+
+#[cfg(windows)]
+pub fn service_api_token_path() -> Result<PathBuf> {
+    Ok(app_resources_dir()?
+        .join("service-data")
+        .join("service-api-token"))
 }
 
 #[cfg(windows)]

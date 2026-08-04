@@ -99,16 +99,6 @@ impl IClashTemp {
         Self::guard_mixed_port(&self.0)
     }
 
-    #[allow(unused)]
-    pub fn get_socks_port(&self) -> u16 {
-        Self::guard_socks_port(&self.0)
-    }
-
-    #[allow(unused)]
-    pub fn get_port(&self) -> u16 {
-        Self::guard_port(&self.0)
-    }
-
     pub fn get_client_info(&self) -> ClashInfo {
         let config = &self.0;
 
@@ -281,54 +271,4 @@ fn test_clash_info() {
         get_case(8888, "192.168.1.1:80800"),
         get_result(8888, "127.0.0.1:9097")
     );
-}
-
-#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub struct IClash {
-    pub mixed_port: Option<u16>,
-    pub allow_lan: Option<bool>,
-    pub log_level: Option<String>,
-    pub ipv6: Option<bool>,
-    pub mode: Option<String>,
-    pub external_controller: Option<String>,
-    pub secret: Option<String>,
-    pub dns: Option<IClashDNS>,
-    pub tun: Option<IClashTUN>,
-    pub interface_name: Option<String>,
-}
-
-#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub struct IClashTUN {
-    pub enable: Option<bool>,
-    pub stack: Option<String>,
-    pub auto_route: Option<bool>,
-    pub auto_detect_interface: Option<bool>,
-    pub dns_hijack: Option<Vec<String>>,
-}
-
-#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub struct IClashDNS {
-    pub enable: Option<bool>,
-    pub listen: Option<String>,
-    pub default_nameserver: Option<Vec<String>>,
-    pub enhanced_mode: Option<String>,
-    pub fake_ip_range: Option<String>,
-    pub use_hosts: Option<bool>,
-    pub fake_ip_filter: Option<Vec<String>>,
-    pub nameserver: Option<Vec<String>>,
-    pub fallback: Option<Vec<String>>,
-    pub fallback_filter: Option<IClashFallbackFilter>,
-    pub nameserver_policy: Option<Vec<String>>,
-}
-
-#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub struct IClashFallbackFilter {
-    pub geoip: Option<bool>,
-    pub geoip_code: Option<String>,
-    pub ipcidr: Option<Vec<String>>,
-    pub domain: Option<Vec<String>>,
 }

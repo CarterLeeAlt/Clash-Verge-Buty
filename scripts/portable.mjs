@@ -43,14 +43,10 @@ async function resolvePortable() {
   const releaseDir = target
     ? `./src-tauri/target/${target}/release`
     : `./src-tauri/target/release`;
-  const configDir = path.join(releaseDir, ".config");
 
   if (!(await fs.pathExists(releaseDir))) {
     throw new Error("could not found the release dir");
   }
-
-  await fs.mkdirp(configDir);
-  await fs.createFile(path.join(configDir, "PORTABLE"));
 
   const releaseExeFiles = (await fs.readdir(releaseDir))
     .filter((name) => name.toLowerCase().endsWith(".exe"))
@@ -77,14 +73,17 @@ async function resolvePortable() {
   const portableExeName =
     preferredNames.find((name) => releaseExeFiles.includes(name)) ||
     releaseExeFiles.find(
-      (name) => !deniedKeyword.test(name) && !/clash-meta(-alpha)?\.exe$/i.test(name)
+      (name) =>
+        !deniedKeyword.test(name) && !/clash-meta(-alpha)?\.exe$/i.test(name)
     );
 
   if (!portableExeName) {
     throw new Error(`Portable main exe not found under ${releaseDir}`);
   }
   if (deniedKeyword.test(portableExeName)) {
-    throw new Error(`Portable main exe resolved to installer-like file: ${portableExeName}`);
+    throw new Error(
+      `Portable main exe resolved to installer-like file: ${portableExeName}`
+    );
   }
   const exePath = path.join(releaseDir, portableExeName);
 
@@ -109,7 +108,6 @@ async function resolvePortable() {
   zip.addLocalFile(clashMetaPath);
   zip.addLocalFile(clashMetaAlphaPath);
   zip.addLocalFolder(resourcesPath, "resources");
-  zip.addLocalFolder(configDir, ".config");
 
   const unsignedSuffix = process.env.UNSIGNED_BUILD === "1" ? "_unsigned" : "";
   const zipFile = `${productFileName}_${version}_${ARCH_MAP[target]}_portable${unsignedSuffix}.zip`;
@@ -120,25 +118,39 @@ async function resolvePortable() {
     .map((entry) => entry.entryName);
   console.log("[INFO]: portable zip entries:", zipCheck);
 
-  const zipExeEntries = zipCheck.filter((name) => name.toLowerCase().endsWith(".exe"));
+  const zipExeEntries = zipCheck.filter((name) =>
+    name.toLowerCase().endsWith(".exe")
+  );
   const zipEntriesLower = zipCheck.map((name) => name.toLowerCase());
-  if (!zipExeEntries.some((name) => path.basename(name).toLowerCase() === portableExeName.toLowerCase())) {
+  if (
+    !zipExeEntries.some(
+      (name) =>
+        path.basename(name).toLowerCase() === portableExeName.toLowerCase()
+    )
+  ) {
     throw new Error(`portable.zip missing main exe: ${portableExeName}`);
   }
-  if (!zipExeEntries.some((name) => path.basename(name).toLowerCase() === "clash-meta.exe")) {
+  if (
+    !zipExeEntries.some(
+      (name) => path.basename(name).toLowerCase() === "clash-meta.exe"
+    )
+  ) {
     throw new Error("portable.zip missing clash-meta.exe");
   }
-  if (!zipExeEntries.some((name) => path.basename(name).toLowerCase() === "clash-meta-alpha.exe")) {
+  if (
+    !zipExeEntries.some(
+      (name) => path.basename(name).toLowerCase() === "clash-meta-alpha.exe"
+    )
+  ) {
     throw new Error("portable.zip missing clash-meta-alpha.exe");
   }
   if (!zipEntriesLower.some((name) => name.startsWith("resources/"))) {
     throw new Error("portable.zip missing resources/ directory");
   }
-  if (!zipEntriesLower.some((name) => name.startsWith(".config/"))) {
-    console.warn("[WARN]: portable.zip missing .config/ directory");
-  }
   if (zipExeEntries.some((name) => deniedKeyword.test(path.basename(name)))) {
-    throw new Error(`portable.zip contains installer exe: ${zipExeEntries.join(", ")}`);
+    throw new Error(
+      `portable.zip contains installer exe: ${zipExeEntries.join(", ")}`
+    );
   }
 
   console.log("[INFO]: create portable zip successfully");

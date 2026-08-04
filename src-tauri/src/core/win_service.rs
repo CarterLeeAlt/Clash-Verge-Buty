@@ -1,5 +1,6 @@
 #![cfg(target_os = "windows")]
 
+use super::clash_api;
 use crate::config::Config;
 use crate::utils::dirs;
 use anyhow::{bail, Context, Result};
@@ -14,11 +15,46 @@ use std::{env::current_exe, process::Command as StdCommand};
 use tokio::time::sleep;
 
 const SERVICE_URL: &str = "http://127.0.0.1:33211";
-const EXTERNAL_CONTROLLER_URL: &str = "http://127.0.0.1:9097/configs";
 const SERVICE_NAME: &str = "clash-verge-service";
 const SERVICE_BINARY: &str = "clash-verge-service.exe";
 const INSTALL_HELPER: &str = "install-service.exe";
 const UNINSTALL_HELPER: &str = "uninstall-service.exe";
+
+fn service_api_token() -> Result<String> {
+    let path = dirs::service_api_token_path()?;
+    let token = std::fs::read_to_string(&path)
+        .with_context(|| format!("failed to read service API token from {}", path.display()))?;
+    let token = token
+        .trim()
+        .split_once(':')
+        .map(|(_, token)| token.to_string())
+        .context("service API token owner is missing")?;
+    if token.len() != 64 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        bail!("service API token is invalid; reinstall the service");
+    }
+    Ok(token)
+}
+
+fn current_user_sid() -> Result<String> {
+    let output = StdCommand::new("whoami.exe")
+        .args(["/user", "/fo", "csv", "/nh"])
+        .creation_flags(0x08000000)
+        .output()
+        .context("failed to query current Windows user SID")?;
+    if !output.status.success() {
+        bail!("whoami.exe failed while querying the current user SID");
+    }
+    let line = String::from_utf8_lossy(&output.stdout);
+    let sid = line
+        .trim()
+        .trim_matches('"')
+        .split("\",\"")
+        .last()
+        .map(str::trim)
+        .filter(|sid| sid.starts_with("S-1-"))
+        .context("failed to parse current Windows user SID")?;
+    Ok(sid.to_string())
+}
 
 #[derive(Debug)]
 struct ScResult {
@@ -199,11 +235,13 @@ pub struct ServiceStatus {
 }
 
 async fn get_service_health() -> Result<HealthResponse> {
+    let token = service_api_token()?;
     reqwest::ClientBuilder::new()
         .no_proxy()
         .timeout(Duration::from_millis(1200))
         .build()?
         .get(format!("{SERVICE_URL}/health"))
+        .bearer_auth(token)
         .send()
         .await?
         .json::<HealthResponse>()
@@ -212,16 +250,27 @@ async fn get_service_health() -> Result<HealthResponse> {
 }
 
 async fn get_service_clash_state() -> Result<JsonResponse> {
+    let token = service_api_token()?;
     reqwest::ClientBuilder::new()
         .no_proxy()
         .timeout(Duration::from_millis(1200))
         .build()?
         .get(format!("{SERVICE_URL}/get_clash"))
+        .bearer_auth(token)
         .send()
         .await?
         .json::<JsonResponse>()
         .await
         .context("failed to parse the clash-verge-service response")
+}
+
+pub async fn is_service_core_running() -> bool {
+    get_service_clash_state()
+        .await
+        .ok()
+        .and_then(|response| response.data)
+        .map(|state| state.running.unwrap_or(false) && state.pid.is_some())
+        .unwrap_or(false)
 }
 
 pub async fn install_service() -> Result<()> {
@@ -232,9 +281,16 @@ pub async fn install_service() -> Result<()> {
     }
     let token = Token::with_current_process()?;
     let level = token.privilege_level()?;
+    let user_sid = current_user_sid()?;
     let status = match level {
-        PrivilegeLevel::NotPrivileged => RunasCommand::new(install_path).show(false).status()?,
+        PrivilegeLevel::NotPrivileged => RunasCommand::new(install_path)
+            .arg("--user-sid")
+            .arg(&user_sid)
+            .show(false)
+            .status()?,
         _ => StdCommand::new(install_path)
+            .arg("--user-sid")
+            .arg(&user_sid)
             .creation_flags(0x08000000)
             .status()?,
     };
@@ -400,10 +456,12 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
     map.insert("log_file", log_path);
     log::info!(target: "app", "service mode enabled: calling /start_clash");
     log::info!(target: "app", "start_clash request field summary: core_type={clash_core}, bin_path_exists={}, config_dir_exists={}, config_file={}, log_file={}", bin_path_buf.exists(), config_dir_buf.exists(), config_file, log_path);
+    let token = service_api_token()?;
     let res = reqwest::ClientBuilder::new()
         .no_proxy()
         .build()?
         .post(format!("{SERVICE_URL}/start_clash"))
+        .bearer_auth(token)
         .json(&map)
         .send()
         .await?
@@ -430,34 +488,24 @@ pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
         bail!("service did not start clash core; /get_clash has no pid");
     }
 
-    log::info!(target: "app", "waiting 9097 ready");
-    let client = reqwest::ClientBuilder::new().no_proxy().build()?;
-    for _ in 0..20 {
-        if client
-            .get(EXTERNAL_CONTROLLER_URL)
-            .send()
-            .await
-            .map(|r| r.status().is_success())
-            .unwrap_or(false)
-        {
-            log::info!(target: "app", "9097 ready success");
-            return Ok(());
-        }
-        sleep(Duration::from_millis(300)).await;
-    }
-    log::error!(target: "app", "9097 ready failure");
-    bail!(
-        "service started clash core (pid {:?}) but external-controller 127.0.0.1:9097 is not ready",
-        core_pid
-    )
+    log::info!(target: "app", "waiting for configured Clash controller readiness");
+    clash_api::wait_for_core_ready(Duration::from_secs(12))
+        .await
+        .with_context(|| {
+            format!(
+                "service started clash core (pid {core_pid:?}) but its configured controller is not ready"
+            )
+        })
 }
 
 pub async fn stop_core_by_service() -> Result<()> {
+    let token = service_api_token()?;
     let res = reqwest::ClientBuilder::new()
         .no_proxy()
         .timeout(Duration::from_millis(1500))
         .build()?
         .post(format!("{SERVICE_URL}/stop_clash"))
+        .bearer_auth(token)
         .send()
         .await?
         .json::<JsonResponse>()

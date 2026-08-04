@@ -118,8 +118,12 @@ pub async fn patch_clash(patch: Mapping) -> Result<()> {
         handle::Handle::emit_log("info", "[tun] patch clash tun config requested");
     }
     Config::clash().draft().patch_config(patch.clone());
+    let mut core_restart_attempted = false;
+    let mut core_config_update_attempted = false;
+    let mut sysproxy_update_attempted = false;
+    let mut runtime_file_written = false;
 
-    match {
+    let result: Result<()> = async {
         let mixed_port = patch.get("mixed-port");
         let socks_port = patch.get("socks-port");
         let port = patch.get("port");
@@ -149,13 +153,17 @@ pub async fn patch_clash(patch: Mapping) -> Result<()> {
             || patch.get("external-controller").is_some()
         {
             Config::generate()?;
+            core_restart_attempted = true;
+            runtime_file_written = true;
             CoreManager::global().run_core().await?;
             handle::Handle::refresh_clash();
         }
 
         // 更新系统代理
         if mixed_port.is_some() {
-            log_err!(sysopt::Sysopt::global().init_sysproxy());
+            sysproxy_update_attempted = true;
+            sysopt::Sysopt::global().update_sysproxy()?;
+            sysopt::Sysopt::global().guard_proxy();
         }
 
         if patch.get("mode").is_some() {
@@ -165,25 +173,71 @@ pub async fn patch_clash(patch: Mapping) -> Result<()> {
         if has_tun_patch {
             log::info!(target: "app", "tun config changed, reload core config");
             handle::Handle::emit_log("info", "[tun] tun config changed, reload core config");
+            core_config_update_attempted = true;
             update_core_config().await?;
         }
 
-        Config::runtime().latest().patch_config(patch);
+        Config::runtime().draft().patch_config(patch);
 
         if has_runtime_patch {
+            runtime_file_written = true;
             Config::generate_file(ConfigType::Run)?;
             handle::Handle::refresh_clash();
         }
 
+        Config::clash().latest().save_config()?;
         <Result<()>>::Ok(())
-    } {
+    }
+    .await;
+
+    match result {
         Ok(()) => {
             Config::clash().apply();
-            Config::clash().data().save_config()?;
+            Config::runtime().apply();
             Ok(())
         }
         Err(err) => {
             Config::clash().discard();
+            Config::runtime().discard();
+
+            let mut rollback_errors = Vec::new();
+            if core_restart_attempted || core_config_update_attempted || runtime_file_written {
+                let runtime_rollback = async {
+                    Config::generate()?;
+                    if core_restart_attempted {
+                        CoreManager::global().run_core().await?;
+                    } else if core_config_update_attempted {
+                        CoreManager::global().update_config().await?;
+                    } else {
+                        Config::generate_file(ConfigType::Run)?;
+                    }
+                    Config::runtime().apply();
+                    <Result<()>>::Ok(())
+                }
+                .await;
+                if let Err(rollback_err) = runtime_rollback {
+                    rollback_errors.push(format!(
+                        "restoring the previous core configuration failed: {rollback_err}"
+                    ));
+                }
+            }
+
+            if sysproxy_update_attempted {
+                if let Err(rollback_err) = sysopt::Sysopt::global().update_sysproxy() {
+                    rollback_errors.push(format!(
+                        "restoring the previous system proxy failed: {rollback_err}"
+                    ));
+                } else {
+                    sysopt::Sysopt::global().guard_proxy();
+                }
+            }
+
+            if !rollback_errors.is_empty() {
+                let rollback_errors = rollback_errors.join("; ");
+                log::error!(target: "app", "patch_clash rollback incomplete: {rollback_errors}");
+                return Err(anyhow::anyhow!("{err}; {rollback_errors}"));
+            }
+
             Err(err)
         }
     }
@@ -244,8 +298,14 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
     }
 
     Config::verge().draft().patch_config(patch.clone());
+    let mut core_restart_attempted = false;
+    let mut core_config_update_attempted = false;
+    let mut auto_launch_update_attempted = false;
+    let mut sysproxy_update_attempted = false;
+    let mut hotkey_update_attempted = false;
+    let mut systray_update_attempted = false;
 
-    match {
+    let result: Result<()> = async {
         #[cfg(target_os = "windows")]
         {
             let service_mode = patch.enable_service_mode;
@@ -253,21 +313,26 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
                 log::debug!(target: "app", "change service mode to {}", service_mode.unwrap());
 
                 Config::generate()?;
+                core_restart_attempted = true;
                 CoreManager::global().run_core().await?;
             } else if tun_mode.is_some() {
+                core_config_update_attempted = true;
                 update_core_config().await?;
             }
         }
 
         #[cfg(not(target_os = "windows"))]
         if tun_mode.is_some() {
+            core_config_update_attempted = true;
             update_core_config().await?;
         }
 
         if auto_launch.is_some() {
+            auto_launch_update_attempted = true;
             sysopt::Sysopt::global().update_launch()?;
         }
         if system_proxy.is_some() || proxy_bypass.is_some() || port.is_some() {
+            sysproxy_update_attempted = true;
             sysopt::Sysopt::global()
                 .update_sysproxy()
                 .map_err(|err| anyhow::anyhow!("failed to update system proxy: {err}"))?;
@@ -278,11 +343,13 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
             sysopt::Sysopt::global().guard_proxy();
         }
 
-        if let Some(hotkeys) = patch.hotkeys {
+        if let Some(hotkeys) = patch.hotkeys.clone() {
+            hotkey_update_attempted = true;
             hotkey::Hotkey::global().update(hotkeys)?;
         }
 
         if language.is_some() {
+            systray_update_attempted = true;
             handle::Handle::update_systray()?;
         } else if system_proxy.is_some()
             || tun_mode.is_some()
@@ -290,18 +357,86 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
             || sysproxy_tray_icon.is_some()
             || tun_tray_icon.is_some()
         {
+            systray_update_attempted = true;
             handle::Handle::update_systray_part()?;
         }
 
+        Config::verge().latest().save_file()?;
         <Result<()>>::Ok(())
-    } {
+    }
+    .await;
+
+    match result {
         Ok(()) => {
             Config::verge().apply();
-            Config::verge().data().save_file()?;
+            Config::runtime().apply();
             Ok(())
         }
         Err(err) => {
             Config::verge().discard();
+            Config::runtime().discard();
+
+            let mut rollback_errors = Vec::new();
+            if core_restart_attempted || core_config_update_attempted {
+                let core_rollback = async {
+                    Config::generate()?;
+                    if core_restart_attempted {
+                        CoreManager::global().run_core().await?;
+                    } else {
+                        CoreManager::global().update_config().await?;
+                    }
+                    Config::runtime().apply();
+                    <Result<()>>::Ok(())
+                }
+                .await;
+                if let Err(rollback_err) = core_rollback {
+                    rollback_errors.push(format!(
+                        "restoring the previous core configuration failed: {rollback_err}"
+                    ));
+                }
+            }
+
+            if sysproxy_update_attempted {
+                if let Err(rollback_err) = sysopt::Sysopt::global().update_sysproxy() {
+                    rollback_errors.push(format!(
+                        "restoring the previous system proxy failed: {rollback_err}"
+                    ));
+                } else {
+                    sysopt::Sysopt::global().guard_proxy();
+                }
+            }
+
+            if auto_launch_update_attempted {
+                if let Err(rollback_err) = sysopt::Sysopt::global().update_launch() {
+                    rollback_errors.push(format!(
+                        "restoring the previous auto-launch setting failed: {rollback_err}"
+                    ));
+                }
+            }
+
+            if hotkey_update_attempted {
+                let old_hotkeys = Config::verge().data().hotkeys.clone().unwrap_or_default();
+                if let Err(rollback_err) = hotkey::Hotkey::global().update(old_hotkeys) {
+                    rollback_errors.push(format!(
+                        "restoring the previous hotkeys failed: {rollback_err}"
+                    ));
+                }
+            }
+
+            if systray_update_attempted {
+                if let Err(rollback_err) = handle::Handle::update_systray() {
+                    rollback_errors.push(format!(
+                        "refreshing the tray after rollback failed: {rollback_err}"
+                    ));
+                }
+            }
+
+            if !rollback_errors.is_empty() {
+                let rollback_errors = rollback_errors.join("; ");
+                log::error!(target: "app", "patch_verge rollback incomplete: {rollback_errors}");
+                return Err(anyhow::anyhow!("{err}; {rollback_errors}"));
+            }
+
             Err(err)
         }
     }
