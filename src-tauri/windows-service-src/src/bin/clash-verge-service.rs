@@ -186,7 +186,7 @@ fn run_service() -> Result<()> {
                                         500,
                                         serde_json::to_string(&JsonResponse::<()> {
                                             code: 500,
-                                            msg: "clash core is not running".into(),
+                                            msg: "Mihomo core is not running".into(),
                                             data: None,
                                         }),
                                     )
@@ -197,7 +197,7 @@ fn run_service() -> Result<()> {
                                     500,
                                     serde_json::to_string(&JsonResponse::<()> {
                                         code: 500,
-                                        msg: "clash core is not started".into(),
+                                        msg: "Mihomo core is not started".into(),
                                         data: None,
                                     }),
                                 )
@@ -307,8 +307,8 @@ fn paths_equal(left: &Path, right: &Path) -> bool {
 
 fn validate_start_request(payload: StartClashRequest) -> Result<ValidatedStartClashRequest> {
     let expected_binary_name = match payload.core_type.as_str() {
-        "clash-meta" => "clash-meta.exe",
-        "clash-meta-alpha" => "clash-meta-alpha.exe",
+        "mihomo" => "mihomo.exe",
+        "mihomo-alpha" => "mihomo-alpha.exe",
         other => bail!("unsupported core_type: {other}"),
     };
 
@@ -451,7 +451,7 @@ fn start_clash(
         }
     };
 
-    eprintln!("spawning clash-meta");
+    eprintln!("spawning mihomo");
     let mut child = match Command::new(&payload.bin_path)
         .arg("-d")
         .arg(&payload.config_dir)
@@ -465,7 +465,7 @@ fn start_clash(
         Err(err) => {
             return serde_json::to_string(&JsonResponse::<()> {
                 code: 500,
-                msg: format!("spawn clash core failed: {err}"),
+                msg: format!("spawn Mihomo core failed: {err}"),
                 data: None,
             })
         }
@@ -476,7 +476,7 @@ fn start_clash(
         eprintln!("child exited immediately: {status}");
         return serde_json::to_string(&JsonResponse::<()> {
             code: 500,
-            msg: format!("clash core exited immediately: {status}"),
+            msg: format!("Mihomo core exited immediately: {status}"),
             data: None,
         });
     }

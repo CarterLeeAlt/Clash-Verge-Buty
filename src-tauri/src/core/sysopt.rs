@@ -73,7 +73,7 @@ fn wait_for_local_proxy(port: u16) -> Result<()> {
     loop {
         if !CoreManager::global().is_core_ready() {
             return Err(anyhow!(
-                "Clash core is not ready; refuse to use an unrelated listener on 127.0.0.1:{port}"
+                "Mihomo core is not ready; refuse to use an unrelated listener on 127.0.0.1:{port}"
             ));
         }
 

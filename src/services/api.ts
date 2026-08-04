@@ -58,7 +58,7 @@ export const updateGeoData = async () => {
   return instance.post("/configs/geo");
 };
 
-/// Upgrade clash core
+/// Upgrade Mihomo core
 export const upgradeCore = async () => {
   const instance = await getAxios();
   return instance.post("/upgrade");

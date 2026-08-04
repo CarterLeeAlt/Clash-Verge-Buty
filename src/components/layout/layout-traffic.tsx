@@ -47,9 +47,9 @@ export const LayoutTraffic = () => {
     };
   }, [clashInfo, pageVisible]);
 
-  /* --------- meta memory information --------- */
-  const isMetaCore = verge?.clash_core?.includes("clash-meta");
-  const displayMemory = isMetaCore && (verge?.enable_memory_usage ?? true);
+  /* --------- Mihomo memory information --------- */
+  const isMihomoCore = verge?.clash_core?.startsWith("mihomo");
+  const displayMemory = isMihomoCore && (verge?.enable_memory_usage ?? true);
 
   const memoryWs = useWebsocket(
     (event) => {

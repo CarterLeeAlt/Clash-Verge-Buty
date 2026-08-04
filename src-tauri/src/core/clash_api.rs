@@ -301,19 +301,7 @@ fn build_clash_client_info(client: ClashInfo) -> Result<(String, HeaderMap)> {
     Ok((server, headers))
 }
 
-/// 缩短clash的日志
-pub fn parse_log(log: String) -> String {
-    if log.starts_with("time=") && log.len() > 33 {
-        return (log[33..]).to_owned();
-    }
-    if log.len() > 9 {
-        return (log[9..]).to_owned();
-    }
-    log
-}
-
-/// 缩短clash -t的错误输出
-/// 仅适配 clash p核 8-26、clash meta 1.13.1
+/// Extract a concise error message from Mihomo's config validation output.
 pub fn parse_check_output(log: String) -> String {
     let t = log.find("time=");
     let m = log.find("msg=");

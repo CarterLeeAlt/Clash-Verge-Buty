@@ -74,7 +74,8 @@ async function resolvePortable() {
     preferredNames.find((name) => releaseExeFiles.includes(name)) ||
     releaseExeFiles.find(
       (name) =>
-        !deniedKeyword.test(name) && !/clash-meta(-alpha)?\.exe$/i.test(name)
+        !deniedKeyword.test(name) &&
+        !/mihomo(-alpha)?\.exe$/i.test(name)
     );
 
   if (!portableExeName) {
@@ -87,14 +88,14 @@ async function resolvePortable() {
   }
   const exePath = path.join(releaseDir, portableExeName);
 
-  const clashMetaPath = path.join(releaseDir, "clash-meta.exe");
-  if (!(await fs.pathExists(clashMetaPath))) {
-    throw new Error(`File not found: ${clashMetaPath}`);
+  const mihomoPath = path.join(releaseDir, "mihomo.exe");
+  if (!(await fs.pathExists(mihomoPath))) {
+    throw new Error(`File not found: ${mihomoPath}`);
   }
 
-  const clashMetaAlphaPath = path.join(releaseDir, "clash-meta-alpha.exe");
-  if (!(await fs.pathExists(clashMetaAlphaPath))) {
-    throw new Error(`File not found: ${clashMetaAlphaPath}`);
+  const mihomoAlphaPath = path.join(releaseDir, "mihomo-alpha.exe");
+  if (!(await fs.pathExists(mihomoAlphaPath))) {
+    throw new Error(`File not found: ${mihomoAlphaPath}`);
   }
 
   const resourcesPath = path.join(releaseDir, "resources");
@@ -105,8 +106,8 @@ async function resolvePortable() {
   const zip = new AdmZip();
 
   zip.addLocalFile(exePath);
-  zip.addLocalFile(clashMetaPath);
-  zip.addLocalFile(clashMetaAlphaPath);
+  zip.addLocalFile(mihomoPath);
+  zip.addLocalFile(mihomoAlphaPath);
   zip.addLocalFolder(resourcesPath, "resources");
 
   const unsignedSuffix = process.env.UNSIGNED_BUILD === "1" ? "_unsigned" : "";
@@ -132,17 +133,18 @@ async function resolvePortable() {
   }
   if (
     !zipExeEntries.some(
-      (name) => path.basename(name).toLowerCase() === "clash-meta.exe"
+      (name) => path.basename(name).toLowerCase() === "mihomo.exe"
     )
   ) {
-    throw new Error("portable.zip missing clash-meta.exe");
+    throw new Error("portable.zip missing mihomo.exe");
   }
   if (
     !zipExeEntries.some(
-      (name) => path.basename(name).toLowerCase() === "clash-meta-alpha.exe"
+      (name) =>
+        path.basename(name).toLowerCase() === "mihomo-alpha.exe"
     )
   ) {
-    throw new Error("portable.zip missing clash-meta-alpha.exe");
+    throw new Error("portable.zip missing mihomo-alpha.exe");
   }
   if (!zipEntriesLower.some((name) => name.startsWith("resources/"))) {
     throw new Error("portable.zip missing resources/ directory");
@@ -194,4 +196,7 @@ async function resolvePortable() {
   });
 }
 
-resolvePortable().catch(console.error);
+resolvePortable().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

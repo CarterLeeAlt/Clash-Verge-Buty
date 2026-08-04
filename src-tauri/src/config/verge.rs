@@ -4,6 +4,10 @@ use anyhow::Result;
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 
+pub const MIHOMO_CORE: &str = "mihomo";
+pub const MIHOMO_ALPHA_CORE: &str = "mihomo-alpha";
+pub const VALID_MIHOMO_CORES: [&str; 2] = [MIHOMO_CORE, MIHOMO_ALPHA_CORE];
+
 /// ### `verge.yaml` schema
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
 pub struct IVerge {
@@ -34,7 +38,7 @@ pub struct IVerge {
     /// enable traffic graph default is true
     pub traffic_graph: Option<bool>,
 
-    /// show memory info (only for Clash Meta)
+    /// show memory info (only for Mihomo)
     pub enable_memory_usage: Option<bool>,
 
     /// enable group icon
@@ -85,7 +89,7 @@ pub struct IVerge {
     /// web ui list
     pub web_ui_list: Option<Vec<String>>,
 
-    /// clash core path
+    /// Mihomo core identifier
     #[serde(skip_serializing_if = "Option::is_none")]
     pub clash_core: Option<String>,
 
@@ -182,7 +186,7 @@ impl IVerge {
 
     pub fn template() -> Self {
         Self {
-            clash_core: Some("clash-meta".into()),
+            clash_core: Some(MIHOMO_CORE.into()),
             language: Some("zh".into()),
             theme_mode: Some("system".into()),
             #[cfg(not(target_os = "windows"))]
@@ -351,6 +355,11 @@ mod tests {
             IVerge::template().default_latency_test.as_deref(),
             Some(DEFAULT_LATENCY_TEST_URL)
         );
+    }
+
+    #[test]
+    fn template_uses_mihomo_core_identifier() {
+        assert_eq!(IVerge::template().clash_core.as_deref(), Some(MIHOMO_CORE));
     }
 
     #[test]

@@ -155,7 +155,7 @@ const SettingClash = ({ onError }: Props) => {
       </SettingItem>
 
       <SettingItem
-        label={t("Clash Core")}
+        label={t("Mihomo Core")}
         extra={
           <IconButton
             color="inherit"

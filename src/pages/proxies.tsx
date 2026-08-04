@@ -54,7 +54,7 @@ const ProxyPage = () => {
   const isSizeLocked = verge?.window_size_locked ?? false;
 
   const modeList = useMemo(() => {
-    if (verge?.clash_core?.includes("clash-meta")) {
+    if (verge?.clash_core?.startsWith("mihomo")) {
       return ["rule", "global", "direct"];
     }
     return ["rule", "global", "direct", "script"];
@@ -75,7 +75,7 @@ const ProxyPage = () => {
   const onRestartCore = useLockFn(async () => {
     try {
       await restartSidecar();
-      Notice.success(`Clash core restarted.`);
+      Notice.success(`Mihomo core restarted.`);
     } catch (err: any) {
       Notice.error(formatNoticeMessage(err));
     }
