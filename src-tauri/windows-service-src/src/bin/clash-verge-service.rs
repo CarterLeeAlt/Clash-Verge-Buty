@@ -19,7 +19,7 @@ use windows_service::{define_windows_service, service_dispatcher};
 
 use clash_verge_windows_service_src::{
     api_token_path, API_ADDR, API_GET_CLASH, API_HEALTH, API_START_CLASH, API_STOP_CLASH,
-    SERVICE_NAME,
+    API_STOP_SERVICE, SERVICE_NAME,
 };
 
 #[derive(Serialize)]
@@ -222,6 +222,12 @@ fn run_service() -> Result<()> {
                         (Method::Post, API_STOP_CLASH) => {
                             eprintln!("/stop_clash called");
                             (200, stop_clash(&clash_state_for_server))
+                        }
+                        (Method::Post, API_STOP_SERVICE) => {
+                            eprintln!("/stop_service called");
+                            let body = stop_clash(&clash_state_for_server);
+                            stop_for_server.store(true, Ordering::SeqCst);
+                            (200, body)
                         }
                         _ => (
                             404,

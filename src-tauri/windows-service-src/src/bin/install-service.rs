@@ -140,34 +140,40 @@ fn main() -> Result<()> {
     )
     .context("failed to connect ServiceManager")?;
 
+    let exe = std::env::current_exe()
+        .context("failed to resolve install-service.exe path")?
+        .with_file_name("clash-verge-service.exe");
+    let info = ServiceInfo {
+        name: OsString::from(SERVICE_NAME),
+        display_name: OsString::from(SERVICE_DISPLAY_NAME),
+        service_type: ServiceType::OWN_PROCESS,
+        start_type: ServiceStartType::OnDemand,
+        error_control: ServiceErrorControl::Normal,
+        executable_path: exe,
+        launch_arguments: vec![],
+        dependencies: vec![],
+        account_name: None,
+        account_password: None,
+    };
     let service = match manager.open_service(
         SERVICE_NAME,
-        ServiceAccess::QUERY_STATUS | ServiceAccess::START | ServiceAccess::STOP,
+        ServiceAccess::QUERY_STATUS
+            | ServiceAccess::START
+            | ServiceAccess::STOP
+            | ServiceAccess::CHANGE_CONFIG,
     ) {
-        Ok(existing) => existing,
-        Err(_) => {
-            let exe = std::env::current_exe()
-                .context("failed to resolve install-service.exe path")?
-                .with_file_name("clash-verge-service.exe");
-            let info = ServiceInfo {
-                name: OsString::from(SERVICE_NAME),
-                display_name: OsString::from(SERVICE_DISPLAY_NAME),
-                service_type: ServiceType::OWN_PROCESS,
-                start_type: ServiceStartType::AutoStart,
-                error_control: ServiceErrorControl::Normal,
-                executable_path: exe,
-                launch_arguments: vec![],
-                dependencies: vec![],
-                account_name: None,
-                account_password: None,
-            };
-            manager
-                .create_service(
-                    &info,
-                    ServiceAccess::QUERY_STATUS | ServiceAccess::START | ServiceAccess::STOP,
-                )
-                .with_context(|| format!("failed to create service '{}'", SERVICE_NAME))?
+        Ok(existing) => {
+            existing
+                .change_config(&info)
+                .with_context(|| format!("failed to repair service '{}'", SERVICE_NAME))?;
+            existing
         }
+        Err(_) => manager
+            .create_service(
+                &info,
+                ServiceAccess::QUERY_STATUS | ServiceAccess::START | ServiceAccess::STOP,
+            )
+            .with_context(|| format!("failed to create service '{}'", SERVICE_NAME))?,
     };
 
     let status = service
@@ -187,12 +193,6 @@ fn main() -> Result<()> {
             anyhow::bail!("service '{}' did not stop in time", SERVICE_NAME);
         }
     }
-
-    let args: Vec<OsString> = Vec::new();
-    service
-        .start(&args)
-        .with_context(|| format!("failed to start service '{}'", SERVICE_NAME))?;
-    std::thread::sleep(Duration::from_millis(500));
 
     Ok(())
 }

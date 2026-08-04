@@ -15,6 +15,7 @@ use std::{env::current_exe, process::Command as StdCommand};
 use tokio::time::sleep;
 
 const SERVICE_URL: &str = "http://127.0.0.1:33211";
+const SERVICE_STOP_URL: &str = "http://127.0.0.1:33211/stop_service";
 const SERVICE_NAME: &str = "clash-verge-service";
 const SERVICE_BINARY: &str = "clash-verge-service.exe";
 const INSTALL_HELPER: &str = "install-service.exe";
@@ -515,4 +516,39 @@ pub async fn stop_core_by_service() -> Result<()> {
         bail!(res.msg);
     }
     Ok(())
+}
+
+pub async fn stop_service_if_idle() -> Result<()> {
+    if !service_exists_detailed(SERVICE_NAME)?
+        || query_service_state().unwrap_or(ServiceStateHint::Other) != ServiceStateHint::Running
+    {
+        return Ok(());
+    }
+    if is_service_core_running().await {
+        bail!("refuse to stop clash-verge-service while it is managing Mihomo");
+    }
+
+    let token = service_api_token()?;
+    let res = reqwest::ClientBuilder::new()
+        .no_proxy()
+        .timeout(Duration::from_millis(1500))
+        .build()?
+        .post(SERVICE_STOP_URL)
+        .bearer_auth(token)
+        .send()
+        .await?
+        .json::<JsonResponse>()
+        .await
+        .context("failed to request idle clash-verge-service shutdown")?;
+    if res.code != 0 {
+        bail!(res.msg);
+    }
+
+    for _ in 0..20 {
+        if query_service_state().unwrap_or(ServiceStateHint::Other) != ServiceStateHint::Running {
+            return Ok(());
+        }
+        sleep(Duration::from_millis(150)).await;
+    }
+    bail!("clash-verge-service did not stop after idle shutdown request")
 }

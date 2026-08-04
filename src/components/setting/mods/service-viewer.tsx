@@ -9,7 +9,12 @@ import {
   uninstallService,
   patchVergeConfig,
 } from "@/services/cmds";
-import { BaseDialog, DialogRef, formatNoticeMessage, Notice } from "@/components/base";
+import {
+  BaseDialog,
+  DialogRef,
+  formatNoticeMessage,
+  Notice,
+} from "@/components/base";
 
 interface Props {
   enable: boolean;
@@ -60,21 +65,25 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
     status == null
       ? "pending"
       : !status.installed
-        ? "service_not_installed"
-        : !status.running
-          ? "service_installed_stopped"
-          : !status.api_ready
-            ? "service_running_api_not_ready"
-            : !status.core_managed
-              ? "service_running_api_ready_core_not_managed"
-              : "service_running_api_ready_core_managed";
+      ? "service_not_installed"
+      : !status.running
+      ? "service_installed_stopped"
+      : !status.api_ready
+      ? "service_running_api_not_ready"
+      : !status.core_managed
+      ? "service_running_api_ready_core_not_managed"
+      : "service_running_api_ready_core_managed";
 
   const onInstall = useLockFn(async () => {
+    const repairing = !!status?.installed;
     setOperation("install");
     try {
       await installService();
       setOpen(false);
-      void Promise.allSettled([mutateCheck(), Promise.resolve(onStatusChange?.())])
+      void Promise.allSettled([
+        mutateCheck(),
+        Promise.resolve(onStatusChange?.()),
+      ])
         .then((results) => {
           results.forEach((result) => {
             if (result.status === "rejected") {
@@ -83,7 +92,11 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
           });
         })
         .catch((err) => console.warn("service status refresh failed:", err));
-      Notice.success("Service installed. You can enable service mode now.");
+      Notice.success(
+        repairing
+          ? "Service repaired. It will start on demand."
+          : "Service installed. You can enable service mode now."
+      );
     } catch (err: any) {
       mutateCheck();
       Notice.error(formatNoticeMessage(err));
@@ -96,9 +109,7 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
     setOperation("uninstall");
     try {
       if (enableTun) {
-        throw new Error(
-          "Disable TUN mode before uninstalling the service."
-        );
+        throw new Error("Disable TUN mode before uninstalling the service.");
       }
       if (enable || enableTun) {
         await patchVergeConfig({
@@ -109,7 +120,10 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
 
       await uninstallService();
       setOpen(false);
-      void Promise.allSettled([mutateCheck(), Promise.resolve(onStatusChange?.())])
+      void Promise.allSettled([
+        mutateCheck(),
+        Promise.resolve(onStatusChange?.()),
+      ])
         .then((results) => {
           results.forEach((result) => {
             if (result.status === "rejected") {
@@ -154,13 +168,14 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
       onClose={() => !isPending && setOpen(false)}
     >
       <Typography>
-        Current State:{" "}
-        {state.startsWith("service_running") ? "running" : state}
+        Current State: {state.startsWith("service_running") ? "running" : state}
       </Typography>
       <Typography>Information: {status?.message}</Typography>
       {showPendingHint && (
         <Typography sx={{ mt: 1 }}>
-          Windows is stopping and removing the service, please wait...
+          {operation === "uninstall"
+            ? "Windows is stopping and removing the service, please wait..."
+            : "Windows is updating the service, please wait..."}
         </Typography>
       )}
 
@@ -182,13 +197,24 @@ export const ServiceViewer = forwardRef<DialogRef, Props>((props, ref) => {
         )}
 
         {state !== "service_not_installed" && (
-          <Button
-            variant="outlined"
-            onClick={onUninstall}
-            disabled={enableTun || isPending}
-          >
-            {operation === "uninstall" ? "Uninstalling..." : "Uninstall"}
-          </Button>
+          <>
+            <Button
+              variant="contained"
+              onClick={onInstall}
+              disabled={
+                enable || enableTun || !!status?.core_managed || isPending
+              }
+            >
+              {operation === "install" ? "Repairing..." : "Repair"}
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={onUninstall}
+              disabled={enableTun || isPending}
+            >
+              {operation === "uninstall" ? "Uninstalling..." : "Uninstall"}
+            </Button>
+          </>
         )}
       </Stack>
     </BaseDialog>

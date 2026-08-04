@@ -524,6 +524,8 @@ pub fn resolve_setup(app: &mut App) {
     create_window(&app.app_handle(), show_when_ready);
 
     log_err!(sysopt::Sysopt::global().init_launch());
+    #[cfg(target_os = "windows")]
+    log_err!(sysopt::Sysopt::global().update_launch());
 
     log_err!(handle::Handle::update_systray_part());
     log_err!(hotkey::Hotkey::global().init(app.app_handle()));
@@ -541,6 +543,10 @@ pub fn resolve_setup(app: &mut App) {
 pub fn resolve_reset() {
     log_err!(sysopt::Sysopt::global().reset_sysproxy());
     log_err!(CoreManager::global().stop_core());
+    #[cfg(target_os = "windows")]
+    log_err!(tauri::async_runtime::block_on(
+        crate::core::win_service::stop_service_if_idle()
+    ));
 }
 
 fn register_frontend_ready_listener(app_handle: &AppHandle, show_when_ready: bool) {
