@@ -123,8 +123,6 @@ const DOWNLOAD_SOURCES = {
   mihomoStableVersion:
     "https://github.com/MetaCubeX/mihomo/releases/latest/download/version.txt",
   mihomoStablePrefix: "https://github.com/MetaCubeX/mihomo/releases/download",
-  simpleScZip:
-    "https://nsis.sourceforge.io/mediawiki/images/e/ef/NSIS_Simple_Service_Plugin_Unicode_1.30.zip",
   countryMmdb:
     "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/country.mmdb",
   geositeDat:
@@ -524,47 +522,6 @@ async function downloadFile(url, path) {
   }
 }
 
-// SimpleSC.dll
-const resolvePlugin = async () => {
-  const name = "SimpleSC";
-  const url = DOWNLOAD_SOURCES.simpleScZip;
-  // TODO: add SHA256 checksum for fixed external asset
-
-  const tempDir = path.join(TEMP_DIR, "SimpleSC");
-  const tempZip = path.join(
-    tempDir,
-    "NSIS_Simple_Service_Plugin_Unicode_1.30.zip"
-  );
-  const tempDll = path.join(tempDir, "SimpleSC.dll");
-  const pluginDir = path.join(process.env.APPDATA, "Local/NSIS");
-  const pluginPath = path.join(pluginDir, "SimpleSC.dll");
-  console.log(
-    `[INFO]: resolving plugin "${name}" url="${url}" targetPath="${pluginPath}" tempZip="${tempZip}" target="${SIDECAR_HOST}"`
-  );
-  await fs.mkdirp(pluginDir);
-  await fs.mkdirp(tempDir);
-  if (!FORCE && (await fs.pathExists(pluginPath))) return;
-  try {
-    if (!(await fs.pathExists(tempZip))) {
-      await downloadFile(url, tempZip);
-    }
-    const zip = new AdmZip(tempZip);
-    zip.getEntries().forEach((entry) => {
-      console.log(`[DEBUG]: "SimpleSC" entry name`, entry.entryName);
-    });
-    zip.extractAllTo(tempDir, true);
-    if (!(await fs.pathExists(tempDll))) {
-      throw new Error(
-        `plugin dll missing for "${name}" (url="${url}", expected="${tempDll}", targetPath="${pluginPath}", target="${SIDECAR_HOST}")`
-      );
-    }
-    await fs.copyFile(tempDll, pluginPath);
-    console.log(`[INFO]: "SimpleSC" unzip finished`);
-  } finally {
-    await fs.remove(tempDir);
-  }
-};
-
 /**
  * main
  */
@@ -610,7 +567,6 @@ const tasks = [
       getLatestReleaseVersion().then(() => resolveSidecar(mihomoStable())),
     retry: 5,
   },
-  { name: "plugin", func: resolvePlugin, retry: 5, winOnly: true },
   {
     name: "windows-service-binaries",
     func: resolveWindowsServiceBinaries,

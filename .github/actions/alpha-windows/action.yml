@@ -99,7 +99,7 @@ runs:
 
     - name: Tauri build
       shell: pwsh
-      run: pnpm tauri build --target ${{ inputs.target }}
+      run: pnpm tauri build --bundles none --target ${{ inputs.target }}
 
     - name: Detect signing availability
       id: sign_mode
@@ -154,7 +154,6 @@ runs:
           "src-tauri/target/${{ inputs.target }}/release/mihomo.exe",
           "src-tauri/target/${{ inputs.target }}/release/mihomo-alpha.exe"
         )
-        $files += Get-ChildItem "src-tauri/target/${{ inputs.target }}/release/bundle" -Recurse -File -Include *.exe,*.msi | ForEach-Object { $_.FullName }
         $files = $files | Where-Object { Test-Path $_ } | Select-Object -Unique
 
         foreach ($f in $files) {
@@ -190,7 +189,6 @@ runs:
           "src-tauri/target/${{ inputs.target }}/release/mihomo.exe",
           "src-tauri/target/${{ inputs.target }}/release/mihomo-alpha.exe"
         )
-        $files += Get-ChildItem "src-tauri/target/${{ inputs.target }}/release/bundle" -Recurse -File -Include *.exe,*.msi | ForEach-Object { $_.FullName }
         $files = $files | Where-Object { Test-Path $_ } | Select-Object -Unique
 
         foreach ($f in $files) {
@@ -204,37 +202,6 @@ runs:
       env:
         SKIP_RELEASE_UPLOAD: "1"
         UNSIGNED_BUILD: ${{ steps.sign_mode.outputs.can_sign == 'true' && '0' || '1' }}
-
-    - name: Normalize unsigned Windows bundle names
-      if: steps.sign_mode.outputs.can_sign != 'true'
-      shell: pwsh
-      run: |
-        $bundleRoot = "src-tauri/target/${{ inputs.target }}/release/bundle"
-        if (Test-Path $bundleRoot) {
-          $targets = Get-ChildItem $bundleRoot -Recurse -File -Include *.exe,*.msi
-          foreach ($f in $targets) {
-            if ($f.Name -match "_unsigned(\.[^.]+)$") { continue }
-            $dest = Join-Path $f.DirectoryName ($f.BaseName + "_unsigned" + $f.Extension)
-            Copy-Item $f.FullName $dest -Force
-            Write-Host "[INFO] unsigned alias: $($f.Name) -> $([IO.Path]::GetFileName($dest))"
-          }
-        }
-
-    - name: Debug Windows bundle outputs
-      shell: pwsh
-      run: |
-        $releaseDir = "src-tauri/target/${{ inputs.target }}/release"
-        $nsisDir = "$releaseDir/bundle/nsis"
-
-        Write-Host "[INFO] target/release exe files"
-        if (Test-Path $releaseDir) {
-          Get-ChildItem $releaseDir -File -Filter *.exe | ForEach-Object { Write-Host " - $($_.Name)" }
-        }
-
-        Write-Host "[INFO] target/release/bundle/nsis exe files"
-        if (Test-Path $nsisDir) {
-          Get-ChildItem $nsisDir -File -Filter *.exe | ForEach-Object { Write-Host " - $($_.Name)" }
-        }
 
     - name: Stage Windows portable artifact
       shell: pwsh
@@ -262,38 +229,9 @@ runs:
           throw "portable artifact content not found after unzip: $($portableZip.FullName)"
         }
 
-    - name: Stage Windows installer artifact
-      shell: pwsh
-      run: |
-        $stage = "dist/windows-alpha-installer"
-        if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
-        New-Item -ItemType Directory -Path $stage | Out-Null
-
-        $nsisRoot = "src-tauri/target/${{ inputs.target }}/release/bundle/nsis"
-        if (-not (Test-Path $nsisRoot)) {
-          throw "nsis bundle folder not found: $nsisRoot"
-        }
-
-        if ("${{ steps.sign_mode.outputs.can_sign }}" -eq "true") {
-          $installers = Get-ChildItem $nsisRoot -Recurse -File -Include *.exe | Where-Object { $_.Name -notmatch "_unsigned(\.[^.]+)$" }
-        } else {
-          $installers = Get-ChildItem $nsisRoot -Recurse -File -Include *_unsigned.exe
-        }
-
-        foreach ($f in $installers) {
-          Copy-Item $f.FullName (Join-Path $stage $f.Name) -Force
-        }
-
-        if (-not (Get-ChildItem $stage -File)) {
-          throw "installer artifact files not found in $stage"
-        }
-
         "### Final Windows artifacts" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
         "- portable artifact: dist/windows-alpha-portable/** (unzipped portable content)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
         Get-ChildItem "dist/windows-alpha-portable" -Recurse -File | ForEach-Object { "  - $($_.FullName)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append }
-
-        "- installer artifact: dist/windows-alpha-installer/*" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-        Get-ChildItem "dist/windows-alpha-installer" -File | ForEach-Object { "  - $($_.Name)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append }
 
     - name: Cleanup cert file
       if: always()
@@ -319,10 +257,3 @@ runs:
         if-no-files-found: error
         include-hidden-files: true
         path: dist/windows-alpha-portable/
-
-    - name: Upload Windows alpha installer artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Clash-Verge-Buty-windows-alpha-installer
-        if-no-files-found: error
-        path: dist/windows-alpha-installer/*
