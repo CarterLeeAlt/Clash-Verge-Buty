@@ -6,6 +6,8 @@ mod linux;
 mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
+#[cfg(target_os = "windows")]
+pub use windows::WindowsProxySnapshot;
 
 // #[cfg(feature = "utils")]
 pub mod utils;
@@ -30,8 +32,12 @@ pub enum Error {
     NetworkInterface,
 
     #[cfg(target_os = "windows")]
-    #[error("system call failed")]
+    #[error("system call failed: {0}")]
     SystemCall(#[from] windows::Win32Error),
+
+    #[cfg(target_os = "windows")]
+    #[error("invalid Windows proxy recovery journal: {0}")]
+    RecoveryJournal(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

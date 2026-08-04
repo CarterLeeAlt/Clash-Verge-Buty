@@ -467,6 +467,7 @@ pub fn resolve_setup(app: &mut App) {
     handle::Handle::global().init(app.app_handle());
     VERSION.get_or_init(|| version.clone());
 
+    log_err!(sysopt::Sysopt::global().recover_pending_sysproxy());
     log_err!(init::init_resources());
     log_err!(init::init_scheme());
     log_err!(init::startup_script());
