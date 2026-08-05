@@ -23,7 +23,7 @@ pub fn validate_script_strict(
     profile_name: &str,
 ) -> Result<Mapping> {
     let (config, _) = run_script_inner(script, config, profile_name, true)?;
-    validate_minimal_clash_config(&config)?;
+    validate_script_output_shape(&config)?;
     Ok(config)
 }
 
@@ -94,13 +94,9 @@ fn run_script_inner(
     }
 }
 
-pub fn validate_minimal_clash_config(config: &Mapping) -> Result<()> {
-    if !config.contains_key(&Value::String("proxies".into()))
-        && !config.contains_key(&Value::String("proxy-providers".into()))
-    {
-        bail!("profile does not contain `proxies` or `proxy-providers`");
-    }
-
+// Only validate fields whose JavaScript types can be checked independently.
+// Mihomo performs the authoritative full-config validation after the script is saved.
+fn validate_script_output_shape(config: &Mapping) -> Result<()> {
     for key in ["rules", "proxies", "proxy-groups"] {
         if let Some(value) = config.get(&Value::String(key.into())) {
             if !value.is_sequence() {
@@ -141,7 +137,6 @@ rules:
             "function main(config) { return 123; }",
             "function main(config) { return [config]; }",
             "function main(config) { return null; }",
-            "function main(config) { return {}; }",
             "function main(config) { config.rules = 'bad'; return config; }",
             "function main(config) { config.proxies = 'bad'; return config; }",
             "function main(config) { config['proxy-groups'] = 'bad'; return config; }",
@@ -153,6 +148,33 @@ rules:
                 "script should be rejected: {script}"
             );
         }
+    }
+
+    #[test]
+    fn strict_validation_accepts_script_with_empty_current_config() {
+        let script = r#"
+function main(config, profileName) {
+  const customRules = [
+    //"DOMAIN-SUFFIX,baidu.com,DIRECT",
+  ];
+
+  config.rules = customRules.concat(config.rules || []);
+  return config;
+}
+"#;
+
+        let config = validate_script_strict(script.into(), Mapping::new(), "").unwrap();
+        assert_eq!(
+            config.get(&Value::String("rules".into())),
+            Some(&Value::Sequence(vec![]))
+        );
+    }
+
+    #[test]
+    fn strict_validation_accepts_empty_object_output() {
+        let script = "function main(config) { return {}; }";
+
+        assert!(validate_script_strict(script.into(), Mapping::new(), "").is_ok());
     }
 
     #[test]
