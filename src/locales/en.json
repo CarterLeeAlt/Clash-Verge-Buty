@@ -131,6 +131,8 @@
   "Lock Window Size": "Lock Window Size",
   "Unlock Window Size": "Unlock Window Size",
   "Upgrade": "Upgrade",
+  "Core Upgrade Success": "Mihomo core updated successfully",
+  "Core Up To Date": "Mihomo core is already up to date",
 
   "Back": "Back",
   "Save": "Save",

@@ -14,9 +14,13 @@ import {
   ListItemButton,
   ListItemText,
 } from "@mui/material";
-import { changeClashCore, restartSidecar } from "@/services/cmds";
-import { closeAllConnections, upgradeCore } from "@/services/api";
-import { grantPermission } from "@/services/cmds";
+import {
+  changeClashCore,
+  grantPermission,
+  restartSidecar,
+  upgradeCore,
+} from "@/services/cmds";
+import { closeAllConnections } from "@/services/api";
 import getSystem from "@/utils/get-system";
 
 const VALID_CORE = [
@@ -81,12 +85,13 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
   const onUpgrade = useLockFn(async () => {
     try {
       setUpgrading(true);
-      await upgradeCore();
-      setUpgrading(false);
-      Notice.success(`Mihomo core upgraded.`);
+      const updated = await upgradeCore();
+      await Promise.all([mutate("getVersion"), mutate("getClashConfig")]);
+      Notice.success(t(updated ? "Core Upgrade Success" : "Core Up To Date"));
     } catch (err: any) {
-      setUpgrading(false);
       Notice.error(formatNoticeMessage(err?.response?.data?.message || err));
+    } finally {
+      setUpgrading(false);
     }
   });
 
@@ -97,22 +102,21 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
         <Box display="flex" justifyContent="space-between">
           {t("Mihomo Core")}
           <Box>
-            {clash_core !== "mihomo" && (
-              <LoadingButton
-                variant="contained"
-                size="small"
-                startIcon={<SwitchAccessShortcut />}
-                loadingPosition="start"
-                loading={upgrading}
-                sx={{ marginRight: "8px" }}
-                onClick={onUpgrade}
-              >
-                {t("Upgrade")}
-              </LoadingButton>
-            )}
+            <LoadingButton
+              variant="contained"
+              size="small"
+              startIcon={<SwitchAccessShortcut />}
+              loadingPosition="start"
+              loading={upgrading}
+              sx={{ marginRight: "8px" }}
+              onClick={onUpgrade}
+            >
+              {t("Upgrade")}
+            </LoadingButton>
             <Button
               variant="contained"
               size="small"
+              disabled={upgrading}
               onClick={onRestart}
               startIcon={<RestartAlt />}
             >
@@ -139,6 +143,7 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
           <ListItemButton
             key={each.core}
             selected={each.core === clash_core}
+            disabled={upgrading}
             onClick={() => onCoreChange(each.core)}
           >
             <ListItemText primary={each.name} secondary={`/${each.core}`} />
