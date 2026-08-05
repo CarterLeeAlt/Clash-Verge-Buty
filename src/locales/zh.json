@@ -131,6 +131,8 @@
   "Lock Window Size": "锁定窗口大小",
   "Unlock Window Size": "解除窗口大小锁定",
   "Upgrade": "升级内核",
+  "Core Upgrade Success": "Mihomo 内核更新成功",
+  "Core Up To Date": "Mihomo 内核已是最新版本",
 
   "Back": "返回",
   "Save": "保存",

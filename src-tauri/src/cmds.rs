@@ -291,6 +291,11 @@ pub async fn restart_sidecar() -> CmdResult {
 }
 
 #[tauri::command]
+pub async fn upgrade_core() -> CmdResult<bool> {
+    wrap_err!(CoreManager::global().upgrade_core().await)
+}
+
+#[tauri::command]
 pub fn grant_permission(_core: String) -> CmdResult {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     return wrap_err!(manager::grant_permission(_core));

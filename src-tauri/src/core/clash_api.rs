@@ -9,6 +9,12 @@ use std::time::Instant;
 use tokio::net::TcpStream;
 use tokio::time::{timeout as tokio_timeout, Duration};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CoreUpgradeStatus {
+    Updated,
+    AlreadyCurrent,
+}
+
 /// PUT /configs
 /// path 是绝对路径
 pub async fn put_configs(path: &str) -> Result<()> {
@@ -39,6 +45,34 @@ pub async fn patch_configs(config: &Mapping) -> Result<()> {
     let builder = client.patch(&url).headers(headers.clone()).json(config);
     builder.send().await?;
     Ok(())
+}
+
+/// Ask the running Mihomo process to replace its executable using an explicit
+/// release channel. CoreManager coordinates the resulting process restart.
+pub async fn upgrade_core(channel: &str) -> Result<CoreUpgradeStatus> {
+    let (url, headers) = clash_client_info()?;
+    let url = format!("{url}/upgrade");
+    let client = reqwest::ClientBuilder::new()
+        .no_proxy()
+        .timeout(Duration::from_secs(120))
+        .build()?;
+    let response = client
+        .post(&url)
+        .headers(headers)
+        .query(&[("channel", channel)])
+        .send()
+        .await?;
+    let status = response.status();
+    let body = response.text().await?;
+
+    if status.is_success() {
+        return Ok(CoreUpgradeStatus::Updated);
+    }
+    if body.contains("already using latest version") {
+        return Ok(CoreUpgradeStatus::AlreadyCurrent);
+    }
+
+    bail!("Mihomo core upgrade failed with HTTP {status}: {body}")
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]

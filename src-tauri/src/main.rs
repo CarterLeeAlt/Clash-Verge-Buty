@@ -38,6 +38,7 @@ fn main() -> std::io::Result<()> {
             cmds::open_web_url,
             cmds::open_core_dir,
             cmds::restart_sidecar,
+            cmds::upgrade_core,
             cmds::grant_permission,
             // clash
             cmds::get_clash_info,
