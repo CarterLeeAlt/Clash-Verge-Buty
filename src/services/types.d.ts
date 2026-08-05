@@ -215,7 +215,6 @@ interface IVergeConfig {
   tun_tray_icon?: boolean;
   enable_tun_mode?: boolean;
   enable_auto_launch?: boolean;
-  enable_url_scheme?: boolean;
   enable_service_mode?: boolean;
   enable_silent_start?: boolean;
   enable_custom_frameless_window?: boolean;

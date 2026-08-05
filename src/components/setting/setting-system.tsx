@@ -48,7 +48,6 @@ const SettingSystem = ({ onError }: Props) => {
   const {
     enable_tun_mode,
     enable_auto_launch,
-    enable_url_scheme,
     enable_service_mode,
     enable_silent_start,
     enable_system_proxy,
@@ -285,21 +284,6 @@ const SettingSystem = ({ onError }: Props) => {
           <Switch edge="end" />
         </GuardState>
       </SettingItem>
-
-      {isWIN && (
-        <SettingItem label={t("Clash URL Scheme")}>
-          <GuardState
-            value={enable_url_scheme ?? true}
-            valueProps="checked"
-            onCatch={onError}
-            onFormat={onSwitchFormat}
-            onChange={(e) => onChangeData({ enable_url_scheme: e })}
-            onGuard={(e) => patchVerge({ enable_url_scheme: e })}
-          >
-            <Switch edge="end" />
-          </GuardState>
-        </SettingItem>
-      )}
 
       <SettingItem label={t("Silent Start")}>
         <GuardState

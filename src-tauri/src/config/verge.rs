@@ -63,10 +63,6 @@ pub struct IVerge {
     /// can the app auto startup
     pub enable_auto_launch: Option<bool>,
 
-    /// register the clash:// URL protocol for this executable
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub enable_url_scheme: Option<bool>,
-
     /// not show the window on launch
     pub enable_silent_start: Option<bool>,
 
@@ -205,7 +201,6 @@ impl IVerge {
             sysproxy_tray_icon: Some(false),
             tun_tray_icon: Some(false),
             enable_auto_launch: Some(false),
-            enable_url_scheme: Some(true),
             enable_silent_start: Some(false),
             enable_system_proxy: Some(false),
             enable_random_port: Some(false),
@@ -291,7 +286,6 @@ impl IVerge {
         patch!(enable_tun_mode);
         patch!(enable_service_mode);
         patch!(enable_auto_launch);
-        patch!(enable_url_scheme);
         patch!(enable_silent_start);
         patch!(enable_custom_frameless_window);
         patch!(enable_random_port);

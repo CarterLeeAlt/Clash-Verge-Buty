@@ -1,6 +1,6 @@
-use crate::config::{IVerge, PrfOption};
+use crate::config::IVerge;
 use crate::{
-    config::{Config, PrfItem},
+    config::Config,
     core::*,
     utils::dirs,
     utils::init,
@@ -14,7 +14,6 @@ use serde_yaml::Mapping;
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tauri::api::notification;
 use tauri::{App, AppHandle, Manager};
 use window_shadows::set_shadow;
 
@@ -470,7 +469,8 @@ pub fn resolve_setup(app: &mut App) {
 
     log_err!(sysopt::Sysopt::global().recover_pending_sysproxy());
     log_err!(init::init_resources());
-    log_err!(init::init_scheme());
+    #[cfg(target_os = "windows")]
+    log_err!(init::cleanup_legacy_scheme_registration());
     log_err!(init::startup_script());
     // 处理随机端口
     let enable_random_port = Config::verge().latest().enable_random_port.unwrap_or(false);
@@ -530,13 +530,6 @@ pub fn resolve_setup(app: &mut App) {
     log_err!(handle::Handle::update_systray_part());
     log_err!(hotkey::Hotkey::global().init(app.app_handle()));
     log_err!(timer::Timer::global().init());
-
-    let argvs: Vec<String> = std::env::args().collect();
-    if argvs.len() > 1 {
-        tauri::async_runtime::block_on(async {
-            resolve_scheme(argvs[1].to_owned()).await;
-        });
-    }
 }
 
 /// reset system proxy
@@ -1488,39 +1481,4 @@ pub fn save_window_size_position(app_handle: &AppHandle, save_to_file: bool) -> 
         verge.save_file()?;
     }
     Ok(())
-}
-
-pub async fn resolve_scheme(param: String) {
-    let url = param
-        .trim_start_matches("clash://install-config/?url=")
-        .trim_start_matches("clash://install-config?url=");
-    let option = PrfOption {
-        user_agent: None,
-        with_proxy: Some(true),
-        self_proxy: None,
-        danger_accept_invalid_certs: None,
-        update_interval: None,
-    };
-    if let Ok(item) = PrfItem::from_url(url, None, None, Some(option)).await {
-        if Config::profiles().data().append_item(item).is_ok() {
-            notification::Notification::new(crate::utils::dirs::APP_ID)
-                .title("Clash-Verge-Buty")
-                .body("Import profile success")
-                .show()
-                .map_err(|err| log::warn!("failed to show import success notification: {err}"))
-                .ok();
-        };
-    } else {
-        notification::Notification::new(crate::utils::dirs::APP_ID)
-            .title("Clash-Verge-Buty")
-            .body("Import profile failed")
-            .show()
-            .map_err(|err| log::warn!("failed to show import failed notification: {err}"))
-            .ok();
-        log::error!(
-            target: "app",
-            "failed to parse url: {}",
-            crate::utils::redact::redact_log_text(url)
-        );
-    }
 }
