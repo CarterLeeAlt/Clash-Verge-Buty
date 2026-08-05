@@ -7,8 +7,6 @@
 use crate::config::*;
 use crate::core::*;
 use crate::log_err;
-#[cfg(target_os = "windows")]
-use crate::utils::init;
 use crate::utils::resolve;
 use anyhow::{bail, Result};
 use serde::Serialize;
@@ -250,8 +248,6 @@ pub async fn patch_clash(patch: Mapping) -> Result<()> {
 pub async fn patch_verge(patch: IVerge) -> Result<()> {
     let tun_mode = patch.enable_tun_mode;
     let auto_launch = patch.enable_auto_launch;
-    #[cfg(target_os = "windows")]
-    let url_scheme = patch.enable_url_scheme;
     let system_proxy = patch.enable_system_proxy;
     let proxy_bypass = patch.system_proxy_bypass.clone();
     let language = patch.language.clone();
@@ -305,8 +301,6 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
     let mut core_restart_attempted = false;
     let mut core_config_update_attempted = false;
     let mut auto_launch_update_attempted = false;
-    #[cfg(target_os = "windows")]
-    let mut url_scheme_update_attempted = false;
     let mut sysproxy_update_attempted = false;
     let mut hotkey_update_attempted = false;
     let mut systray_update_attempted = false;
@@ -339,11 +333,6 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
         if auto_launch.is_some() {
             auto_launch_update_attempted = true;
             sysopt::Sysopt::global().update_launch()?;
-        }
-        #[cfg(target_os = "windows")]
-        if let Some(enable) = url_scheme {
-            url_scheme_update_attempted = true;
-            init::sync_scheme(enable)?;
         }
         if system_proxy.is_some() || proxy_bypass.is_some() || port.is_some() {
             sysproxy_update_attempted = true;
@@ -424,19 +413,6 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
                 if let Err(rollback_err) = sysopt::Sysopt::global().update_launch() {
                     rollback_errors.push(format!(
                         "restoring the previous auto-launch setting failed: {rollback_err}"
-                    ));
-                }
-            }
-
-            #[cfg(target_os = "windows")]
-            if url_scheme_update_attempted {
-                let previous = Config::verge()
-                    .data()
-                    .enable_url_scheme
-                    .unwrap_or(true);
-                if let Err(rollback_err) = init::sync_scheme(previous) {
-                    rollback_errors.push(format!(
-                        "restoring the previous clash URL scheme setting failed: {rollback_err}"
                     ));
                 }
             }
