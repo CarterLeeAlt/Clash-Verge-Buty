@@ -62,7 +62,8 @@
 //!
 //! ### Windows
 //!
-//! On Windows, it will add a registry entry under `\HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`.
+//! On Windows, it creates a per-user Task Scheduler logon task that runs
+//! interactively with the highest available privileges.
 //!
 //! ```rust
 //! # #[cfg(target_os = "windows")]
