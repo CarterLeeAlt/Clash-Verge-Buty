@@ -90,7 +90,8 @@ fn main() {
 On Windows, it creates a per-user Task Scheduler logon task that runs interactively
 with the highest available privileges. This supports applications that must start
 elevated without an interactive UAC prompt during sign-in. Legacy registry-based
-startup entries owned by the same executable are removed during migration.
+startup entries owned by the same executable are removed during migration. Enabling
+or updating the task from a non-elevated process requests UAC approval when needed.
 
 ```rust
 use auto_launch::AutoLaunch;
