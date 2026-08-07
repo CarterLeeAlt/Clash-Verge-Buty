@@ -16,6 +16,7 @@ static TASK_MANAGER_OVERRIDE_REGKEY: &str =
     "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
+const HRESULT_ACCESS_DENIED: i32 = 0x80070005u32 as i32;
 const HRESULT_FILE_NOT_FOUND: i32 = 0x80070002u32 as i32;
 const HRESULT_PATH_NOT_FOUND: i32 = 0x80070003u32 as i32;
 const SCHED_E_TASK_NOT_FOUND: i32 = 0x8004130fu32 as i32;
@@ -138,18 +139,92 @@ fn schtasks(args: &[&str]) -> std::io::Result<Output> {
         .output()
 }
 
+fn elevated_schtasks(args: &[&str]) -> std::io::Result<Output> {
+    const ELEVATED_SCHTASKS_SCRIPT: &str = r#"
+$ErrorActionPreference = "Stop"
+try {
+    $process = Start-Process `
+        -FilePath (Join-Path $env:SystemRoot "System32\schtasks.exe") `
+        -ArgumentList $env:CLASH_VERGE_SCHTASKS_ARGUMENTS `
+        -Verb RunAs `
+        -WindowStyle Hidden `
+        -Wait `
+        -PassThru
+    exit $process.ExitCode
+} catch {
+    exit 1
+}
+"#;
+    let arguments = args
+        .iter()
+        .map(|argument| quote_windows_argument(argument))
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    Command::new("powershell.exe")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-WindowStyle",
+            "Hidden",
+            "-Command",
+            ELEVATED_SCHTASKS_SCRIPT,
+        ])
+        .env("CLASH_VERGE_SCHTASKS_ARGUMENTS", arguments)
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+}
+
 fn schtasks_error(operation: &str, output: &Output) -> std::io::Error {
     let stdout = decode_command_output(&output.stdout);
     let stderr = decode_command_output(&output.stderr);
+    let details = [stdout.trim(), stderr.trim()]
+        .into_iter()
+        .filter(|text| !text.is_empty() && !text.contains('\u{fffd}'))
+        .collect::<Vec<_>>()
+        .join(" | ");
+    let details = if details.is_empty() {
+        String::new()
+    } else {
+        format!(": {details}")
+    };
     std::io::Error::new(
         ErrorKind::Other,
         format!(
-            "schtasks.exe {operation} failed with status {}: {}{}",
+            "schtasks.exe {operation} failed with status {}{details}",
             output.status.code().unwrap_or(-1),
-            stdout.trim(),
-            stderr.trim()
         ),
     )
+}
+
+fn schtasks_mutation(
+    operation: &str,
+    args: &[&str],
+    allow_not_found: bool,
+) -> std::io::Result<()> {
+    let output = schtasks(args)?;
+    if output.status.success()
+        || (allow_not_found && task_not_found(output.status.code()))
+    {
+        return Ok(());
+    }
+    if output.status.code() != Some(HRESULT_ACCESS_DENIED) {
+        return Err(schtasks_error(operation, &output));
+    }
+
+    let elevated = elevated_schtasks(args)?;
+    if elevated.status.success()
+        || (allow_not_found && task_not_found(elevated.status.code()))
+    {
+        return Ok(());
+    }
+    Err(std::io::Error::new(
+        ErrorKind::PermissionDenied,
+        format!(
+            "schtasks.exe {operation} requires administrator approval; elevation was denied or failed with status {}",
+            elevated.status.code().unwrap_or(-1)
+        ),
+    ))
 }
 
 fn task_name(app_name: &str) -> String {
@@ -184,11 +259,11 @@ fn query_task_xml(task_name: &str) -> std::io::Result<Option<String>> {
 }
 
 fn delete_task(task_name: &str) -> std::io::Result<()> {
-    let output = schtasks(&["/Delete", "/TN", task_name, "/F", "/HRESULT"])?;
-    if output.status.success() || task_not_found(output.status.code()) {
-        return Ok(());
-    }
-    Err(schtasks_error("delete", &output))
+    schtasks_mutation(
+        "delete",
+        &["/Delete", "/TN", task_name, "/F", "/HRESULT"],
+        true,
+    )
 }
 
 fn current_user_sid() -> std::io::Result<String> {
@@ -315,7 +390,7 @@ fn task_matches(xml: &str, app_name: &str, app_path: &str, args: &[String], sid:
         && xml.contains("<LogonType>InteractiveToken</LogonType>")
         && xml.contains("<RunLevel>HighestAvailable</RunLevel>")
         && xml.contains("<ExecutionTimeLimit>PT0S</ExecutionTimeLimit>")
-        && xml.contains("<Enabled>true</Enabled>")
+        && !xml.contains("<Enabled>false</Enabled>")
 }
 
 fn task_xml(app_name: &str, app_path: &str, args: &[String], sid: &str) -> String {
@@ -481,18 +556,19 @@ impl AutoLaunch {
         let xml = task_xml(&self.app_name, executable_path, &self.args, &sid);
         let temporary_xml = TemporaryTaskXml::create(&xml)?;
         let temporary_xml_path = temporary_xml.path.to_string_lossy();
-        let output = schtasks(&[
-            "/Create",
-            "/TN",
-            &task_name,
-            "/XML",
-            &temporary_xml_path,
-            "/F",
-            "/HRESULT",
-        ])?;
-        if !output.status.success() {
-            return Err(schtasks_error("create", &output).into());
-        }
+        schtasks_mutation(
+            "create",
+            &[
+                "/Create",
+                "/TN",
+                &task_name,
+                "/XML",
+                &temporary_xml_path,
+                "/F",
+                "/HRESULT",
+            ],
+            false,
+        )?;
 
         let registered = query_task_xml(&task_name)?.ok_or_else(|| {
             std::io::Error::new(
@@ -554,7 +630,8 @@ mod tests {
     use super::{
         build_arguments, command_targets_app, decode_command_output, encode_task_xml,
         task_is_owned, task_matches, task_name, task_not_found, task_xml, xml_escape,
-        HRESULT_FILE_NOT_FOUND, HRESULT_PATH_NOT_FOUND, SCHED_E_TASK_NOT_FOUND,
+        HRESULT_ACCESS_DENIED, HRESULT_FILE_NOT_FOUND, HRESULT_PATH_NOT_FOUND,
+        SCHED_E_TASK_NOT_FOUND,
     };
 
     #[test]
@@ -595,6 +672,11 @@ mod tests {
     }
 
     #[test]
+    fn recognizes_access_denied_hresult() {
+        assert_eq!(HRESULT_ACCESS_DENIED, -2147024891);
+    }
+
+    #[test]
     fn encodes_task_xml_as_utf16_le_with_bom() {
         let xml = r#"<?xml version="1.0" encoding="UTF-16"?><Task>测试</Task>"#;
         let encoded = encode_task_xml(xml);
@@ -629,6 +711,25 @@ mod tests {
         assert!(xml.contains("<ExecutionTimeLimit>PT0S</ExecutionTimeLimit>"));
         assert!(task_is_owned(&xml, app_name));
         assert!(task_matches(&xml, app_name, app_path, &args, sid));
+        let normalized_xml = xml.replace("<Enabled>true</Enabled>", "");
+        assert!(task_matches(
+            &normalized_xml,
+            app_name,
+            app_path,
+            &args,
+            sid
+        ));
+        let disabled_xml = xml.replace(
+            "<Enabled>true</Enabled>",
+            "<Enabled>false</Enabled>",
+        );
+        assert!(!task_matches(
+            &disabled_xml,
+            app_name,
+            app_path,
+            &args,
+            sid
+        ));
         assert!(!task_matches(
             &xml,
             app_name,
