@@ -87,9 +87,10 @@ fn main() {
 
 ### Windows
 
-On Windows, it will add registry entries under `\HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run` and `\HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run`.
-
-It will also detect if startup is disabled inside Task Manager or the Windows settings UI, and can re-enable after being disabled in one of those.
+On Windows, it creates a per-user Task Scheduler logon task that runs interactively
+with the highest available privileges. This supports applications that must start
+elevated without an interactive UAC prompt during sign-in. Legacy registry-based
+startup entries owned by the same executable are removed during migration.
 
 ```rust
 use auto_launch::AutoLaunch;
