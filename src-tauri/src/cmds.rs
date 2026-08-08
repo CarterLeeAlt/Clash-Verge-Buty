@@ -94,7 +94,7 @@ pub fn view_profile(app_handle: tauri::AppHandle, index: String) -> CmdResult {
     }?;
 
     let path = wrap_err!(help::resolve_profile_path(&file))?;
-    let canonical_path = wrap_err!(std::fs::canonicalize(&path))?;
+    let canonical_path = wrap_err!(dunce::canonicalize(&path))?;
 
     if !canonical_path.exists() {
         ret_err!("the file not found");
