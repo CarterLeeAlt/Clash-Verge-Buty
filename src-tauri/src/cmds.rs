@@ -469,6 +469,11 @@ pub mod service {
     }
 
     #[tauri::command]
+    pub fn is_elevated() -> CmdResult<bool> {
+        wrap_err!(win_service::is_current_process_elevated())
+    }
+
+    #[tauri::command]
     pub async fn install_service() -> CmdResult {
         wrap_err!(win_service::install_service().await)
     }
@@ -509,6 +514,10 @@ pub mod service {
     #[tauri::command]
     pub async fn check_service() -> CmdResult {
         Ok(())
+    }
+    #[tauri::command]
+    pub fn is_elevated() -> CmdResult<bool> {
+        Ok(false)
     }
     #[tauri::command]
     pub async fn install_service() -> CmdResult {

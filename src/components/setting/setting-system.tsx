@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IconButton, Tooltip } from "@mui/material";
 import { PrivacyTipRounded, Settings, InfoRounded } from "@mui/icons-material";
-import { checkService } from "@/services/cmds";
+import { checkService, isElevated } from "@/services/cmds";
 import { useVerge } from "@/hooks/use-verge";
 import { DialogRef, Notice, Switch } from "@/components/base";
 import { SettingList, SettingItem } from "./mods/setting-comp";
@@ -133,6 +133,9 @@ const SettingSystem = ({ onError }: Props) => {
             setPendingSwitch("tun");
             try {
               if (isWIN && e) {
+                if (!(await isElevated())) {
+                  throw new Error(String(t("Administrator Required")));
+                }
                 const latestServiceStatus = await mutateServiceStatus();
                 if (!latestServiceStatus?.installed) {
                   throw new Error("Install and enable service mode first.");
@@ -189,6 +192,9 @@ const SettingSystem = ({ onError }: Props) => {
               setPendingSwitch("service");
               try {
                 if (isWIN) {
+                  if (e && !(await isElevated())) {
+                    throw new Error(String(t("Administrator Required")));
+                  }
                   const latestServiceStatus = await mutateServiceStatus();
                   if (enable_tun_mode) {
                     throw new Error(

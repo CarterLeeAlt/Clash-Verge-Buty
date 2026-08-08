@@ -21,6 +21,12 @@ const SERVICE_BINARY: &str = "clash-verge-service.exe";
 const INSTALL_HELPER: &str = "install-service.exe";
 const UNINSTALL_HELPER: &str = "uninstall-service.exe";
 
+pub fn is_current_process_elevated() -> Result<bool> {
+    let token = Token::with_current_process()?;
+    let level = token.privilege_level()?;
+    Ok(!matches!(level, PrivilegeLevel::NotPrivileged))
+}
+
 fn service_api_token() -> Result<String> {
     let path = dirs::service_api_token_path()?;
     let token = std::fs::read_to_string(&path)

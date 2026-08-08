@@ -176,5 +176,6 @@
   "Portable Updater Error": "便携版不支持应用内更新，请手动下载替换",
   "Tun Mode Info Windows": "Tun模式需要授予内核相关权限，使用前请先开启服务模式",
   "Tun Mode Info Unix": "Tun模式需要授予内核相关权限，使用前请先在内核设置中给内核授权",
-  "System and Mixed Can Only be Used in Service Mode": "System和Mixed只能在服务模式下使用"
+  "System and Mixed Can Only be Used in Service Mode": "System和Mixed只能在服务模式下使用",
+  "Administrator Required": "服务模式和网卡模式要求以管理员身份运行 Clash Verge。"
 }

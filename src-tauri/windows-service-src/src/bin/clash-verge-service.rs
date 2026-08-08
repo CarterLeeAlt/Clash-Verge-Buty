@@ -3,7 +3,9 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::Duration;
 use std::{
+    ffi::OsString,
     fs,
+    os::windows::ffi::{OsStrExt, OsStringExt},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
 };
@@ -311,6 +313,40 @@ fn paths_equal(left: &Path, right: &Path) -> bool {
         .eq_ignore_ascii_case(&right.to_string_lossy())
 }
 
+/// Mihomo joins files below its data directory with `/`. A verbatim Windows
+/// path such as `\\?\C:\data` therefore becomes the invalid mixed path
+/// `\\?\C:\data/file`. Keep canonical paths for validation, but pass their
+/// equivalent ordinary Win32 form to the child process.
+fn win32_compatible_path(path: &Path) -> PathBuf {
+    const VERBATIM_PREFIX: [u16; 4] =
+        [b'\\' as u16, b'\\' as u16, b'?' as u16, b'\\' as u16];
+    const VERBATIM_UNC_PREFIX: [u16; 8] = [
+        b'\\' as u16,
+        b'\\' as u16,
+        b'?' as u16,
+        b'\\' as u16,
+        b'U' as u16,
+        b'N' as u16,
+        b'C' as u16,
+        b'\\' as u16,
+    ];
+
+    let wide = path.as_os_str().encode_wide().collect::<Vec<_>>();
+    let normalized = if wide.starts_with(&VERBATIM_UNC_PREFIX) {
+        let mut result = vec![b'\\' as u16, b'\\' as u16];
+        result.extend_from_slice(&wide[VERBATIM_UNC_PREFIX.len()..]);
+        result
+    } else if wide.starts_with(&VERBATIM_PREFIX)
+        && wide.get(5).copied() == Some(b':' as u16)
+    {
+        wide[VERBATIM_PREFIX.len()..].to_vec()
+    } else {
+        return path.to_path_buf();
+    };
+
+    PathBuf::from(OsString::from_wide(&normalized))
+}
+
 fn validate_start_request(payload: StartClashRequest) -> Result<ValidatedStartClashRequest> {
     let expected_binary_name = match payload.core_type.as_str() {
         "mihomo" => "mihomo.exe",
@@ -395,10 +431,10 @@ fn validate_start_request(payload: StartClashRequest) -> Result<ValidatedStartCl
 
     Ok(ValidatedStartClashRequest {
         core_type: payload.core_type,
-        bin_path,
-        config_dir,
-        config_file,
-        log_file,
+        bin_path: win32_compatible_path(&bin_path),
+        config_dir: win32_compatible_path(&config_dir),
+        config_file: win32_compatible_path(&config_file),
+        log_file: win32_compatible_path(&log_file),
     })
 }
 
@@ -521,4 +557,34 @@ fn stop_clash(
         msg: "stopped".into(),
         data: None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::win32_compatible_path;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn strips_verbatim_disk_prefix_for_child_processes() {
+        assert_eq!(
+            win32_compatible_path(Path::new(r"\\?\C:\Portable\Clash")),
+            PathBuf::from(r"C:\Portable\Clash")
+        );
+    }
+
+    #[test]
+    fn converts_verbatim_unc_prefix_for_child_processes() {
+        assert_eq!(
+            win32_compatible_path(Path::new(r"\\?\UNC\server\share\Clash")),
+            PathBuf::from(r"\\server\share\Clash")
+        );
+    }
+
+    #[test]
+    fn preserves_regular_windows_paths() {
+        assert_eq!(
+            win32_compatible_path(Path::new(r"C:\Portable\Clash")),
+            PathBuf::from(r"C:\Portable\Clash")
+        );
+    }
 }

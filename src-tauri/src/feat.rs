@@ -261,6 +261,11 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
     #[cfg(target_os = "windows")]
     {
         let service_mode = patch.enable_service_mode;
+        if (service_mode == Some(true) || tun_mode == Some(true))
+            && !super::core::win_service::is_current_process_elevated()?
+        {
+            bail!("Service mode and TUN mode require Clash Verge to be run as administrator.");
+        }
         let (current_tun_enabled, current_service_enabled) = {
             let verge_config = Config::verge();
             let current_verge = verge_config.latest();
