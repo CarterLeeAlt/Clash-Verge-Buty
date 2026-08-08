@@ -76,6 +76,7 @@ fn main() -> std::io::Result<()> {
             cmds::save_profile_file,
             // service mode
             cmds::service::check_service,
+            cmds::service::is_elevated,
             cmds::service::install_service,
             cmds::service::uninstall_service,
             // clash api

@@ -213,6 +213,10 @@ export async function checkService() {
   }
 }
 
+export async function isElevated() {
+  return invoke<boolean>("is_elevated");
+}
+
 export async function installService() {
   return invoke<void>("install_service");
 }
