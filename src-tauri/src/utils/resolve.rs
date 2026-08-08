@@ -471,6 +471,8 @@ pub fn resolve_setup(app: &mut App) {
     log_err!(init::init_resources());
     #[cfg(target_os = "windows")]
     log_err!(init::cleanup_legacy_scheme_registration());
+    #[cfg(target_os = "windows")]
+    log_err!(crate::core::win_firewall::reconcile_lan_firewall_on_startup());
     log_err!(init::startup_script());
     // 处理随机端口
     let enable_random_port = Config::verge().latest().enable_random_port.unwrap_or(false);

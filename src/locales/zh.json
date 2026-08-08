@@ -74,6 +74,7 @@
   "System Setting": "系统设置",
   "Verge Setting": "Verge 设置",
   "Allow Lan": "局域网连接",
+  "LAN Firewall Error": "无法更新 Mihomo 内核的 Windows 防火墙放行规则。请批准管理员权限请求后重试。",
   "IPv6": "IPv6 支持",
   "Log Level": "日志等级",
   "Port Config": "端口设置",

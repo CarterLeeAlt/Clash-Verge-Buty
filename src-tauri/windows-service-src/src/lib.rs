@@ -4,6 +4,7 @@ pub const SERVICE_DISPLAY_NAME: &str = "clash-verge-service";
 pub const SERVICE_BINARY: &str = "clash-verge-service.exe";
 pub const INSTALL_HELPER: &str = "install-service.exe";
 pub const UNINSTALL_HELPER: &str = "uninstall-service.exe";
+pub const FIREWALL_HELPER: &str = "firewall-helper.exe";
 
 pub const API_ADDR: &str = "127.0.0.1:33211";
 pub const API_HEALTH: &str = "/health";

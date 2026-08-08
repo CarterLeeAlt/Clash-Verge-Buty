@@ -57,6 +57,16 @@ const SettingClash = ({ onError }: Props) => {
       Notice.error(formatNoticeMessage(err?.response?.data?.message || err));
     }
   });
+  const onGuardAllowLan = useLockFn(async (enabled: boolean) => {
+    try {
+      await patchClash({ "allow-lan": enabled });
+    } catch (err) {
+      if (isWIN) {
+        throw new Error(t("LAN Firewall Error"));
+      }
+      throw err;
+    }
+  });
 
   return (
     <SettingList title={t("Clash Setting")}>
@@ -71,7 +81,7 @@ const SettingClash = ({ onError }: Props) => {
           onCatch={onError}
           onFormat={onSwitchFormat}
           onChange={(e) => onChangeData({ "allow-lan": e })}
-          onGuard={(e) => patchClash({ "allow-lan": e })}
+          onGuard={onGuardAllowLan}
         >
           <Switch edge="end" />
         </GuardState>

@@ -100,6 +100,11 @@ pub fn service_path() -> Result<PathBuf> {
 }
 
 #[cfg(windows)]
+pub fn firewall_helper_path() -> Result<PathBuf> {
+    Ok(app_resources_dir()?.join("firewall-helper.exe"))
+}
+
+#[cfg(windows)]
 pub fn service_api_token_path() -> Result<PathBuf> {
     Ok(app_resources_dir()?
         .join("service-data")
