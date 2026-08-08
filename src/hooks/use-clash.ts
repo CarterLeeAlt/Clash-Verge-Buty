@@ -19,10 +19,13 @@ export const useClash = () => {
   );
 
   const patchClash = useLockFn(async (patch: Partial<IConfigData>) => {
+    const hasAllowLanPatch = patch["allow-lan"] != null;
     const hasRuntimePatch =
       patch.ipv6 != null || patch["allow-lan"] != null || patch["log-level"] != null;
 
-    await updateConfigs(patch);
+    if (!hasAllowLanPatch) {
+      await updateConfigs(patch);
+    }
     await patchClashConfig(patch);
     await mutateClash();
     await mutate("getClashConfig");

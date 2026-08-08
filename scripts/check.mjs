@@ -361,6 +361,7 @@ const WINDOWS_SERVICE_BINARY_FILES = [
   "clash-verge-service.exe",
   "install-service.exe",
   "uninstall-service.exe",
+  "firewall-helper.exe",
 ];
 
 let windowsServiceBuildPromise = null;

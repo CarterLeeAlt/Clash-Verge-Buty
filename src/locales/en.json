@@ -74,6 +74,7 @@
   "System Setting": "System Setting",
   "Verge Setting": "Verge Setting",
   "Allow Lan": "Allow Lan",
+  "LAN Firewall Error": "Failed to update the Windows Firewall rules for Mihomo. Approve the administrator request and try again.",
   "IPv6": "IPv6",
   "Log Level": "Log Level",
   "Port Config": "Port Config",

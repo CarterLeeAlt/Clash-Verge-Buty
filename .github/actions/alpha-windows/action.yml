@@ -86,7 +86,7 @@ runs:
         cargo build --manifest-path src-tauri/windows-service-src/Cargo.toml --release --target ${{ inputs.target }}
         New-Item -ItemType Directory -Force -Path src-tauri/local-binaries/windows-service-bin | Out-Null
         $svcOut = "src-tauri/windows-service-src/target/${{ inputs.target }}/release"
-        $need = @("clash-verge-service.exe", "install-service.exe", "uninstall-service.exe")
+        $need = @("clash-verge-service.exe", "install-service.exe", "uninstall-service.exe", "firewall-helper.exe")
         foreach ($n in $need) {
           $src = Join-Path $svcOut $n
           if (-not (Test-Path $src)) { throw "missing service binary: $src" }
