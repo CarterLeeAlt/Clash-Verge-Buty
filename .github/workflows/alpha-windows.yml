@@ -1,0 +1,50 @@
+name: Alpha Build Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      signing_mode:
+        description: "Windows signing mode"
+        required: false
+        default: "unsigned"
+        type: choice
+        options:
+          - unsigned
+          - pfx
+          - signpath
+          - ossign
+
+permissions:
+  contents: read
+
+jobs:
+  alpha-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout alpha branch
+        uses: actions/checkout@v4
+        with:
+          ref: alpha
+
+      - name: Run alpha Windows build
+        uses: ./.github/actions/alpha-windows
+        with:
+          target: ${{ matrix.target }}
+          signing-mode: ${{ github.event.inputs.signing_mode || vars.WINDOWS_SIGNING_MODE || 'unsigned' }}
+          windows-certificate-base64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          windows-certificate-password: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          signpath-organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          signpath-project-slug: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          signpath-api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          signpath-signing-policy-slug: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
+          signpath-artifact-configuration-slug: ${{ secrets.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          ossign-client-id: ${{ secrets.OSSIGN_CLIENT_ID }}
+          ossign-client-secret: ${{ secrets.OSSIGN_CLIENT_SECRET }}
