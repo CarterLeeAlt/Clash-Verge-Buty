@@ -14,7 +14,71 @@ use crate::utils::{init, resolve, server};
 use std::time::Duration;
 use tauri::{Manager, SystemTray};
 
+#[cfg(target_os = "windows")]
+const WATCHDOG_CHILD_ARG: &str = "--clash-verge-watchdog-child";
+
+/// Keep a small supervisor process outside the Tauri/WebView process.  A panic
+/// hook cannot catch Windows fail-fast exceptions such as 0xc0000409, so the
+/// supervisor is the last line of defence for startup crashes.
+#[cfg(target_os = "windows")]
+fn run_watchdog() -> Option<std::io::Result<()>> {
+    let args: Vec<_> = std::env::args_os().collect();
+    if args
+        .iter()
+        .any(|arg| arg == std::ffi::OsStr::new(WATCHDOG_CHILD_ARG))
+    {
+        return None;
+    }
+
+    let exe = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(err) => return Some(Err(err)),
+    };
+    let child_args = args.into_iter().skip(1).chain(
+        std::iter::once(std::ffi::OsString::from(WATCHDOG_CHILD_ARG)),
+    );
+
+    // A clean exit (status 0) means the user closed the app and must not be
+    // restarted.  Non-zero exits are retried a few times to handle transient
+    // WebView/Tauri startup failures without creating an endless crash loop.
+    for attempt in 0..5 {
+        let status = match std::process::Command::new(&exe)
+            .args(child_args.clone())
+            .spawn()
+            .and_then(|mut child| child.wait())
+        {
+            Ok(status) => status,
+            Err(err) => {
+                if attempt == 4 {
+                    return Some(Err(err));
+                }
+                std::thread::sleep(Duration::from_secs(2));
+                continue;
+            }
+        };
+
+        if status.success() || attempt == 4 {
+            return Some(Ok(()));
+        }
+
+        log::error!(
+            target: "app",
+            "Clash-Verge child exited unexpectedly ({status}); retrying in 2s ({}/{})",
+            attempt + 1,
+            5
+        );
+        std::thread::sleep(Duration::from_secs(2));
+    }
+
+    Some(Ok(()))
+}
+
 fn main() -> std::io::Result<()> {
+    #[cfg(target_os = "windows")]
+    if let Some(result) = run_watchdog() {
+        return result;
+    }
+
     // 单例检测
     if server::check_singleton().is_err() {
         println!("app exists");
