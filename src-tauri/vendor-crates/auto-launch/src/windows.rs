@@ -391,9 +391,7 @@ fn task_matches(xml: &str, app_name: &str, app_path: &str, args: &[String], sid:
         && xml.contains("<RunLevel>HighestAvailable</RunLevel>")
         && xml.contains("<Delay>PT10S</Delay>")
         && xml.contains("<ExecutionTimeLimit>PT0S</ExecutionTimeLimit>")
-        && xml.contains("<RestartOnFailure>")
-        && xml.contains("<Interval>PT10S</Interval>")
-        && xml.contains("<Count>3</Count>")
+        && !xml.contains("<RestartOnFailure>")
         && !xml.contains("<Enabled>false</Enabled>")
 }
 
@@ -450,11 +448,6 @@ fn task_xml(app_name: &str, app_path: &str, args: &[String], sid: &str) -> Strin
     <RunOnlyIfIdle>false</RunOnlyIfIdle>
     <WakeToRun>false</WakeToRun>
     <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
-    <RestartOnFailure>
-      <Interval>PT10S</Interval>
-      <Count>3</Count>
-      <StopAtDurationEnd>false</StopAtDurationEnd>
-    </RestartOnFailure>
     <Priority>7</Priority>
   </Settings>
   <Actions Context="Author">
@@ -720,10 +713,7 @@ mod tests {
         assert!(xml.contains("<RunLevel>HighestAvailable</RunLevel>"));
         assert!(xml.contains("<Delay>PT10S</Delay>"));
         assert!(xml.contains("<ExecutionTimeLimit>PT0S</ExecutionTimeLimit>"));
-        assert!(xml.contains("<RestartOnFailure>"));
-        assert!(xml.contains("<Interval>PT10S</Interval>"));
-        assert!(xml.contains("<Count>3</Count>"));
-        assert!(xml.contains("<StopAtDurationEnd>false</StopAtDurationEnd>"));
+        assert!(!xml.contains("<RestartOnFailure>"));
         assert!(task_is_owned(&xml, app_name));
         assert!(task_matches(&xml, app_name, app_path, &args, sid));
         let normalized_xml = xml.replace("<Enabled>true</Enabled>", "");

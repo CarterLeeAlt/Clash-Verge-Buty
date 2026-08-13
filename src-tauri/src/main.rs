@@ -39,9 +39,12 @@ fn run_watchdog() -> Option<std::io::Result<()>> {
     );
 
     // A clean exit (status 0) means the user closed the app and must not be
-    // restarted.  Non-zero exits are retried a few times to handle transient
-    // WebView/Tauri startup failures without creating an endless crash loop.
-    for attempt in 0..5 {
+    // restarted. Non-zero exits are retried up to three times at ten-second
+    // intervals to handle transient WebView/Tauri startup failures without
+    // creating an endless crash loop.
+    const MAX_RETRIES: usize = 3;
+    const RETRY_DELAY: Duration = Duration::from_secs(10);
+    for attempt in 0..=MAX_RETRIES {
         let status = match std::process::Command::new(&exe)
             .args(child_args.clone())
             .spawn()
@@ -49,25 +52,25 @@ fn run_watchdog() -> Option<std::io::Result<()>> {
         {
             Ok(status) => status,
             Err(err) => {
-                if attempt == 4 {
+                if attempt == MAX_RETRIES {
                     return Some(Err(err));
                 }
-                std::thread::sleep(Duration::from_secs(2));
+                std::thread::sleep(RETRY_DELAY);
                 continue;
             }
         };
 
-        if status.success() || attempt == 4 {
+        if status.success() || attempt == MAX_RETRIES {
             return Some(Ok(()));
         }
 
         log::error!(
             target: "app",
-            "Clash-Verge child exited unexpectedly ({status}); retrying in 2s ({}/{})",
+            "Clash-Verge child exited unexpectedly ({status}); retrying in 10s ({}/{})",
             attempt + 1,
-            5
+            MAX_RETRIES
         );
-        std::thread::sleep(Duration::from_secs(2));
+        std::thread::sleep(RETRY_DELAY);
     }
 
     Some(Ok(()))
