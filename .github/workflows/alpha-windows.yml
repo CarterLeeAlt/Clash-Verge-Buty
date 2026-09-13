@@ -29,10 +29,8 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout alpha branch
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: alpha
 
       - name: Run alpha Windows build
         uses: ./.github/actions/alpha-windows

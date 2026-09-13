@@ -2,14 +2,15 @@
   "name": "clash-verge-buty",
   "version": "1.5.6",
   "description": "A Mihomo GUI based on Tauri.",
-  "author": "zzzgydi",
   "license": "GPL-3.0-only",
   "homepage": "https://github.com/CarterLeeAlt/Clash-Verge-Buty",
   "repository": "https://github.com/CarterLeeAlt/Clash-Verge-Buty.git",
   "metadata": {
     "productName": "Clash-Verge-Buty",
     "identifier": "io.github.clash-verge-buty.data",
-    "authors": ["zzzgydi", "wonfen", "MystiPanda"],
+    "authors": [
+      "Clash-Verge-Buty"
+    ],
     "releaseNamePrefix": "Clash-Verge-Buty v"
   },
   "packageManager": "pnpm@8.15.9",
@@ -22,7 +23,6 @@
     "web:build": "tsc && vite build",
     "web:serve": "vite preview",
     "check": "node scripts/check.mjs",
-    "updater": "node scripts/updater.mjs",
     "portable": "node scripts/portable.mjs",
     "sync-metadata": "node scripts/sync-metadata.mjs",
     "sync-version": "pnpm sync-metadata",

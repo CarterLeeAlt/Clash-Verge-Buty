@@ -8,3 +8,8 @@ scripts/_env.sh
 .vscode
 
 src-tauri/local-binaries/windows-service-bin/*.exe
+
+# workspace-local toolchain
+/.rustup/
+/.cargo/
+/.toolchain/

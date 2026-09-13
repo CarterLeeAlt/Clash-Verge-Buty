@@ -20,20 +20,18 @@ body:
       label: Platform
       options:
         - Windows
-        - Linux
-        - MacOS
     validations:
       required: true
   - type: input
     attributes:
       label: System Version
-      placeholder: "e.g. macOS 10.15.7"
+      placeholder: "e.g. Windows 10 22H2 / Windows 11"
     validations:
       required: true
   - type: input
     attributes:
       label: Software Version
-      placeholder: "e.g. 1.4.3"
+      placeholder: "e.g. 1.5.6"
     validations:
       required: true
   - type: textarea
