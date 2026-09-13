@@ -63,7 +63,7 @@ jobs:
           if ("${{ github.event_name }}" -eq "push") {
             # auto mode: bump patch by 1; carry into minor when patch exceeds 9 (2.0.9 -> 2.1.0)
             $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
-            $current = $conf.version
+            $current = if ($conf.package -and $conf.package.version) { $conf.package.version } else { $conf.version }
             if ($current -notmatch '^\d+\.\d+\.\d+$') { throw "unexpected version in tauri.conf.json: $current" }
             $parts = $current.Split('.')
             $patch = [int]$parts[2] + 1
