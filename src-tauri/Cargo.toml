@@ -2,7 +2,7 @@
 name = "clash-verge-buty"
 version = "1.5.6"
 description = "A Mihomo GUI based on Tauri."
-authors = ["zzzgydi", "wonfen", "MystiPanda"]
+authors = ["Clash-Verge-Buty"]
 license = "GPL-3.0-only"
 repository = "https://github.com/CarterLeeAlt/Clash-Verge-Buty.git"
 default-run = "clash-verge-buty"
@@ -25,7 +25,7 @@ log4rs = "1"
 nanoid = "0.4"
 chrono = "0.4"
 sysinfo = "0.30"
-rquickjs = "0.3" # 高版本不支持 Linux aarch64
+rquickjs = "0.3"
 serde_json = "1.0"
 serde_yaml = "0.9"
 once_cell = "1.18"

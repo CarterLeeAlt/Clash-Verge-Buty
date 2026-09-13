@@ -15,7 +15,6 @@ Before you start contributing to the project, you need to set up your developmen
 If you're a Windows user, you may need to perform some additional steps:
 
 - Make sure to add Rust and Node.js to your system's PATH. This is usually done during the installation process, but you can verify and manually add them if necessary.
-- The gnu `patch` tool should be installed
 
 ### Install Node.js Packages
 

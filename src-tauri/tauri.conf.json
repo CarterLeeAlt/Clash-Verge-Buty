@@ -21,7 +21,7 @@
       ],
       "resources": ["resources"],
       "externalBin": ["sidecar/mihomo", "sidecar/mihomo-alpha"],
-      "copyright": "© 2022 zzzgydi All Rights Reserved",
+      "copyright": "© 2026 Clash-Verge-Buty",
       "category": "DeveloperTool",
       "shortDescription": "A Mihomo GUI based on Tauri.",
       "longDescription": "A Mihomo GUI based on Tauri."
