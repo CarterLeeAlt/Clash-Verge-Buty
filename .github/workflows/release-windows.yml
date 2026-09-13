@@ -1,6 +1,9 @@
 name: Release Build Windows
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       release_tag:
@@ -17,6 +20,11 @@ on:
           - pfx
           - signpath
           - ossign
+
+# Serialize release builds on main so auto version bumps never race each other
+concurrency:
+  group: release-windows-main
+  cancel-in-progress: false
 
 permissions: write-all
 
@@ -49,19 +57,31 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Resolve release version from tag
+      - name: Resolve release version
         shell: pwsh
         run: |
-          $tag = "${{ github.event.inputs.release_tag }}".Trim()
-          if (-not $tag) { throw "release_tag input is required" }
-          if (-not $tag.StartsWith("v")) { throw "release_tag must start with v, got: $tag" }
-          if ($tag.StartsWith("v")) {
-            $version = $tag.Substring(1)
+          if ("${{ github.event_name }}" -eq "push") {
+            # auto mode: bump patch by 1; carry into minor when patch exceeds 9 (2.0.9 -> 2.1.0)
+            $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+            $current = $conf.version
+            if ($current -notmatch '^\d+\.\d+\.\d+$') { throw "unexpected version in tauri.conf.json: $current" }
+            $parts = $current.Split('.')
+            $patch = [int]$parts[2] + 1
+            if ($patch -gt 9) {
+              $patch = 0
+              $parts[1] = "$([int]$parts[1] + 1)"
+            }
+            $version = "$($parts[0]).$($parts[1]).$patch"
+            Write-Host "[INFO] auto bump version: $current -> $version"
           } else {
-            $version = $tag
+            # manual mode: version comes from the release_tag input
+            $tag = "${{ github.event.inputs.release_tag }}".Trim()
+            if (-not $tag) { throw "release_tag input is required for manual runs" }
+            if (-not $tag.StartsWith("v")) { throw "release_tag must start with v, got: $tag" }
+            $version = $tag.Substring(1)
+            if (-not $version) { throw "resolved VERSION is empty from tag: $tag" }
           }
-          if (-not $version) { throw "resolved VERSION is empty from tag: $tag" }
-          "TAG_NAME=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TAG_NAME=v$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install Rust Stable
@@ -86,6 +106,40 @@ jobs:
         with:
           version: 8
           run_install: false
+
+      - name: Bump version, commit and tag (auto mode)
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          $text = Get-Content package.json -Raw
+          $rx = [regex]'("version"\s*:\s*)"[^"]*"'
+          $newText = $rx.Replace($text, ('$1"' + $env:VERSION + '"'), 1)
+          Set-Content -Path package.json -Value $newText -NoNewline -Encoding UTF8
+          pnpm sync-metadata
+
+          $lockPath = "src-tauri/Cargo.lock"
+          $lines = Get-Content $lockPath
+          $inTarget = $false
+          for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match '^\[\[package\]\]') { $inTarget = $false; continue }
+            if ($lines[$i] -match '^name = "clash-verge-buty"') { $inTarget = $true; continue }
+            if ($inTarget -and $lines[$i] -match '^\s*version\s*=') {
+              $lines[$i] = 'version = "' + $env:VERSION + '"'
+              $inTarget = $false
+            }
+          }
+          Set-Content -Path $lockPath -Value $lines
+
+          git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+          git commit -m "chore(release): v$env:VERSION [skip ci]"
+          git pull --rebase origin main
+          git tag "v$env:VERSION"
+          git push origin HEAD:main --tags
 
       - name: Build Windows service binaries from source
         shell: pwsh
@@ -280,7 +334,7 @@ jobs:
           }
 
       - name: Upload Windows distribution assets
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG_NAME }}
           files: |
