@@ -1,34 +1,24 @@
 import { mutate } from "swr";
 import { forwardRef, useImperativeHandle, useState } from "react";
-import { BaseDialog, DialogRef, formatNoticeMessage, Notice } from "@/components/base";
+import {
+  BaseDialog,
+  DialogRef,
+  formatNoticeMessage,
+  Notice,
+} from "@/components/base";
 import { useTranslation } from "react-i18next";
 import { useVerge } from "@/hooks/use-verge";
 import { useLockFn } from "ahooks";
 import { LoadingButton } from "@mui/lab";
 import { SwitchAccessShortcut, RestartAlt } from "@mui/icons-material";
-import {
-  Box,
-  Button,
-  Tooltip,
-  List,
-  ListItemButton,
-  ListItemText,
-} from "@mui/material";
-import {
-  changeClashCore,
-  grantPermission,
-  restartSidecar,
-  upgradeCore,
-} from "@/services/cmds";
+import { Box, Button, List, ListItemButton, ListItemText } from "@mui/material";
+import { changeClashCore, restartSidecar, upgradeCore } from "@/services/cmds";
 import { closeAllConnections } from "@/services/api";
-import getSystem from "@/utils/get-system";
 
 const VALID_CORE = [
   { name: "Mihomo", core: "mihomo" },
   { name: "Mihomo Alpha", core: "mihomo-alpha" },
 ];
-
-const OS = getSystem();
 
 export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
   const { t } = useTranslation();
@@ -57,17 +47,6 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
         mutate("getVersion");
       }, 100);
       Notice.success(`Switched to ${core}.`);
-    } catch (err: any) {
-      Notice.error(formatNoticeMessage(err));
-    }
-  });
-
-  const onGrant = useLockFn(async (core: string) => {
-    try {
-      await grantPermission(core);
-      // 自动重启
-      if (core === clash_core) await restartSidecar();
-      Notice.success(`Permission granted for ${core}.`);
     } catch (err: any) {
       Notice.error(formatNoticeMessage(err));
     }
@@ -147,22 +126,6 @@ export const ClashCoreViewer = forwardRef<DialogRef>((props, ref) => {
             onClick={() => onCoreChange(each.core)}
           >
             <ListItemText primary={each.name} secondary={`/${each.core}`} />
-
-            {(OS === "macos" || OS === "linux") && (
-              <Tooltip title={t("Tun mode requires")}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onGrant(each.core);
-                  }}
-                >
-                  {t("Grant")}
-                </Button>
-              </Tooltip>
-            )}
           </ListItemButton>
         ))}
       </List>

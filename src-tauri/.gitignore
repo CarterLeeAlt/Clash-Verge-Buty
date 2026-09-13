@@ -3,3 +3,5 @@
 /target/
 WixTools
 sidecar
+/resources
+windows-service-src/target/

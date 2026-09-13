@@ -94,12 +94,7 @@ const SettingSystem = ({ onError }: Props) => {
         label={t("Tun Mode")}
         extra={
           <>
-            <Tooltip
-              title={
-                isWIN ? t("Tun Mode Info Windows") : t("Tun Mode Info Unix")
-              }
-              placement="top"
-            >
+            <Tooltip title={t("Tun Mode Info Windows")} placement="top">
               <IconButton color="inherit" size="small">
                 <InfoRounded
                   fontSize="inherit"

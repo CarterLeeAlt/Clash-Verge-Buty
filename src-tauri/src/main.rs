@@ -106,7 +106,6 @@ fn main() -> std::io::Result<()> {
             cmds::open_core_dir,
             cmds::restart_sidecar,
             cmds::upgrade_core,
-            cmds::grant_permission,
             // clash
             cmds::get_clash_info,
             cmds::get_clash_logs,
@@ -149,26 +148,6 @@ fn main() -> std::io::Result<()> {
             // clash api
             cmds::clash_api_get_proxy_delay
         ]);
-
-    #[cfg(target_os = "macos")]
-    let builder = {
-        use tauri::{Menu, MenuItem, Submenu};
-
-        builder.menu(
-            Menu::new().add_submenu(Submenu::new(
-                "Edit",
-                Menu::new()
-                    .add_native_item(MenuItem::Undo)
-                    .add_native_item(MenuItem::Redo)
-                    .add_native_item(MenuItem::Copy)
-                    .add_native_item(MenuItem::Paste)
-                    .add_native_item(MenuItem::Cut)
-                    .add_native_item(MenuItem::SelectAll)
-                    .add_native_item(MenuItem::CloseWindow)
-                    .add_native_item(MenuItem::Quit),
-            )),
-        )
-    };
 
     let app = builder
         .build(tauri::generate_context!())

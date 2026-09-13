@@ -189,9 +189,6 @@ impl IVerge {
             clash_core: Some(MIHOMO_CORE.into()),
             language: Some("zh".into()),
             theme_mode: Some("system".into()),
-            #[cfg(not(target_os = "windows"))]
-            env_type: Some("bash".into()),
-            #[cfg(target_os = "windows")]
             env_type: Some("powershell".into()),
             start_page: Some("/".into()),
             traffic_graph: Some(true),

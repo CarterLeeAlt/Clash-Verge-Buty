@@ -63,8 +63,7 @@ const Layout = () => {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // macOS有cmd+w
-      if (e.key === "Escape" && OS !== "macos") {
+      if (e.key === "Escape") {
         appWindow.hide().catch(() => undefined);
       }
     };

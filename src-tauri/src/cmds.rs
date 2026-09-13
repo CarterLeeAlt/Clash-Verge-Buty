@@ -295,15 +295,6 @@ pub async fn upgrade_core() -> CmdResult<bool> {
     wrap_err!(CoreManager::global().upgrade_core().await)
 }
 
-#[tauri::command]
-pub fn grant_permission(_core: String) -> CmdResult {
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
-    return wrap_err!(manager::grant_permission(_core));
-
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-    return Err("Unsupported target".into());
-}
-
 /// get the system proxy
 #[tauri::command]
 pub fn get_sys_proxy() -> CmdResult<Mapping> {
@@ -504,37 +495,5 @@ pub mod service {
             }
             Err(err) => Err(err.to_string()),
         }
-    }
-}
-
-#[cfg(not(windows))]
-pub mod service {
-    use super::*;
-
-    #[tauri::command]
-    pub async fn check_service() -> CmdResult {
-        Ok(())
-    }
-    #[tauri::command]
-    pub fn is_elevated() -> CmdResult<bool> {
-        Ok(false)
-    }
-    #[tauri::command]
-    pub async fn install_service() -> CmdResult {
-        Ok(())
-    }
-    #[tauri::command]
-    pub async fn uninstall_service() -> CmdResult {
-        Ok(())
-    }
-}
-
-#[cfg(not(windows))]
-pub mod uwp {
-    use super::*;
-
-    #[tauri::command]
-    pub async fn invoke_uwp_tool() -> CmdResult {
-        Ok(())
     }
 }

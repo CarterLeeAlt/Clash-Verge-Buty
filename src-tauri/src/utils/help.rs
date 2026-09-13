@@ -209,9 +209,6 @@ pub fn resolve_profile_path(file: &str) -> Result<PathBuf> {
 /// open file
 /// use vscode by default
 pub fn open_file(app: tauri::AppHandle, path: PathBuf) -> Result<()> {
-    #[cfg(target_os = "macos")]
-    let code = "Visual Studio Code";
-    #[cfg(not(target_os = "macos"))]
     let code = "code";
 
     let _ = match Program::from_str(code) {
