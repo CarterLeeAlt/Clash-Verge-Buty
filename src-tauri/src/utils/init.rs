@@ -298,9 +298,6 @@ pub fn init_resources() -> Result<()> {
         );
     }
 
-    #[cfg(target_os = "windows")]
-    let file_list = ["Country.mmdb", "geoip.dat", "geosite.dat"];
-    #[cfg(not(target_os = "windows"))]
     let file_list = ["Country.mmdb", "geoip.dat", "geosite.dat"];
 
     // copy the resource file

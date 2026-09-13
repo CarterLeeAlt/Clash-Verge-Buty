@@ -143,10 +143,6 @@ export async function upgradeCore() {
   return invoke<boolean>("upgrade_core");
 }
 
-export async function grantPermission(core: string) {
-  return invoke<void>("grant_permission", { core });
-}
-
 export async function getAppDir() {
   return invoke<string>("get_app_dir");
 }

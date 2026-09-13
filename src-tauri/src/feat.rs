@@ -370,12 +370,6 @@ pub async fn patch_verge(patch: IVerge) -> Result<()> {
             }
         }
 
-        #[cfg(not(target_os = "windows"))]
-        if tun_mode.is_some() {
-            core_config_update_attempted = true;
-            update_core_config().await?;
-        }
-
         if auto_launch.is_some() {
             auto_launch_update_attempted = true;
             sysopt::Sysopt::global().update_launch()?;
@@ -567,14 +561,7 @@ pub fn copy_clash_env(app_handle: &AppHandle) {
     let env_type = { Config::verge().latest().env_type.clone() };
     let env_type = match env_type {
         Some(env_type) => env_type,
-        None => {
-            #[cfg(not(target_os = "windows"))]
-            let default = "bash";
-            #[cfg(target_os = "windows")]
-            let default = "powershell";
-
-            default.to_string()
-        }
+        None => "powershell".to_string(),
     };
     match env_type.as_str() {
         "bash" => cliboard.write_text(sh).unwrap_or_default(),

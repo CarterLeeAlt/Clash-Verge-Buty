@@ -80,11 +80,6 @@ fn configured_reliable_mode() -> bool {
         .unwrap_or(false)
 }
 
-#[cfg(not(target_os = "windows"))]
-fn configured_reliable_mode() -> bool {
-    false
-}
-
 fn effective_reliable_mode(build_mode: WindowBuildMode) -> bool {
     match build_mode {
         WindowBuildMode::ForcedReliableFallback => true,
@@ -461,8 +456,6 @@ pub fn find_unused_port() -> Result<u16> {
 
 /// handle something when start app
 pub fn resolve_setup(app: &mut App) {
-    #[cfg(target_os = "macos")]
-    app.set_activation_policy(tauri::ActivationPolicy::Accessory);
     let version = app.package_info().version.to_string();
     handle::Handle::global().init(app.app_handle());
     VERSION.get_or_init(|| version.clone());
@@ -789,12 +782,6 @@ fn window_needs_repair(window: &tauri::Window) -> bool {
     !visible || minimized
 }
 
-#[cfg(not(target_os = "windows"))]
-fn window_needs_repair(window: &tauri::Window) -> bool {
-    let (visible, minimized, _) = window_state(window);
-    !visible || minimized
-}
-
 pub fn focus_main_window_if_open(app_handle: &AppHandle, context: &str) -> bool {
     let Some(window) = app_handle.get_window("main") else {
         return false;
@@ -956,12 +943,6 @@ fn request_show_existing_window(window: &tauri::Window, request_id: u64, reason:
 
     #[cfg(target_os = "windows")]
     schedule_windows_show_retries(window.clone(), current_request_id, reason, showing_guard);
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        log_window_state(window, "show_existing_window final");
-        finish_show_flow(window, current_request_id, showing_guard);
-    }
 }
 
 fn show_existing_window(window: &tauri::Window, request_id: u64, reason: ShowReason) {
@@ -1265,16 +1246,6 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
             {
                 builder = builder.inner_size(800.0, 636.0).center();
             }
-
-            #[cfg(target_os = "macos")]
-            {
-                builder = builder.inner_size(800.0, 642.0).center();
-            }
-
-            #[cfg(target_os = "linux")]
-            {
-                builder = builder.inner_size(800.0, 642.0).center();
-            }
         }
 
         #[cfg(target_os = "windows")]
@@ -1302,14 +1273,6 @@ pub fn create_window(app_handle: &AppHandle, show_when_ready: bool) {
                 .visible(false)
                 .build()
         };
-        #[cfg(target_os = "macos")]
-        let window = builder
-            .decorations(true)
-            .hidden_title(true)
-            .title_bar_style(tauri::TitleBarStyle::Overlay)
-            .build();
-        #[cfg(target_os = "linux")]
-        let window = builder.decorations(true).transparent(false).build();
 
         window
     };

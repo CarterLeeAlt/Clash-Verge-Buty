@@ -4,8 +4,6 @@ use crate::{config::*, utils::dirs};
 use anyhow::{bail, Context, Result};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-#[cfg(target_os = "linux")]
-use std::path::Path;
 use std::{
     fs,
     io::Write,
@@ -240,8 +238,6 @@ impl CoreManager {
         } else {
             killed_sidecar
         };
-        #[cfg(not(target_os = "windows"))]
-        let should_kill = killed_sidecar;
 
         // 这里得等一会儿
         if should_kill {
@@ -414,17 +410,6 @@ impl CoreManager {
             }
             log::info!(target: "app", "Windows Tun diagnostics: ensure clash-verge-service is active, wintun driver can be loaded, and firewall allows route/DNS hijack operations.");
             super::handle::Handle::emit_log("info", "[tun] Windows Tun diagnostics: ensure service active, wintun loadable, and firewall allows route/DNS hijack operations.");
-        }
-        #[cfg(target_os = "linux")]
-        {
-            if !Path::new("/dev/net/tun").exists() {
-                log::error!(target: "app", "Tun mode requires /dev/net/tun on Linux, but it does not exist.");
-            }
-            log::info!(target: "app", "Tun mode on Linux requires CAP_NET_ADMIN and iptables/nftables permissions.");
-        }
-        #[cfg(target_os = "macos")]
-        {
-            log::info!(target: "app", "Tun mode on macOS requires network extension / route permissions.");
         }
     }
 
@@ -679,11 +664,6 @@ impl CoreManager {
     /// Update the selected portable Mihomo executable while retaining process
     /// ownership in CoreManager and rolling back if validation or restart fails.
     pub async fn upgrade_core(&'static self) -> Result<bool> {
-        #[cfg(not(target_os = "windows"))]
-        {
-            bail!("managed Mihomo core updates are only available on Windows portable builds");
-        }
-
         #[cfg(target_os = "windows")]
         {
             let _operation = self.core_operation.lock().await;

@@ -144,10 +144,7 @@ impl Tray {
         let tun_tray_icon = verge.tun_tray_icon.as_ref().unwrap_or(&false);
 
         let mut indication_icon = if *system_proxy {
-            #[cfg(not(target_os = "macos"))]
             let mut icon = include_bytes!("../../icons/tray-icon-sys.png").to_vec();
-            #[cfg(target_os = "macos")]
-            let mut icon = include_bytes!("../../icons/mac-tray-icon-sys.png").to_vec();
             if *sysproxy_tray_icon {
                 let path = dirs::app_home_dir()?.join("icons").join("sysproxy.png");
                 if path.exists() {
@@ -158,10 +155,7 @@ impl Tray {
             }
             icon
         } else {
-            #[cfg(not(target_os = "macos"))]
             let mut icon = include_bytes!("../../icons/tray-icon.png").to_vec();
-            #[cfg(target_os = "macos")]
-            let mut icon = include_bytes!("../../icons/mac-tray-icon.png").to_vec();
             if *common_tray_icon {
                 let path = dirs::app_home_dir()?.join("icons").join("common.png");
                 if path.exists() {
@@ -174,10 +168,7 @@ impl Tray {
         };
 
         if *tun_mode {
-            #[cfg(not(target_os = "macos"))]
             let mut icon = include_bytes!("../../icons/tray-icon-tun.png").to_vec();
-            #[cfg(target_os = "macos")]
-            let mut icon = include_bytes!("../../icons/mac-tray-icon-tun.png").to_vec();
             if *tun_tray_icon {
                 let path = dirs::app_home_dir()?.join("icons").join("tun.png");
                 if path.exists() {

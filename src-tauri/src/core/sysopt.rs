@@ -42,11 +42,6 @@ pub struct Sysopt {
 
 #[cfg(target_os = "windows")]
 static DEFAULT_BYPASS: &str = "localhost;127.*;192.168.*;10.*;172.16.*;<local>";
-#[cfg(target_os = "linux")]
-static DEFAULT_BYPASS: &str = "localhost,127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,::1";
-#[cfg(target_os = "macos")]
-static DEFAULT_BYPASS: &str =
-    "127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,localhost,*.local,*.crashlytics.com,<local>";
 
 fn is_sysproxy_match(actual: &Sysproxy, expected: &Sysproxy) -> bool {
     if actual.enable != expected.enable {
@@ -111,8 +106,6 @@ fn set_system_proxy_once(
                 });
             }
 
-            #[cfg(not(target_os = "windows"))]
-            let _ = (action, allow_registry_fallback);
             Err(primary_err.into())
         }
     }
@@ -364,8 +357,6 @@ impl Sysopt {
                 Err(err) => {
                     #[cfg(target_os = "windows")]
                     log::warn!(target: "app", "read current system proxy before enable failed; use the raw Windows snapshot for rollback: {err}");
-                    #[cfg(not(target_os = "windows"))]
-                    log::warn!(target: "app", "read current system proxy before enable failed; continue without a rollback snapshot: {err}");
                     None
                 }
             };
@@ -407,16 +398,6 @@ impl Sysopt {
                     cached_current.as_ref(),
                     "proxy enable rollback",
                 );
-                #[cfg(not(target_os = "windows"))]
-                if let Some(before) = before.as_ref() {
-                    if let Err(rollback_err) = set_system_proxy_with_retry(
-                        before,
-                        "restore system proxy after failed enable",
-                        false,
-                    ) {
-                        log::error!(target: "app", "enable system proxy rollback failed: {rollback_err}");
-                    }
-                }
                 return Err(err);
             }
 
@@ -677,39 +658,7 @@ impl Sysopt {
             .to_string();
 
         // fix issue #26
-        #[cfg(target_os = "windows")]
         let app_path = format!("\"{app_path}\"");
-
-        // use the /Applications/Clash-Verge-Buty.app path
-        #[cfg(target_os = "macos")]
-        let app_path = (|| -> Option<String> {
-            let path = std::path::PathBuf::from(&app_path);
-            let path = path.parent()?.parent()?.parent()?;
-            let extension = path.extension()?.to_str()?;
-            match extension == "app" {
-                true => Some(path.as_os_str().to_str()?.to_string()),
-                false => None,
-            }
-        })()
-        .unwrap_or(app_path);
-
-        // fix #403
-        #[cfg(target_os = "linux")]
-        let app_path = {
-            use crate::core::handle::Handle;
-            use tauri::Manager;
-
-            let handle = Handle::global();
-            match handle.app_handle.lock().as_ref() {
-                Some(app_handle) => {
-                    let appimage = app_handle.env().appimage;
-                    appimage
-                        .and_then(|p| p.to_str().map(|s| s.to_string()))
-                        .unwrap_or(app_path)
-                }
-                None => app_path,
-            }
-        };
 
         let auto = AutoLaunchBuilder::new()
             .set_app_name(app_name)
