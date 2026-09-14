@@ -573,7 +573,7 @@ dependencies = [
 
 [[package]]
 name = "clash-verge-buty"
-version = "1.6.5"
+version = "1.6.6"
 dependencies = [
  "anyhow",
  "auto-launch",
