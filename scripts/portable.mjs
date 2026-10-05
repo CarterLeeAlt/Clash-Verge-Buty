@@ -76,20 +76,24 @@ async function resolvePortable() {
     !deniedKeyword.test(name) &&
     !/watchdog/i.test(name) &&
     !/mihomo(-alpha)?\.exe$/i.test(name);
-  const portableExeName =
+  const mainExeSource =
     preferredNames.find(
       (name) => releaseExeFiles.includes(name) && isMainExeCandidate(name)
     ) || releaseExeFiles.find(isMainExeCandidate);
 
-  if (!portableExeName) {
+  if (!mainExeSource) {
     throw new Error(`Portable main exe not found under ${releaseDir}`);
   }
-  if (deniedKeyword.test(portableExeName)) {
+  if (deniedKeyword.test(mainExeSource)) {
     throw new Error(
-      `Portable main exe resolved to installer-like file: ${portableExeName}`
+      `Portable main exe resolved to installer-like file: ${mainExeSource}`
     );
   }
-  const exePath = path.join(releaseDir, portableExeName);
+  // The shipped file name must stay all lowercase regardless of how the
+  // build pipeline names the binary (tauri CLI uses the mixed-case product
+  // name, plain cargo build uses the lowercase package name).
+  const exePath = path.join(releaseDir, mainExeSource);
+  const portableExeName = "clash-verge-buty.exe";
 
   const mihomoPath = path.join(releaseDir, "mihomo.exe");
   if (!(await fs.pathExists(mihomoPath))) {
@@ -108,7 +112,7 @@ async function resolvePortable() {
 
   const zip = new AdmZip();
 
-  zip.addLocalFile(exePath);
+  zip.addFile(portableExeName, await fs.readFile(exePath));
   zip.addLocalFile(watchdogPath);
   zip.addLocalFile(mihomoPath);
   zip.addLocalFile(mihomoAlphaPath);
