@@ -1,7 +1,7 @@
 [package]
 name = "clash-verge-buty"
 version = "1.6.6"
-description = "A Mihomo GUI based on Tauri."
+description = "Clash-Verge-Buty"
 authors = ["Clash-Verge-Buty"]
 license = "GPL-3.0-only"
 repository = "https://github.com/CarterLeeAlt/Clash-Verge-Buty.git"

@@ -1,0 +1,23 @@
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+
+const args = process.argv.slice(2);
+const targetIndex = args.indexOf("--target");
+const target = targetIndex === -1 ? undefined : args[targetIndex + 1];
+if (targetIndex !== -1 && !target) throw new Error("--target requires a target triple");
+const debug = args.includes("--debug");
+const profile = debug ? "debug" : "release";
+const cargoArgs = ["build", "--manifest-path", "src-tauri/watchdog/Cargo.toml", "--locked"];
+if (!debug) cargoArgs.push("--release");
+if (target) cargoArgs.push("--target", target);
+const result = spawnSync("cargo", cargoArgs, { stdio: "inherit" });
+if (result.error) throw result.error;
+if (result.status !== 0) process.exit(result.status ?? 1);
+const parts = target ? [target, profile] : [profile];
+const source = path.join("src-tauri", "watchdog", "target", ...parts, "clash-verge-buty-watchdog.exe");
+const destination = path.join("src-tauri", "target", ...parts, "clash-verge-buty-watchdog.exe");
+if (!existsSync(source)) throw new Error(`Watchdog binary not found: ${source}`);
+mkdirSync(path.dirname(destination), { recursive: true });
+copyFileSync(source, destination);
+console.log(`Staged ${destination}`);

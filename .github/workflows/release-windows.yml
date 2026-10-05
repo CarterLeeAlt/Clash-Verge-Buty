@@ -200,6 +200,17 @@ jobs:
       - name: Tauri build
         run: pnpm tauri build --bundles none --target ${{ matrix.target }}
 
+      - name: Build and stage Windows watchdog
+        shell: pwsh
+        run: |
+          cargo build --manifest-path src-tauri/watchdog/Cargo.toml --release --target ${{ matrix.target }}
+          if ($LASTEXITCODE -ne 0) { throw "watchdog build failed" }
+          $watchdogSource = "src-tauri/watchdog/target/${{ matrix.target }}/release/clash-verge-buty-watchdog.exe"
+          $releaseDir = "src-tauri/target/${{ matrix.target }}/release"
+          if (-not (Test-Path -LiteralPath $watchdogSource -PathType Leaf)) { throw "missing watchdog binary: $watchdogSource" }
+          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+          Copy-Item -LiteralPath $watchdogSource -Destination (Join-Path $releaseDir "clash-verge-buty-watchdog.exe") -Force
+
       - name: Restore certificate
         if: steps.sign_mode.outputs.mode == 'pfx' && steps.sign_mode.outputs.can_sign == 'true'
         shell: pwsh
@@ -214,12 +225,16 @@ jobs:
           if (-not $signtool) { throw "signtool.exe not found" }
           $files = @(
             "src-tauri/target/${{ matrix.target }}/release/Clash_Verge_Buty.exe",
+            "src-tauri/target/${{ matrix.target }}/release/clash-verge-buty-watchdog.exe",
             "src-tauri/target/${{ matrix.target }}/release/clash-meta.exe",
             "src-tauri/target/${{ matrix.target }}/release/clash-meta-alpha.exe"
           )
+          $watchdogPath = "src-tauri/target/${{ matrix.target }}/release/clash-verge-buty-watchdog.exe"
+          if (-not (Test-Path -LiteralPath $watchdogPath -PathType Leaf)) { throw "missing watchdog binary: $watchdogPath" }
           $files = $files | Where-Object { Test-Path $_ } | Select-Object -Unique
           foreach ($f in $files) {
             & $signtool sign /fd SHA256 /td SHA256 /tr "http://timestamp.digicert.com" /f "windows-signing.pfx" /p "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" "$f"
+            if ($f.EndsWith("/clash-verge-buty-watchdog.exe") -and $LASTEXITCODE -ne 0) { throw "watchdog signing failed: $f" }
           }
 
       - name: Sign final release artifacts (SignPath)
@@ -232,6 +247,18 @@ jobs:
           signing-policy-slug: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
           artifact-configuration-slug: ${{ secrets.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
           input-artifact-path: src-tauri/target/${{ matrix.target }}/release/Clash_Verge_Buty.exe
+          output-artifact-directory: src-tauri/target/${{ matrix.target }}/release
+
+      - name: Sign Windows watchdog (SignPath)
+        if: steps.sign_mode.outputs.mode == 'signpath' && steps.sign_mode.outputs.can_sign == 'true'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ secrets.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          input-artifact-path: src-tauri/target/${{ matrix.target }}/release/clash-verge-buty-watchdog.exe
           output-artifact-directory: src-tauri/target/${{ matrix.target }}/release
 
       - name: OSSign signing placeholder
@@ -247,12 +274,16 @@ jobs:
           $signtool = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe | Sort-Object FullName -Descending | Select-Object -First 1).FullName
           $files = @(
             "src-tauri/target/${{ matrix.target }}/release/Clash_Verge_Buty.exe",
+            "src-tauri/target/${{ matrix.target }}/release/clash-verge-buty-watchdog.exe",
             "src-tauri/target/${{ matrix.target }}/release/clash-meta.exe",
             "src-tauri/target/${{ matrix.target }}/release/clash-meta-alpha.exe"
           )
+          $watchdogPath = "src-tauri/target/${{ matrix.target }}/release/clash-verge-buty-watchdog.exe"
+          if (-not (Test-Path -LiteralPath $watchdogPath -PathType Leaf)) { throw "missing watchdog binary: $watchdogPath" }
           $files = $files | Where-Object { Test-Path $_ } | Select-Object -Unique
           foreach ($f in $files) {
             & $signtool verify /pa /v "$f"
+            if ($f.EndsWith("/clash-verge-buty-watchdog.exe") -and $LASTEXITCODE -ne 0) { throw "watchdog signature verification failed: $f" }
             Get-AuthenticodeSignature "$f" | Format-List Status,StatusMessage,SignerCertificate,TimeStamperCertificate
           }
 

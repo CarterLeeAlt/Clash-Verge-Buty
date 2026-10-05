@@ -130,19 +130,58 @@ impl CoreManager {
     }
 
     pub fn init(&self) -> Result<()> {
-        // kill old clash process
         let _ = dirs::clash_pid_path()
-            .and_then(|path| fs::read(path).map(|p| p.to_vec()).context(""))
-            .and_then(|pid| String::from_utf8_lossy(&pid).parse().context(""))
-            .map(|pid| {
+            .and_then(|path| fs::read_to_string(path).context("read previous core PID"))
+            .and_then(|pid| pid.trim().parse::<u32>().context("parse previous core PID"))
+            .and_then(|pid| {
+                let app_dir = dirs::app_home_dir()?;
+                let exe_dir = dirs::executable_dir()?;
+                let expected: Vec<_> = [MIHOMO_CORE, MIHOMO_ALPHA_CORE]
+                    .iter()
+                    .filter_map(|name| dunce::canonicalize(exe_dir.join(format!("{name}.exe"))).ok())
+                    .collect();
                 let mut system = System::new();
-                system.refresh_all();
-                if let Some(proc) = system.process(Pid::from_u32(pid)) {
-                    if proc.name().contains("clash") {
-                        log::debug!(target: "app", "kill old clash process");
-                        proc.kill();
+                let pid = Pid::from_u32(pid);
+                system.refresh_process_specifics(
+                    pid,
+                    sysinfo::ProcessRefreshKind::new()
+                        .with_exe(sysinfo::UpdateKind::Always)
+                        .with_cmd(sysinfo::UpdateKind::Always),
+                );
+                if let Some(process) = system.process(pid) {
+                    let owns_executable = process
+                        .exe()
+                        .and_then(|path| dunce::canonicalize(path).ok())
+                        .map(|actual| {
+                            expected.iter().any(|path| {
+                                actual.to_string_lossy().eq_ignore_ascii_case(&path.to_string_lossy())
+                            })
+                        })
+                        .unwrap_or(false);
+                    let owns_config = process.cmd().windows(2).any(|args| {
+                        args[0] == "-d"
+                            && dunce::canonicalize(&args[1])
+                                .ok()
+                                .zip(dunce::canonicalize(&app_dir).ok())
+                                .map(|(actual, expected)| {
+                                    actual.to_string_lossy().eq_ignore_ascii_case(&expected.to_string_lossy())
+                                })
+                                .unwrap_or(false)
+                    });
+                    if owns_executable && owns_config {
+                        log::info!(target: "app", "stopping previous app-owned Mihomo core, pid={pid}");
+                        if !process.kill() {
+                            bail!("could not stop previous Mihomo core, pid={pid}");
+                        }
+                        for _ in 0..40 {
+                            if !system.refresh_process(pid) {
+                                break;
+                            }
+                            std::thread::sleep(Duration::from_millis(50));
+                        }
                     }
                 }
+                Ok(())
             });
 
         tauri::async_runtime::spawn(async {
@@ -562,8 +601,8 @@ impl CoreManager {
         service_mode: bool,
         generation: u64,
     ) {
-        let still_active = generation != 0
-            && self.active_generation.load(Ordering::SeqCst) == generation;
+        let still_active =
+            generation != 0 && self.active_generation.load(Ordering::SeqCst) == generation;
         let core_ready = core_ready && still_active;
         self.desired_running
             .store(desired_running, Ordering::SeqCst);
@@ -630,10 +669,7 @@ impl CoreManager {
             .await;
 
         if !backup_path.is_file() {
-            bail!(
-                "Mihomo updater backup not found: {}",
-                backup_path.display()
-            );
+            bail!("Mihomo updater backup not found: {}", backup_path.display());
         }
 
         let failed_path = core_path.with_extension("exe.update-failed");
@@ -735,9 +771,7 @@ impl CoreManager {
 
             self.stop_core_after_self_update_locked(&core_path, service_mode)
                 .await;
-            let activation = self
-                .activate_updated_core_locked(desired_running)
-                .await;
+            let activation = self.activate_updated_core_locked(desired_running).await;
             if let Err(activation_err) = activation {
                 let rollback = self
                     .rollback_core_update_locked(

@@ -6,3 +6,5 @@ pub mod redact;
 pub mod resolve;
 pub mod server;
 pub mod tmpl;
+#[cfg(target_os = "windows")]
+pub mod watchdog;

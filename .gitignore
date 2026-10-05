@@ -13,3 +13,4 @@ src-tauri/local-binaries/windows-service-bin/*.exe
 /.rustup/
 /.cargo/
 /.toolchain/
+/.tmp/

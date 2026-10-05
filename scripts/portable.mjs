@@ -62,14 +62,24 @@ async function resolvePortable() {
     `${productName.toLowerCase().replace(/-/g, "_")}.exe`,
   ];
 
+  const watchdogExeName = "clash-verge-buty-watchdog.exe";
+  const watchdogPath = path.join(releaseDir, watchdogExeName);
+  if (
+    !(await fs.pathExists(watchdogPath)) ||
+    !(await fs.stat(watchdogPath)).isFile()
+  ) {
+    throw new Error(`File not found: ${watchdogPath}`);
+  }
+
   const deniedKeyword = /(setup|setup_unsigned|installer)/i;
+  const isMainExeCandidate = (name) =>
+    !deniedKeyword.test(name) &&
+    !/watchdog/i.test(name) &&
+    !/mihomo(-alpha)?\.exe$/i.test(name);
   const portableExeName =
-    preferredNames.find((name) => releaseExeFiles.includes(name)) ||
-    releaseExeFiles.find(
-      (name) =>
-        !deniedKeyword.test(name) &&
-        !/mihomo(-alpha)?\.exe$/i.test(name)
-    );
+    preferredNames.find(
+      (name) => releaseExeFiles.includes(name) && isMainExeCandidate(name)
+    ) || releaseExeFiles.find(isMainExeCandidate);
 
   if (!portableExeName) {
     throw new Error(`Portable main exe not found under ${releaseDir}`);
@@ -99,6 +109,7 @@ async function resolvePortable() {
   const zip = new AdmZip();
 
   zip.addLocalFile(exePath);
+  zip.addLocalFile(watchdogPath);
   zip.addLocalFile(mihomoPath);
   zip.addLocalFile(mihomoAlphaPath);
   zip.addLocalFolder(resourcesPath, "resources");
@@ -123,6 +134,9 @@ async function resolvePortable() {
     )
   ) {
     throw new Error(`portable.zip missing main exe: ${portableExeName}`);
+  }
+  if (!zipCheck.includes(watchdogExeName)) {
+    throw new Error(`portable.zip missing watchdog exe at root: ${watchdogExeName}`);
   }
   if (
     !zipExeEntries.some(

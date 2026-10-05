@@ -6,7 +6,7 @@
   "build": {
     "distDir": "../dist",
     "devPath": "http://localhost:3000/",
-    "beforeDevCommand": "pnpm run web:dev",
+    "beforeDevCommand": "node scripts/build-watchdog.mjs --debug && pnpm run web:dev",
     "beforeBuildCommand": "pnpm run web:build"
   },
   "tauri": {
@@ -23,8 +23,8 @@
       "externalBin": ["sidecar/mihomo", "sidecar/mihomo-alpha"],
       "copyright": "© 2026 Clash-Verge-Buty",
       "category": "DeveloperTool",
-      "shortDescription": "A Mihomo GUI based on Tauri.",
-      "longDescription": "A Mihomo GUI based on Tauri."
+      "shortDescription": "Clash-Verge-Buty",
+      "longDescription": "Clash-Verge-Buty"
     },
 
     "updater": {

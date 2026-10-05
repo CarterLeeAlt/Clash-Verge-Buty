@@ -101,6 +101,17 @@ runs:
       shell: pwsh
       run: pnpm tauri build --bundles none --target ${{ inputs.target }}
 
+    - name: Build and stage Windows watchdog
+      shell: pwsh
+      run: |
+        cargo build --manifest-path src-tauri/watchdog/Cargo.toml --release --target ${{ inputs.target }}
+        if ($LASTEXITCODE -ne 0) { throw "watchdog build failed" }
+        $watchdogSource = "src-tauri/watchdog/target/${{ inputs.target }}/release/clash-verge-buty-watchdog.exe"
+        $releaseDir = "src-tauri/target/${{ inputs.target }}/release"
+        if (-not (Test-Path -LiteralPath $watchdogSource -PathType Leaf)) { throw "missing watchdog binary: $watchdogSource" }
+        New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+        Copy-Item -LiteralPath $watchdogSource -Destination (Join-Path $releaseDir "clash-verge-buty-watchdog.exe") -Force
+
     - name: Detect signing availability
       id: sign_mode
       shell: pwsh
@@ -151,13 +162,17 @@ runs:
 
         $files = @(
           "src-tauri/target/${{ inputs.target }}/release/Clash_Verge_Buty.exe",
+          "src-tauri/target/${{ inputs.target }}/release/clash-verge-buty-watchdog.exe",
           "src-tauri/target/${{ inputs.target }}/release/mihomo.exe",
           "src-tauri/target/${{ inputs.target }}/release/mihomo-alpha.exe"
         )
+        $watchdogPath = "src-tauri/target/${{ inputs.target }}/release/clash-verge-buty-watchdog.exe"
+        if (-not (Test-Path -LiteralPath $watchdogPath -PathType Leaf)) { throw "missing watchdog binary: $watchdogPath" }
         $files = $files | Where-Object { Test-Path $_ } | Select-Object -Unique
 
         foreach ($f in $files) {
           & $signtool sign /fd SHA256 /td SHA256 /tr "http://timestamp.digicert.com" /f "windows-signing.pfx" /p "${{ inputs.windows-certificate-password }}" "$f"
+          if ($f.EndsWith("/clash-verge-buty-watchdog.exe") -and $LASTEXITCODE -ne 0) { throw "watchdog signing failed: $f" }
         }
 
     - name: Sign Windows artifacts (SignPath)
@@ -170,6 +185,18 @@ runs:
         signing-policy-slug: ${{ inputs.signpath-signing-policy-slug }}
         artifact-configuration-slug: ${{ inputs.signpath-artifact-configuration-slug }}
         input-artifact-path: src-tauri/target/${{ inputs.target }}/release/Clash_Verge_Buty.exe
+        output-artifact-directory: src-tauri/target/${{ inputs.target }}/release
+
+    - name: Sign Windows watchdog (SignPath)
+      if: steps.sign_mode.outputs.mode == 'signpath' && steps.sign_mode.outputs.can_sign == 'true'
+      uses: signpath/github-action-submit-signing-request@v1
+      with:
+        api-token: ${{ inputs.signpath-api-token }}
+        organization-id: ${{ inputs.signpath-organization-id }}
+        project-slug: ${{ inputs.signpath-project-slug }}
+        signing-policy-slug: ${{ inputs.signpath-signing-policy-slug }}
+        artifact-configuration-slug: ${{ inputs.signpath-artifact-configuration-slug }}
+        input-artifact-path: src-tauri/target/${{ inputs.target }}/release/clash-verge-buty-watchdog.exe
         output-artifact-directory: src-tauri/target/${{ inputs.target }}/release
 
     - name: OSSign signing placeholder
@@ -186,13 +213,17 @@ runs:
 
         $files = @(
           "src-tauri/target/${{ inputs.target }}/release/Clash_Verge_Buty.exe",
+          "src-tauri/target/${{ inputs.target }}/release/clash-verge-buty-watchdog.exe",
           "src-tauri/target/${{ inputs.target }}/release/mihomo.exe",
           "src-tauri/target/${{ inputs.target }}/release/mihomo-alpha.exe"
         )
+        $watchdogPath = "src-tauri/target/${{ inputs.target }}/release/clash-verge-buty-watchdog.exe"
+        if (-not (Test-Path -LiteralPath $watchdogPath -PathType Leaf)) { throw "missing watchdog binary: $watchdogPath" }
         $files = $files | Where-Object { Test-Path $_ } | Select-Object -Unique
 
         foreach ($f in $files) {
           & $signtool verify /pa /v "$f"
+          if ($f.EndsWith("/clash-verge-buty-watchdog.exe") -and $LASTEXITCODE -ne 0) { throw "watchdog signature verification failed: $f" }
           Get-AuthenticodeSignature "$f" | Format-List Status,StatusMessage,SignerCertificate,TimeStamperCertificate
         }
 

@@ -8,7 +8,7 @@ use anyhow::Result;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{
-    api, AppHandle, CustomMenuItem, Manager, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
+    AppHandle, CustomMenuItem, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
     SystemTraySubmenu,
 };
 
@@ -280,7 +280,7 @@ impl Tray {
                     "open_core_dir" => crate::log_err!(cmds::open_core_dir()),
                     "open_logs_dir" => crate::log_err!(cmds::open_logs_dir()),
                     "restart_clash" => feat::restart_clash_core(),
-                    "restart_app" => api::process::restart(&app_handle.env()),
+                    "restart_app" => cmds::restart_app(app_handle.clone()),
                     "quit" => cmds::exit_app(app_handle.clone()),
 
                     _ => {}

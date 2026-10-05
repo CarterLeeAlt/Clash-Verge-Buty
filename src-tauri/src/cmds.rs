@@ -440,13 +440,32 @@ pub fn get_window_style_config() -> CmdResult<resolve::WindowStyleConfig> {
 
 #[tauri::command]
 pub fn exit_app(app_handle: tauri::AppHandle) {
-    log::info!(target: "app", "exit_app called, mark app as quitting");
+    shutdown_app(app_handle, 0);
+}
+
+pub fn restart_app(app_handle: tauri::AppHandle) {
+    #[cfg(target_os = "windows")]
+    if crate::utils::watchdog::is_supervised() {
+        shutdown_app(app_handle, crate::watchdog_protocol::RESTART_EXIT_CODE);
+        return;
+    }
+
+    log::info!(target: "app", "restart_app without supervisor, restarting directly");
     resolve::set_app_quitting(true);
     let _ = resolve::save_window_size_position(&app_handle, true);
     resolve::resolve_reset();
     api::process::kill_children();
-    app_handle.exit(0);
-    std::process::exit(0);
+    api::process::restart(&app_handle.env());
+}
+
+fn shutdown_app(app_handle: tauri::AppHandle, exit_code: i32) {
+    log::info!(target: "app", "shutdown_app called, exit_code={exit_code}");
+    resolve::set_app_quitting(true);
+    let _ = resolve::save_window_size_position(&app_handle, true);
+    resolve::resolve_reset();
+    api::process::kill_children();
+    app_handle.exit(exit_code);
+    std::process::exit(exit_code);
 }
 
 #[cfg(windows)]
